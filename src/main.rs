@@ -1,5 +1,8 @@
+mod lexer;
+
 use clap::{Parser, Subcommand};
 use color_eyre::eyre::Result;
+use lexer::Lexer;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
 
@@ -54,5 +57,8 @@ fn taurox_main() -> Result<ExitCode> {
 }
 
 fn tokenize(src: &str) -> Result<()> {
+    let scanner = Lexer::new(src);
+    dbg!(scanner);
+
     Ok(())
 }
