@@ -67,6 +67,9 @@ pub enum LexerState {
     Decimal(DecimalState),
     // Double characters
     DoubleCharacter(DoubleCharacterState),
+    // Slash and comment
+    Slash(SlashState),
+    Comment(CommentState),
 }
 
 impl LexerState {
@@ -83,6 +86,8 @@ impl LexerState {
             LexerState::Period(s) => s.execute(source, next_char),
             LexerState::Decimal(s) => s.execute(source, next_char),
             LexerState::DoubleCharacter(s) => s.execute(source, next_char),
+            LexerState::Slash(s) => s.execute(source, next_char),
+            LexerState::Comment(s) => s.execute(source, next_char),
         }
     }
 }
@@ -116,7 +121,7 @@ impl LexerStateExecutor for NormalState {
                     kind: TokenKind::Eof,
                     span: Span {
                         start: self.location,
-                        length: 1.into(),
+                        length: source.len() - self.location,
                     },
                 }),
             };
@@ -158,7 +163,8 @@ impl LexerStateExecutor for NormalState {
             '>' => LexerStateTransition::ChangeState(LexerState::DoubleCharacter(
                 DoubleCharacterState::new_greater_than_state(start),
             )),
-
+            // Slash/comment
+            '/' => LexerStateTransition::ChangeState(LexerState::Slash(SlashState { start })),
             // Identifier/keyword token
             'a'..='z' | 'A'..='Z' | '_' => {
                 LexerStateTransition::ChangeState(LexerState::Ident(IdentState { start }))
@@ -406,8 +412,8 @@ impl LexerStateExecutor for DecimalState {
 
 #[derive(Debug)]
 pub struct DoubleCharacterState {
-    pub start: SpanIndex,
-    pub spec: DoubleCharacterTokenSpec,
+    start: SpanIndex,
+    spec: DoubleCharacterTokenSpec,
 }
 
 impl DoubleCharacterState {
@@ -480,6 +486,82 @@ impl LexerStateExecutor for DoubleCharacterState {
                 }),
                 put_back: c,
             }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct SlashState {
+    start: SpanIndex,
+}
+
+impl LexerStateExecutor for SlashState {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
+        let Some((offset, c)) = next_char else {
+            return LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: source.len().into(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::Slash,
+                    span: Span {
+                        start: self.start,
+                        length: '/'.len_utf8().into(),
+                    },
+                }),
+            };
+        };
+
+        if c == '/' {
+            LexerStateTransition::ChangeState(LexerState::Comment(CommentState {
+                start: self.start,
+            }))
+        } else {
+            LexerStateTransition::ChangeStateAndEmitAndPutBack {
+                new_state: LexerState::Normal(NormalState {
+                    location: offset + '/'.len_utf8(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::Slash,
+                    span: Span {
+                        start: self.start,
+                        length: '/'.len_utf8().into(),
+                    },
+                }),
+                put_back: c,
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct CommentState {
+    start: SpanIndex,
+}
+
+impl LexerStateExecutor for CommentState {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
+        let Some((offset, c)) = next_char else {
+            return LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: source.len().into(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::Eof,
+                    span: Span {
+                        start: self.start,
+                        length: source.len() - self.start,
+                    },
+                }),
+            };
+        };
+
+        if c != '\n' {
+            LexerStateTransition::Stay
+        } else {
+            LexerStateTransition::ChangeState(LexerState::Normal(NormalState {
+                location: offset + c.len_utf8(),
+            }))
         }
     }
 }
