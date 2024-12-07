@@ -335,9 +335,9 @@ pub struct PeriodState {
 impl LexerStateExecutor for PeriodState {
     fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
-            return LexerStateTransition::ChangeStateAndEmit {
+            return LexerStateTransition::ChangeStateAndEmitAndPutBack {
                 new_state: LexerState::Normal(NormalState {
-                    location: source.len().into(),
+                    location: (source.len() - '.'.len_utf8()).into(),
                 }),
                 token_or_error: Ok(Token {
                     kind: TokenKind::NumericLiteral,
@@ -346,6 +346,7 @@ impl LexerStateExecutor for PeriodState {
                         length: source.len() - self.start,
                     },
                 }),
+                put_back: '.',
             };
         };
 
