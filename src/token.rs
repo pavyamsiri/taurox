@@ -3,7 +3,69 @@ use std::fmt::Display;
 use std::ops::Range;
 use std::sync::LazyLock;
 
-pub type SpanIndex = u32;
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpanIndex(u32);
+
+impl From<SpanIndex> for usize {
+    fn from(value: SpanIndex) -> Self {
+        value.0 as usize
+    }
+}
+
+impl From<usize> for SpanIndex {
+    fn from(value: usize) -> Self {
+        Self(value as u32)
+    }
+}
+
+impl std::ops::Add<SpanLength> for SpanIndex {
+    type Output = Self;
+
+    fn add(self, rhs: SpanLength) -> Self::Output {
+        Self(self.0 + rhs.0)
+    }
+}
+
+impl std::ops::Add<usize> for SpanIndex {
+    type Output = Self;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        Self(self.0 + rhs as u32)
+    }
+}
+
+impl std::ops::Sub<SpanIndex> for SpanIndex {
+    type Output = SpanLength;
+
+    fn sub(self, rhs: SpanIndex) -> Self::Output {
+        SpanLength(self.0 - rhs.0)
+    }
+}
+
+impl std::ops::Sub<SpanIndex> for usize {
+    type Output = SpanLength;
+
+    fn sub(self, rhs: SpanIndex) -> Self::Output {
+        SpanLength(self as u32 - rhs.0)
+    }
+}
+
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SpanLength(u32);
+
+impl From<SpanLength> for usize {
+    fn from(value: SpanLength) -> Self {
+        value.0 as usize
+    }
+}
+
+impl From<usize> for SpanLength {
+    fn from(value: usize) -> Self {
+        Self(value as u32)
+    }
+}
 
 /// The hashmap for keywords
 pub static KEYWORD_HASHMAP: LazyLock<HashMap<&'static str, TokenKind>> = LazyLock::new(|| {
@@ -32,12 +94,12 @@ pub struct Span {
     /// The byte position of the start of the token.
     pub start: SpanIndex,
     /// The length of the token in bytes.
-    pub length: SpanIndex,
+    pub length: SpanLength,
 }
 
 impl Span {
     pub fn range(&self) -> Range<usize> {
-        (self.start as usize)..((self.start + self.length) as usize)
+        self.start.into()..(self.start + self.length).into()
     }
 
     pub fn next_offset(&self) -> SpanIndex {

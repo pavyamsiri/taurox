@@ -2,9 +2,13 @@ use crate::token::{Span, SpanIndex, Token, TokenKind, KEYWORD_HASHMAP};
 
 use super::{LexicalError, LexicalErrorKind};
 
-pub struct LexerStateTransition {
-    pub new_state: LexerState,
-    pub token_or_error: Option<Result<Token, LexicalError>>,
+pub enum LexerStateTransition {
+    Stay,
+    ChangeState(LexerState),
+    ChangeStateAndEmit {
+        new_state: LexerState,
+        token_or_error: Result<Token, LexicalError>,
+    },
 }
 
 pub trait LexerStateExecutor {
@@ -30,7 +34,7 @@ impl LexerState {
 
 impl std::default::Default for LexerState {
     fn default() -> Self {
-        Self::Normal(NormalState { location: 0 })
+        Self::Normal(NormalState { location: 0.into() })
     }
 }
 
@@ -51,65 +55,62 @@ impl LexerStateExecutor for NormalState {
     fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition {
         let _ = source;
         let Some((start, c)) = next_char else {
-            return LexerStateTransition {
+            return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(self.increment()),
-                token_or_error: Some(Ok(Token {
+                token_or_error: Ok(Token {
                     kind: TokenKind::Eof,
                     span: Span {
                         start: self.location,
-                        length: 1,
+                        length: 1.into(),
                     },
-                })),
+                }),
             };
         };
 
-        let start = start as SpanIndex;
+        let start: SpanIndex = start.into();
 
-        let just = move |kind: TokenKind| LexerStateTransition {
+        let just = move |kind: TokenKind, length: usize| LexerStateTransition::ChangeStateAndEmit {
             new_state: LexerState::Normal(self.increment()),
-            token_or_error: Some(Ok(Token {
+            token_or_error: Ok(Token {
                 kind,
-                span: Span { start, length: 1 },
-            })),
+                span: Span {
+                    start,
+                    length: length.into(),
+                },
+            }),
         };
 
         match c {
             // Single character tokens
-            '(' => just(TokenKind::LeftParenthesis),
-            ')' => just(TokenKind::RightParenthesis),
-            '{' => just(TokenKind::LeftBrace),
-            '}' => just(TokenKind::RightBrace),
-            ',' => just(TokenKind::Comma),
-            '.' => just(TokenKind::Dot),
-            '-' => just(TokenKind::Minus),
-            '+' => just(TokenKind::Plus),
-            ';' => just(TokenKind::Semicolon),
-            '*' => just(TokenKind::Star),
+            '(' => just(TokenKind::LeftParenthesis, '('.len_utf8()),
+            ')' => just(TokenKind::RightParenthesis, ')'.len_utf8()),
+            '{' => just(TokenKind::LeftBrace, '{'.len_utf8()),
+            '}' => just(TokenKind::RightBrace, '}'.len_utf8()),
+            ',' => just(TokenKind::Comma, ','.len_utf8()),
+            '.' => just(TokenKind::Dot, '.'.len_utf8()),
+            '-' => just(TokenKind::Minus, '-'.len_utf8()),
+            '+' => just(TokenKind::Plus, '+'.len_utf8()),
+            ';' => just(TokenKind::Semicolon, ';'.len_utf8()),
+            '*' => just(TokenKind::Star, '*'.len_utf8()),
             // Identifier/keyword token
-            'a'..='z' | 'A'..='Z' | '_' => LexerStateTransition {
-                new_state: LexerState::Ident(IdentState { start }),
-                token_or_error: None,
-            },
-            // // String literal
-            // '"' => State::String(super::StringState {
-            //     start: current_char.offset,
-            // }),
+            'a'..='z' | 'A'..='Z' | '_' => {
+                LexerStateTransition::ChangeState(LexerState::Ident(IdentState { start }))
+            }
+            // String literal
+            '"' => LexerStateTransition::ChangeState(LexerState::String(StringState { start })),
             _ => {
                 if c.is_ascii_whitespace() {
-                    LexerStateTransition {
-                        new_state: LexerState::Normal(self.increment()),
-                        token_or_error: None,
-                    }
+                    LexerStateTransition::ChangeState(LexerState::Normal(self.increment()))
                 } else {
-                    LexerStateTransition {
+                    LexerStateTransition::ChangeStateAndEmit {
                         new_state: LexerState::Normal(self.increment()),
-                        token_or_error: Some(Err(LexicalError {
+                        token_or_error: Err(LexicalError {
                             kind: LexicalErrorKind::Unrecognized(c),
                             span: Span {
                                 start,
-                                length: c.len_utf8() as SpanIndex,
+                                length: c.len_utf8().into(),
                             },
-                        })),
+                        }),
                     }
                 }
             }
@@ -142,28 +143,25 @@ impl IdentState {
 impl LexerStateExecutor for IdentState {
     fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
-            let token = self.lex_ident_or_keyword(source, source.len() as SpanIndex);
-            return LexerStateTransition {
+            let token = self.lex_ident_or_keyword(source, source.len().into());
+            return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
-                    location: source.len() as SpanIndex,
+                    location: source.len().into(),
                 }),
-                token_or_error: Some(Ok(token)),
+                token_or_error: Ok(token),
             };
         };
-        let offset = offset as SpanIndex;
+        let offset: SpanIndex = offset.into();
 
         if c.is_ascii_alphanumeric() || c == '_' {
-            LexerStateTransition {
-                new_state: LexerState::Ident(self.clone()),
-                token_or_error: None,
-            }
+            LexerStateTransition::Stay
         } else {
             let token = self.lex_ident_or_keyword(source, offset);
-            LexerStateTransition {
+            LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
                     location: offset + 1,
                 }),
-                token_or_error: Some(Ok(token)),
+                token_or_error: Ok(token),
             }
         }
     }
@@ -177,40 +175,37 @@ struct StringState {
 impl LexerStateExecutor for StringState {
     fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
-            return LexerStateTransition {
+            return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
-                    location: source.len() as SpanIndex,
+                    location: source.len().into(),
                 }),
-                token_or_error: Some(Err(LexicalError {
+                token_or_error: Err(LexicalError {
                     kind: LexicalErrorKind::UnclosedString,
                     span: Span {
                         start: self.start,
-                        length: source.len() as SpanIndex - self.start,
+                        length: source.len() - self.start,
                     },
-                })),
+                }),
             };
         };
 
-        let offset = offset as SpanIndex;
+        let offset: SpanIndex = offset.into();
 
         if c == '"' {
-            LexerStateTransition {
+            LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
                     location: offset + 1,
                 }),
-                token_or_error: Some(Ok(Token {
+                token_or_error: Ok(Token {
                     kind: TokenKind::StringLiteral,
                     span: Span {
                         start: self.start,
                         length: offset - self.start,
                     },
-                })),
+                }),
             }
         } else {
-            LexerStateTransition {
-                new_state: LexerState::String(self.clone()),
-                token_or_error: None,
-            }
+            LexerStateTransition::Stay
         }
     }
 }

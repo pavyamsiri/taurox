@@ -1,6 +1,6 @@
 mod state;
 
-use crate::token::{Span, Token, TokenKind};
+use crate::token::{Span, Token};
 use state::LexerState;
 use std::str::CharIndices;
 use thiserror::Error;
@@ -53,10 +53,19 @@ impl<'src> Lexer<'src> {
         loop {
             let next_char = self.next_char();
             let transition = self.state.execute(self.source, next_char);
-            self.state = transition.new_state;
 
-            if let Some(r) = transition.token_or_error {
-                return r;
+            match transition {
+                state::LexerStateTransition::Stay => {}
+                state::LexerStateTransition::ChangeState(new_state) => {
+                    self.state = new_state;
+                }
+                state::LexerStateTransition::ChangeStateAndEmit {
+                    new_state,
+                    token_or_error,
+                } => {
+                    self.state = new_state;
+                    return token_or_error;
+                }
             }
         }
     }
