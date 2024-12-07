@@ -1,10 +1,12 @@
 mod lexer;
+mod token;
 
 use clap::{Parser, Subcommand};
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{Context, Result};
 use lexer::Lexer;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
+use token::TokenKind;
 
 #[derive(Debug, Parser)]
 #[clap(name = "taurox", version)]
@@ -57,8 +59,19 @@ fn taurox_main() -> Result<ExitCode> {
 }
 
 fn tokenize(src: &str) -> Result<()> {
-    let scanner = Lexer::new(src);
-    dbg!(scanner);
-
-    Ok(())
+    let mut scanner = Lexer::new(src);
+    loop {
+        let token = match scanner.next_token() {
+            Ok(t) => t,
+            Err(e) => {
+                eprintln!("Lexical {e}");
+                return Err(e).wrap_err("Lexical error");
+            }
+        };
+        if matches!(token.kind, TokenKind::Eof) {
+            eprintln!("Hit EOF!");
+            return Ok(());
+        }
+        eprintln!("Token = {token:?}");
+    }
 }
