@@ -2,6 +2,7 @@ use crate::token::{Span, SpanIndex, Token, TokenKind, KEYWORD_HASHMAP};
 
 use super::{LexicalError, LexicalErrorKind};
 
+#[derive(Debug)]
 pub enum LexerStateTransition {
     Stay,
     ChangeState(LexerState),
@@ -9,10 +10,15 @@ pub enum LexerStateTransition {
         new_state: LexerState,
         token_or_error: Result<Token, LexicalError>,
     },
+    ChangeStateAndEmitAndPutBack {
+        new_state: LexerState,
+        token_or_error: Result<Token, LexicalError>,
+        put_back: char,
+    },
 }
 
 pub trait LexerStateExecutor {
-    fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition;
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition;
 }
 
 #[derive(Debug)]
@@ -20,14 +26,27 @@ pub enum LexerState {
     Normal(NormalState),
     Ident(IdentState),
     String(StringState),
+    // Integer part of number
+    Integer(IntegerState),
+    // Period after integer
+    Period(PeriodState),
+    // Decimal part of number
+    Decimal(DecimalState),
 }
 
 impl LexerState {
-    pub fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition {
+    pub fn execute(
+        &self,
+        source: &str,
+        next_char: Option<(SpanIndex, char)>,
+    ) -> LexerStateTransition {
         match self {
             LexerState::Normal(s) => s.execute(source, next_char),
             LexerState::Ident(s) => s.execute(source, next_char),
             LexerState::String(s) => s.execute(source, next_char),
+            LexerState::Integer(s) => s.execute(source, next_char),
+            LexerState::Period(s) => s.execute(source, next_char),
+            LexerState::Decimal(s) => s.execute(source, next_char),
         }
     }
 }
@@ -39,7 +58,7 @@ impl std::default::Default for LexerState {
 }
 
 #[derive(Debug)]
-struct NormalState {
+pub struct NormalState {
     location: SpanIndex,
 }
 
@@ -52,7 +71,7 @@ impl NormalState {
 }
 
 impl LexerStateExecutor for NormalState {
-    fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let _ = source;
         let Some((start, c)) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
@@ -66,8 +85,6 @@ impl LexerStateExecutor for NormalState {
                 }),
             };
         };
-
-        let start: SpanIndex = start.into();
 
         let just = move |kind: TokenKind, length: usize| LexerStateTransition::ChangeStateAndEmit {
             new_state: LexerState::Normal(self.increment()),
@@ -98,6 +115,10 @@ impl LexerStateExecutor for NormalState {
             }
             // String literal
             '"' => LexerStateTransition::ChangeState(LexerState::String(StringState { start })),
+            // Numeric literal
+            '0'..='9' => {
+                LexerStateTransition::ChangeState(LexerState::Integer(IntegerState { start }))
+            }
             _ => {
                 if c.is_ascii_whitespace() {
                     LexerStateTransition::ChangeState(LexerState::Normal(self.increment()))
@@ -118,8 +139,8 @@ impl LexerStateExecutor for NormalState {
     }
 }
 
-#[derive(Debug, Clone)]
-struct IdentState {
+#[derive(Debug)]
+pub struct IdentState {
     start: SpanIndex,
 }
 
@@ -141,7 +162,7 @@ impl IdentState {
 }
 
 impl LexerStateExecutor for IdentState {
-    fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
             let token = self.lex_ident_or_keyword(source, source.len().into());
             return LexerStateTransition::ChangeStateAndEmit {
@@ -151,7 +172,6 @@ impl LexerStateExecutor for IdentState {
                 token_or_error: Ok(token),
             };
         };
-        let offset: SpanIndex = offset.into();
 
         if c.is_ascii_alphanumeric() || c == '_' {
             LexerStateTransition::Stay
@@ -167,13 +187,13 @@ impl LexerStateExecutor for IdentState {
     }
 }
 
-#[derive(Debug, Clone)]
-struct StringState {
+#[derive(Debug)]
+pub struct StringState {
     start: SpanIndex,
 }
 
 impl LexerStateExecutor for StringState {
-    fn execute(&self, source: &str, next_char: Option<(usize, char)>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
@@ -188,8 +208,6 @@ impl LexerStateExecutor for StringState {
                 }),
             };
         };
-
-        let offset: SpanIndex = offset.into();
 
         if c == '"' {
             LexerStateTransition::ChangeStateAndEmit {
@@ -206,6 +224,132 @@ impl LexerStateExecutor for StringState {
             }
         } else {
             LexerStateTransition::Stay
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct IntegerState {
+    start: SpanIndex,
+}
+
+impl LexerStateExecutor for IntegerState {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
+        let Some((offset, c)) = next_char else {
+            return LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: source.len().into(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::NumericLiteral,
+                    span: Span {
+                        start: self.start,
+                        length: source.len() - self.start,
+                    },
+                }),
+            };
+        };
+
+        if c.is_ascii_digit() {
+            LexerStateTransition::Stay
+        } else if c == '.' {
+            LexerStateTransition::ChangeState(LexerState::Period(PeriodState { start: self.start }))
+        } else {
+            LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: offset + 1,
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::NumericLiteral,
+                    span: Span {
+                        start: self.start,
+                        length: offset - self.start,
+                    },
+                }),
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct PeriodState {
+    start: SpanIndex,
+}
+
+impl LexerStateExecutor for PeriodState {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
+        let Some((offset, c)) = next_char else {
+            return LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: source.len().into(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::NumericLiteral,
+                    span: Span {
+                        start: self.start,
+                        length: source.len() - self.start,
+                    },
+                }),
+            };
+        };
+
+        if c.is_ascii_digit() {
+            LexerStateTransition::ChangeState(LexerState::Decimal(DecimalState {
+                start: self.start,
+            }))
+        } else {
+            LexerStateTransition::ChangeStateAndEmitAndPutBack {
+                new_state: LexerState::Normal(NormalState { location: offset }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::NumericLiteral,
+                    span: Span {
+                        start: self.start,
+                        length: offset - self.start - '.'.len_utf8(),
+                    },
+                }),
+                put_back: '.',
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DecimalState {
+    start: SpanIndex,
+}
+
+impl LexerStateExecutor for DecimalState {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
+        let Some((offset, c)) = next_char else {
+            return LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: source.len().into(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::NumericLiteral,
+                    span: Span {
+                        start: self.start,
+                        length: source.len() - self.start,
+                    },
+                }),
+            };
+        };
+
+        if c.is_ascii_digit() {
+            LexerStateTransition::Stay
+        } else {
+            LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: offset + 1,
+                }),
+                token_or_error: Ok(Token {
+                    kind: TokenKind::NumericLiteral,
+                    span: Span {
+                        start: self.start,
+                        length: offset - self.start,
+                    },
+                }),
+            }
         }
     }
 }

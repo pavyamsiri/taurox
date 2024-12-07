@@ -67,6 +67,14 @@ impl From<usize> for SpanLength {
     }
 }
 
+impl std::ops::Sub<usize> for SpanLength {
+    type Output = SpanLength;
+
+    fn sub(self, rhs: usize) -> Self::Output {
+        SpanLength(self.0 - rhs as u32)
+    }
+}
+
 /// The hashmap for keywords
 pub static KEYWORD_HASHMAP: LazyLock<HashMap<&'static str, TokenKind>> = LazyLock::new(|| {
     let mut map = HashMap::new();
