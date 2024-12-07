@@ -22,6 +22,39 @@ pub trait LexerStateExecutor {
 }
 
 #[derive(Debug)]
+pub struct DoubleCharacterTokenSpec {
+    first: char,
+    second: char,
+    single_token: TokenKind,
+    double_token: TokenKind,
+}
+
+const BANG_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+    first: '!',
+    second: '=',
+    single_token: TokenKind::Bang,
+    double_token: TokenKind::BangEqual,
+};
+const EQUAL_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+    first: '=',
+    second: '=',
+    single_token: TokenKind::Equal,
+    double_token: TokenKind::EqualEqual,
+};
+const LESS_THAN_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+    first: '<',
+    second: '=',
+    single_token: TokenKind::LessThan,
+    double_token: TokenKind::LessThanEqual,
+};
+const GREATER_THAN_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+    first: '>',
+    second: '=',
+    single_token: TokenKind::GreaterThan,
+    double_token: TokenKind::GreaterThanEqual,
+};
+
+#[derive(Debug)]
 pub enum LexerState {
     Normal(NormalState),
     Ident(IdentState),
@@ -32,6 +65,8 @@ pub enum LexerState {
     Period(PeriodState),
     // Decimal part of number
     Decimal(DecimalState),
+    // Double characters
+    DoubleCharacter(DoubleCharacterState),
 }
 
 impl LexerState {
@@ -47,6 +82,7 @@ impl LexerState {
             LexerState::Integer(s) => s.execute(source, next_char),
             LexerState::Period(s) => s.execute(source, next_char),
             LexerState::Decimal(s) => s.execute(source, next_char),
+            LexerState::DoubleCharacter(s) => s.execute(source, next_char),
         }
     }
 }
@@ -109,6 +145,20 @@ impl LexerStateExecutor for NormalState {
             '+' => just(TokenKind::Plus, '+'.len_utf8()),
             ';' => just(TokenKind::Semicolon, ';'.len_utf8()),
             '*' => just(TokenKind::Star, '*'.len_utf8()),
+            // Double character tokens
+            '!' => LexerStateTransition::ChangeState(LexerState::DoubleCharacter(
+                DoubleCharacterState::new_bang_state(start),
+            )),
+            '=' => LexerStateTransition::ChangeState(LexerState::DoubleCharacter(
+                DoubleCharacterState::new_equal_state(start),
+            )),
+            '<' => LexerStateTransition::ChangeState(LexerState::DoubleCharacter(
+                DoubleCharacterState::new_less_than_state(start),
+            )),
+            '>' => LexerStateTransition::ChangeState(LexerState::DoubleCharacter(
+                DoubleCharacterState::new_greater_than_state(start),
+            )),
+
             // Identifier/keyword token
             'a'..='z' | 'A'..='Z' | '_' => {
                 LexerStateTransition::ChangeState(LexerState::Ident(IdentState { start }))
@@ -179,7 +229,7 @@ impl LexerStateExecutor for IdentState {
             let token = self.lex_ident_or_keyword(source, offset);
             LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
-                    location: offset + 1,
+                    location: offset + c.len_utf8(),
                 }),
                 token_or_error: Ok(token),
             }
@@ -212,7 +262,7 @@ impl LexerStateExecutor for StringState {
         if c == '"' {
             LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
-                    location: offset + 1,
+                    location: offset + c.len_utf8(),
                 }),
                 token_or_error: Ok(Token {
                     kind: TokenKind::StringLiteral,
@@ -257,7 +307,7 @@ impl LexerStateExecutor for IntegerState {
         } else {
             LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
-                    location: offset + 1,
+                    location: offset + c.len_utf8(),
                 }),
                 token_or_error: Ok(Token {
                     kind: TokenKind::NumericLiteral,
@@ -340,7 +390,7 @@ impl LexerStateExecutor for DecimalState {
         } else {
             LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
-                    location: offset + 1,
+                    location: offset + c.len_utf8(),
                 }),
                 token_or_error: Ok(Token {
                     kind: TokenKind::NumericLiteral,
@@ -349,6 +399,86 @@ impl LexerStateExecutor for DecimalState {
                         length: offset - self.start,
                     },
                 }),
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct DoubleCharacterState {
+    pub start: SpanIndex,
+    pub spec: DoubleCharacterTokenSpec,
+}
+
+impl DoubleCharacterState {
+    pub fn new_bang_state(start: SpanIndex) -> Self {
+        Self {
+            start,
+            spec: BANG_SPEC,
+        }
+    }
+
+    pub fn new_equal_state(start: SpanIndex) -> Self {
+        Self {
+            start,
+            spec: EQUAL_SPEC,
+        }
+    }
+    pub fn new_less_than_state(start: SpanIndex) -> Self {
+        Self {
+            start,
+            spec: LESS_THAN_SPEC,
+        }
+    }
+    pub fn new_greater_than_state(start: SpanIndex) -> Self {
+        Self {
+            start,
+            spec: GREATER_THAN_SPEC,
+        }
+    }
+}
+
+impl LexerStateExecutor for DoubleCharacterState {
+    fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
+        let Some((offset, c)) = next_char else {
+            return LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: source.len().into(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: self.spec.single_token,
+                    span: Span {
+                        start: self.start,
+                        length: self.spec.first.len_utf8().into(),
+                    },
+                }),
+            };
+        };
+
+        if c == self.spec.second {
+            LexerStateTransition::ChangeStateAndEmit {
+                new_state: LexerState::Normal(NormalState {
+                    location: offset + c.len_utf8(),
+                }),
+                token_or_error: Ok(Token {
+                    kind: self.spec.double_token,
+                    span: Span {
+                        start: self.start,
+                        length: offset - self.start,
+                    },
+                }),
+            }
+        } else {
+            LexerStateTransition::ChangeStateAndEmitAndPutBack {
+                new_state: LexerState::Normal(NormalState { location: offset }),
+                token_or_error: Ok(Token {
+                    kind: self.spec.double_token,
+                    span: Span {
+                        start: self.start,
+                        length: offset - self.start,
+                    },
+                }),
+                put_back: c,
             }
         }
     }
