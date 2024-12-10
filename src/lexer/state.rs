@@ -252,11 +252,12 @@ impl LexerStateExecutor for IdentState {
             LexerStateTransition::Stay
         } else {
             let token = self.lex_ident_or_keyword(source, next_char.offset);
-            LexerStateTransition::ChangeStateAndEmit {
+            LexerStateTransition::ChangeStateAndEmitAndPutBack {
                 new_state: LexerState::Normal(NormalState {
-                    location: next_char.next_offset(),
+                    location: next_char.offset,
                 }),
                 token_or_error: Ok(token),
+                put_back: next_char.clone(),
             }
         }
     }
