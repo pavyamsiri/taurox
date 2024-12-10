@@ -44,6 +44,12 @@ impl SExpressionFormatter {
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
+            ExpressionTreeNode::Group { inner } => {
+                format!(
+                    "(group {})",
+                    SExpressionFormatter::format_node(tree, &inner)
+                )
+            }
         }
     }
 

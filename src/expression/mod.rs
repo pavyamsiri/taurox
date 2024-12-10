@@ -47,6 +47,9 @@ pub enum ExpressionTreeNode {
         lhs: ExpressionTreeNodeRef,
         rhs: ExpressionTreeNodeRef,
     },
+    Group {
+        inner: ExpressionTreeNodeRef,
+    },
 }
 
 #[derive(Debug, Clone)]

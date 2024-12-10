@@ -167,7 +167,7 @@ impl<'src> Parser<'src> {
             TokenKind::LeftParenthesis => {
                 let inner = self.parse_expression_pratt(0, tree)?;
                 self.expect(TokenKind::RightParenthesis)?;
-                inner
+                tree.push(ExpressionTreeNode::Group { inner })
             }
             kind => {
                 return Err(ParserError {
