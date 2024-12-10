@@ -320,9 +320,9 @@ impl LexerStateExecutor for IntegerState {
         } else if next_char.value == '.' {
             LexerStateTransition::ChangeState(LexerState::Period(PeriodState { start: self.start }))
         } else {
-            LexerStateTransition::ChangeStateAndEmit {
+            LexerStateTransition::ChangeStateAndEmitAndPutBack {
                 new_state: LexerState::Normal(NormalState {
-                    location: next_char.next_offset(),
+                    location: next_char.offset,
                 }),
                 token_or_error: Ok(Token {
                     kind: TokenKind::NumericLiteral,
@@ -331,6 +331,7 @@ impl LexerStateExecutor for IntegerState {
                         length: next_char.offset - self.start,
                     },
                 }),
+                put_back: next_char.value,
             }
         }
     }
