@@ -224,4 +224,5 @@ impl Display for TokenKind {
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
+    pub line: u32,
 }

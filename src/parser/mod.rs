@@ -73,7 +73,7 @@ impl<'src> Parser<'src> {
         let next_token = self.next_token()?;
         if next_token.kind != expected {
             Err(ParserError {
-                line: 0,
+                line: next_token.line,
                 kind: ParserErrorKind::UnexpectedToken {
                     actual: next_token.kind,
                     expected,
@@ -172,7 +172,7 @@ impl<'src> Parser<'src> {
             kind => {
                 return Err(ParserError {
                     kind: ParserErrorKind::NonLeftHandSide(kind),
-                    line: 0,
+                    line: token.line,
                 })
             }
         };
