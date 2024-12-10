@@ -22,7 +22,7 @@ pub struct LexicalError {
     pub line: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct SourceChar {
     value: char,
     offset: SpanIndex,
@@ -85,18 +85,14 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    fn put_back_char(&mut self, c: char) {
-        self.lookahead = Some(SourceChar {
-            value: c,
-            offset: self.offset,
-            line: self.line,
-        });
+    fn put_back_char(&mut self, c: SourceChar) {
+        self.lookahead = Some(c);
     }
 
     pub fn next_token(&mut self) -> Result<Token, LexicalError> {
         loop {
             let next_char = self.next_char();
-            let transition = self.state.execute(self.source, next_char);
+            let transition = self.state.execute(self.source, &next_char);
 
             match transition {
                 LexerStateTransition::Stay => {}

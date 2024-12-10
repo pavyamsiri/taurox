@@ -13,12 +13,12 @@ pub enum LexerStateTransition {
     ChangeStateAndEmitAndPutBack {
         new_state: LexerState,
         token_or_error: Result<Token, LexicalError>,
-        put_back: char,
+        put_back: SourceChar,
     },
 }
 
 pub trait LexerStateExecutor {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition;
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition;
 }
 
 // States
@@ -64,6 +64,7 @@ pub struct IntegerState {
 #[derive(Debug)]
 pub struct PeriodState {
     start: SpanIndex,
+    period: SourceChar,
 }
 
 #[derive(Debug)]
@@ -97,7 +98,7 @@ pub struct DoubleCharacterTokenSpec {
 }
 
 impl LexerState {
-    pub fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    pub fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         match self {
             LexerState::Normal(s) => s.execute(source, next_char),
             LexerState::Ident(s) => s.execute(source, next_char),
@@ -127,7 +128,7 @@ impl NormalState {
 }
 
 impl LexerStateExecutor for NormalState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let _ = source;
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
@@ -236,7 +237,7 @@ impl IdentState {
 }
 
 impl LexerStateExecutor for IdentState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             let token = self.lex_ident_or_keyword(source, source.len().into());
             return LexerStateTransition::ChangeStateAndEmit {
@@ -262,7 +263,7 @@ impl LexerStateExecutor for IdentState {
 }
 
 impl LexerStateExecutor for StringState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
@@ -299,7 +300,7 @@ impl LexerStateExecutor for StringState {
 }
 
 impl LexerStateExecutor for IntegerState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
@@ -318,7 +319,10 @@ impl LexerStateExecutor for IntegerState {
         if next_char.value.is_ascii_digit() {
             LexerStateTransition::Stay
         } else if next_char.value == '.' {
-            LexerStateTransition::ChangeState(LexerState::Period(PeriodState { start: self.start }))
+            LexerStateTransition::ChangeState(LexerState::Period(PeriodState {
+                start: self.start,
+                period: next_char.clone(),
+            }))
         } else {
             LexerStateTransition::ChangeStateAndEmitAndPutBack {
                 new_state: LexerState::Normal(NormalState {
@@ -331,14 +335,14 @@ impl LexerStateExecutor for IntegerState {
                         length: next_char.offset - self.start,
                     },
                 }),
-                put_back: next_char.value,
+                put_back: next_char.clone(),
             }
         }
     }
 }
 
 impl LexerStateExecutor for PeriodState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmitAndPutBack {
                 new_state: LexerState::Normal(NormalState {
@@ -351,7 +355,7 @@ impl LexerStateExecutor for PeriodState {
                         length: source.len() - self.start,
                     },
                 }),
-                put_back: '.',
+                put_back: self.period,
             };
         };
 
@@ -371,14 +375,14 @@ impl LexerStateExecutor for PeriodState {
                         length: next_char.offset - self.start - '.'.len_utf8(),
                     },
                 }),
-                put_back: '.',
+                put_back: next_char.clone(),
             }
         }
     }
 }
 
 impl LexerStateExecutor for DecimalState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
@@ -467,7 +471,7 @@ impl DoubleCharacterState {
 }
 
 impl LexerStateExecutor for DoubleCharacterState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
@@ -508,14 +512,14 @@ impl LexerStateExecutor for DoubleCharacterState {
                         length: next_char.offset - self.start,
                     },
                 }),
-                put_back: next_char.value,
+                put_back: next_char.clone(),
             }
         }
     }
 }
 
 impl LexerStateExecutor for SlashState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
@@ -547,14 +551,14 @@ impl LexerStateExecutor for SlashState {
                         length: '/'.len_utf8().into(),
                     },
                 }),
-                put_back: next_char.value,
+                put_back: next_char.clone(),
             }
         }
     }
 }
 
 impl LexerStateExecutor for CommentState {
-    fn execute(&self, source: &str, next_char: Option<SourceChar>) -> LexerStateTransition {
+    fn execute(&self, source: &str, next_char: &Option<SourceChar>) -> LexerStateTransition {
         let Some(next_char) = next_char else {
             return LexerStateTransition::ChangeStateAndEmit {
                 new_state: LexerState::Normal(NormalState {
