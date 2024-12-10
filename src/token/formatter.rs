@@ -87,10 +87,10 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
     fn format_lexical_error(&self, error: &LexicalError) -> String {
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
-                format!("[line {}]: Error: Unexpected character: {c}", error.line)
+                format!("[line {}] Error: Unexpected character: {c}", error.line)
             }
             LexicalErrorKind::UnclosedString => {
-                format!("[line {}]: Error: Unterminated string", error.line)
+                format!("[line {}] Error: Unterminated string", error.line)
             }
         }
     }

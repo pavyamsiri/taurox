@@ -53,8 +53,8 @@ fn taurox_main() -> Result<ExitCode> {
             let src = read_to_string(path)?;
             let res = tokenize(&src, &format);
             match res {
-                Ok(_) => {}
-                Err(_) => {
+                Ok(true) => {}
+                Ok(false) | Err(_) => {
                     return Ok(ExitCode::from(65));
                 }
             }
@@ -75,22 +75,24 @@ fn taurox_main() -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn tokenize(src: &str, format: &TokenFormat) -> Result<()> {
+fn tokenize(src: &str, format: &TokenFormat) -> Result<bool> {
     let mut scanner = Lexer::new(src);
     let formatter: Box<dyn TokenFormatter> = match format {
         TokenFormat::Debug => Box::new(ToFormatter::<DebugFormatter>::create_formatter(&scanner)),
         TokenFormat::Basic => Box::new(ToFormatter::<BasicFormatter>::create_formatter(&scanner)),
     };
+    let mut succeeded = true;
     loop {
         match scanner.next_token() {
             Ok(token) => {
                 eprintln!("{}", formatter.format(&token));
                 if matches!(token.kind, TokenKind::Eof) {
-                    return Ok(());
+                    return Ok(succeeded);
                 }
             }
             Err(error) => {
                 eprintln!("{}", formatter.format_lexical_error(&error));
+                succeeded = false;
             }
         };
     }
