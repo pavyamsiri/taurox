@@ -54,12 +54,8 @@ fn taurox_main() -> Result<ExitCode> {
         TauroxCommand::Tokenize { path, format } => {
             eprintln!("Tokenizing {:?}...", path);
             let src = read_to_string(path)?;
-            let res = tokenize(&src, &format);
-            match res {
-                Ok(true) => {}
-                Ok(false) | Err(_) => {
-                    return Ok(ExitCode::from(65));
-                }
+            if !tokenize(&src, &format) {
+                return Ok(ExitCode::from(65));
             }
         }
         TauroxCommand::Parse { path, format } => {
@@ -67,8 +63,9 @@ fn taurox_main() -> Result<ExitCode> {
             let src = read_to_string(path)?;
             let res = parse(&src, &format);
             match res {
-                Ok(true) => {}
-                Ok(false) | Err(_) => {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("{e}");
                     return Ok(ExitCode::from(65));
                 }
             }
@@ -85,7 +82,7 @@ fn taurox_main() -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn tokenize(src: &str, format: &TokenFormat) -> Result<bool> {
+fn tokenize(src: &str, format: &TokenFormat) -> bool {
     use taurox::lexer::Lexer;
     use taurox::token::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
     use taurox::token::TokenKind;
@@ -101,7 +98,7 @@ fn tokenize(src: &str, format: &TokenFormat) -> Result<bool> {
             Ok(token) => {
                 eprintln!("{}", formatter.format(&token));
                 if matches!(token.kind, TokenKind::Eof) {
-                    return Ok(succeeded);
+                    return succeeded;
                 }
             }
             Err(error) => {
@@ -112,7 +109,7 @@ fn tokenize(src: &str, format: &TokenFormat) -> Result<bool> {
     }
 }
 
-fn parse(src: &str, format: &ExpressionFormat) -> Result<bool> {
+fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
     use taurox::expression::formatter::{
         DebugFormatter, ExpressionFormatter, SExpressionFormatter,
     };
@@ -123,7 +120,7 @@ fn parse(src: &str, format: &ExpressionFormat) -> Result<bool> {
         ExpressionFormat::Debug => Box::new(DebugFormatter {}),
         ExpressionFormat::SExpr => Box::new(SExpressionFormatter {}),
     };
-    let expression = parser.parse_expression();
+    let expression = parser.parse_expression()?;
     eprintln!("{}", formatter.format(&expression));
-    Ok(true)
+    Ok(())
 }

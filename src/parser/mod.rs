@@ -7,6 +7,29 @@ use crate::{
     token::{Token, TokenKind},
 };
 
+use thiserror::Error;
+
+#[derive(Debug, Error, Clone)]
+pub enum ParserErrorKind {
+    #[error("Expected {expected:?} but got token {actual:?}")]
+    UnexpectedToken {
+        actual: TokenKind,
+        expected: TokenKind,
+    },
+    #[error("Expected an operator but got token {0:?}")]
+    NonOperator(TokenKind),
+    #[error("Encountered a lexer error {0}")]
+    LexicalError(#[from] LexicalError),
+}
+
+#[derive(Debug, Error, Clone)]
+#[error("[line {line}] {kind}")]
+pub struct ParserError {
+    #[source]
+    pub kind: ParserErrorKind,
+    pub line: u32,
+}
+
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, LexicalError>>,
@@ -40,28 +63,42 @@ impl<'src> Parser<'src> {
             }
         }
     }
+
+    fn expect(&mut self, expected: TokenKind) -> Result<Token, ParserError> {
+        let next_token = self.next_token().map_err(|e| ParserError {
+            kind: ParserErrorKind::LexicalError(e.clone()),
+            line: e.line,
+        })?;
+        if next_token.kind != expected {
+            Err(ParserError {
+                line: 0,
+                kind: ParserErrorKind::UnexpectedToken {
+                    actual: next_token.kind,
+                    expected,
+                },
+            })
+        } else {
+            Ok(next_token)
+        }
+    }
 }
 
 // Pratt parser for expressions
 impl<'src> Parser<'src> {
-    pub fn parse_expression(&mut self) -> ExpressionTreeWithRoot {
+    pub fn parse_expression(&mut self) -> Result<ExpressionTreeWithRoot, ParserError> {
         let mut tree = ExpressionTree::new();
-        let res = self.parse_expression_pratt(0, &mut tree);
+        let res = self.parse_expression_pratt(0, &mut tree)?;
 
-        ExpressionTreeWithRoot::new(tree, res)
-            .expect("Root was obtained from the tree itself so it must be valid.")
+        Ok(ExpressionTreeWithRoot::new(tree, res)
+            .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
     fn parse_expression_pratt(
         &mut self,
         min_bp: u8,
         tree: &mut ExpressionTree,
-    ) -> ExpressionTreeNodeRef {
-        let current_token = self.next_token().unwrap();
-
-        if !matches!(current_token.kind, TokenKind::NumericLiteral) {
-            panic!("Not a numeric!");
-        };
+    ) -> Result<ExpressionTreeNodeRef, ParserError> {
+        let current_token = self.expect(TokenKind::NumericLiteral)?;
 
         let value: f64 = self
             .lexer
@@ -80,7 +117,10 @@ impl<'src> Parser<'src> {
                         break;
                     }
                     _ => {
-                        panic!("Unexpected token!");
+                        return Err(ParserError {
+                            kind: ParserErrorKind::NonOperator(next_token.kind),
+                            line: 0,
+                        })
                     }
                 }
             };
@@ -90,9 +130,9 @@ impl<'src> Parser<'src> {
             }
             let _ = self.next_token();
 
-            let rhs = self.parse_expression_pratt(rbp, tree);
+            let rhs = self.parse_expression_pratt(rbp, tree)?;
             lhs = tree.push(ExpressionTreeNode::Expression(operator, vec![lhs, rhs]));
         }
-        lhs
+        Ok(lhs)
     }
 }
