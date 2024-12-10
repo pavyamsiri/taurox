@@ -1,6 +1,6 @@
 use crate::{
     expression::{
-        ExpressionOperator, ExpressionTree, ExpressionTreeAtom, ExpressionTreeNode,
+        BinaryOperator, ExpressionTree, ExpressionTreeAtom, ExpressionTreeNode,
         ExpressionTreeNodeRef, ExpressionTreeWithRoot,
     },
     lexer::{Lexer, LexicalError},
@@ -93,14 +93,14 @@ impl<'src> Parser<'src> {
             .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
-    fn peek_operator(&mut self) -> Result<Option<ExpressionOperator>, ParserError> {
+    fn peek_operator(&mut self) -> Result<Option<BinaryOperator>, ParserError> {
         let token = self.peek()?;
 
         match token.kind {
-            TokenKind::Plus => Ok(Some(ExpressionOperator::Add)),
-            TokenKind::Minus => Ok(Some(ExpressionOperator::Subtract)),
-            TokenKind::Star => Ok(Some(ExpressionOperator::Multiply)),
-            TokenKind::Slash => Ok(Some(ExpressionOperator::Divide)),
+            TokenKind::Plus => Ok(Some(BinaryOperator::Add)),
+            TokenKind::Minus => Ok(Some(BinaryOperator::Subtract)),
+            TokenKind::Star => Ok(Some(BinaryOperator::Multiply)),
+            TokenKind::Slash => Ok(Some(BinaryOperator::Divide)),
             TokenKind::Eof => Ok(None),
             _ => Err(ParserError {
                 kind: ParserErrorKind::NonOperator(token.kind),
@@ -164,7 +164,7 @@ impl<'src> Parser<'src> {
             let _ = self.next_token()?;
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
-            lhs = tree.push(ExpressionTreeNode::Expression(operator, vec![lhs, rhs]));
+            lhs = tree.push(ExpressionTreeNode::Binary { operator, lhs, rhs });
         }
         Ok(lhs)
     }

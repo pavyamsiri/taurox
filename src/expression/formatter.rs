@@ -1,5 +1,5 @@
 use super::{
-    ExpressionOperator, ExpressionTreeAtom, ExpressionTreeNode, ExpressionTreeNodeRef,
+    BinaryOperator, ExpressionTreeAtom, ExpressionTreeNode, ExpressionTreeNodeRef,
     ExpressionTreeWithRoot,
 };
 
@@ -27,24 +27,23 @@ impl SExpressionFormatter {
             ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value)) => {
                 format!("{value}")
             }
-            ExpressionTreeNode::Expression(operator, expressions) => {
-                let mut buffer = format!("({}", SExpressionFormatter::format_operator(operator));
-                for expression in expressions {
-                    buffer.push(' ');
-                    buffer += &SExpressionFormatter::format_node(tree, &expression);
-                }
-                buffer.push(')');
-                buffer
+            ExpressionTreeNode::Binary { operator, lhs, rhs } => {
+                format!(
+                    "({} {} {})",
+                    SExpressionFormatter::format_operator(operator),
+                    SExpressionFormatter::format_node(tree, &lhs),
+                    SExpressionFormatter::format_node(tree, &rhs),
+                )
             }
         }
     }
 
-    fn format_operator(operator: &ExpressionOperator) -> String {
+    fn format_operator(operator: &BinaryOperator) -> String {
         match operator {
-            ExpressionOperator::Add => "+",
-            ExpressionOperator::Subtract => "-",
-            ExpressionOperator::Multiply => "*",
-            ExpressionOperator::Divide => "/",
+            BinaryOperator::Add => "+",
+            BinaryOperator::Subtract => "-",
+            BinaryOperator::Multiply => "*",
+            BinaryOperator::Divide => "/",
         }
         .into()
     }

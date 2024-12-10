@@ -3,18 +3,18 @@ pub mod formatter;
 use compact_str::CompactString;
 
 #[derive(Debug, Clone)]
-pub enum ExpressionOperator {
+pub enum BinaryOperator {
     Add,
     Subtract,
     Multiply,
     Divide,
 }
 
-impl ExpressionOperator {
+impl BinaryOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
-            ExpressionOperator::Add | ExpressionOperator::Subtract => (1, 2),
-            ExpressionOperator::Multiply | ExpressionOperator::Divide => (3, 4),
+            BinaryOperator::Add | BinaryOperator::Subtract => (1, 2),
+            BinaryOperator::Multiply | BinaryOperator::Divide => (3, 4),
         }
     }
 }
@@ -24,7 +24,11 @@ pub struct ExpressionTreeNodeRef(u32);
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeNode {
     Atom(ExpressionTreeAtom),
-    Expression(ExpressionOperator, Vec<ExpressionTreeNodeRef>),
+    Binary {
+        operator: BinaryOperator,
+        lhs: ExpressionTreeNodeRef,
+        rhs: ExpressionTreeNodeRef,
+    },
 }
 
 #[derive(Debug, Clone)]
