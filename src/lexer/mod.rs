@@ -40,6 +40,10 @@ impl<'src> Lexer<'src> {
             offset: 0.into(),
         }
     }
+
+    pub fn get_source(&self) -> &'src str {
+        self.source
+    }
 }
 
 impl<'src> Lexer<'src> {

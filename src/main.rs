@@ -6,6 +6,7 @@ use color_eyre::eyre::{Context, Result};
 use lexer::Lexer;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
+use token::formatter::{BasicFormatter, ToFormatter, TokenFormatter};
 use token::TokenKind;
 
 #[derive(Debug, Parser)]
@@ -60,6 +61,7 @@ fn taurox_main() -> Result<ExitCode> {
 
 fn tokenize(src: &str) -> Result<()> {
     let mut scanner = Lexer::new(src);
+    let formatter: BasicFormatter = scanner.create_formatter();
     loop {
         let token = match scanner.next_token() {
             Ok(t) => t,
@@ -68,10 +70,9 @@ fn tokenize(src: &str) -> Result<()> {
                 return Err(e).wrap_err("Lexical error");
             }
         };
+        eprintln!("{}", formatter.format(&token));
         if matches!(token.kind, TokenKind::Eof) {
-            eprintln!("Hit EOF!");
             return Ok(());
         }
-        eprintln!("Token = {token:?}");
     }
 }

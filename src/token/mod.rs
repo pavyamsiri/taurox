@@ -1,3 +1,5 @@
+pub mod formatter;
+
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::ops::Range;
