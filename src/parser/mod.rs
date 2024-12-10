@@ -32,7 +32,7 @@ pub struct ParserError {
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
-    lookahead: Option<Result<Token, LexicalError>>,
+    lookahead: Option<Result<Token, ParserError>>,
 }
 
 impl<'src> Parser<'src> {
@@ -43,32 +43,32 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn peek(&mut self) -> Result<Token, LexicalError> {
+    fn peek(&mut self) -> Result<Token, ParserError> {
         match self.lookahead {
             Some(ref token_or_error) => token_or_error.clone(),
             None => {
-                let next_token = self.lexer.next_token();
+                let next_token = self.next_token();
                 self.lookahead = Some(next_token.clone());
                 next_token
             }
         }
     }
 
-    fn next_token(&mut self) -> Result<Token, LexicalError> {
+    fn next_token(&mut self) -> Result<Token, ParserError> {
         match self.lookahead.take() {
             Some(token_or_error) => token_or_error,
             None => {
-                let next_token = self.lexer.next_token();
-                next_token
+                let token_or_error = self.lexer.next_token();
+                token_or_error.map_err(|e| ParserError {
+                    kind: ParserErrorKind::LexicalError(e.clone()),
+                    line: e.line,
+                })
             }
         }
     }
 
     fn expect(&mut self, expected: TokenKind) -> Result<Token, ParserError> {
-        let next_token = self.next_token().map_err(|e| ParserError {
-            kind: ParserErrorKind::LexicalError(e.clone()),
-            line: e.line,
-        })?;
+        let next_token = self.next_token()?;
         if next_token.kind != expected {
             Err(ParserError {
                 line: 0,
@@ -93,6 +93,19 @@ impl<'src> Parser<'src> {
             .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
+    fn peek_operator(&mut self) -> Result<Option<ExpressionOperator>, ParserError> {
+        let token = self.peek()?;
+
+        match token.kind {
+            TokenKind::Plus => Ok(Some(ExpressionOperator::Add)),
+            TokenKind::Eof => Ok(None),
+            _ => Err(ParserError {
+                kind: ParserErrorKind::NonOperator(token.kind),
+                line: 0,
+            }),
+        }
+    }
+
     fn parse_expression_pratt(
         &mut self,
         min_bp: u8,
@@ -103,32 +116,21 @@ impl<'src> Parser<'src> {
         let value: f64 = self
             .lexer
             .get_lexeme(&current_token.span)
-            .unwrap()
+            .expect("The token came from the lexer and so its lexeme must exist.")
             .parse()
-            .unwrap();
+            .expect("Numeric literal tokens can always be parsed into doubles.");
         let mut lhs = tree.push(ExpressionTreeNode::Number(value));
 
         loop {
-            let operator = {
-                let next_token = self.peek().unwrap();
-                match next_token.kind {
-                    TokenKind::Plus => ExpressionOperator::Add,
-                    TokenKind::Eof => {
-                        break;
-                    }
-                    _ => {
-                        return Err(ParserError {
-                            kind: ParserErrorKind::NonOperator(next_token.kind),
-                            line: 0,
-                        })
-                    }
-                }
+            let Some(operator) = self.peek_operator()? else {
+                break;
             };
+
             let (lbp, rbp) = operator.get_binding_power();
             if lbp < min_bp {
                 break;
             }
-            let _ = self.next_token();
+            let _ = self.next_token()?;
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
             lhs = tree.push(ExpressionTreeNode::Expression(operator, vec![lhs, rhs]));
