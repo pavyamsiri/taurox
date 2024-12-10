@@ -69,6 +69,14 @@ impl From<usize> for SpanLength {
     }
 }
 
+impl std::ops::Add<usize> for SpanLength {
+    type Output = SpanLength;
+
+    fn add(self, rhs: usize) -> Self::Output {
+        SpanLength(self.0 + rhs as u32)
+    }
+}
+
 impl std::ops::Sub<usize> for SpanLength {
     type Output = SpanLength;
 

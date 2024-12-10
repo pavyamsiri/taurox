@@ -288,7 +288,7 @@ impl LexerStateExecutor for StringState {
                     kind: TokenKind::StringLiteral,
                     span: Span {
                         start: self.start,
-                        length: next_char.offset - self.start,
+                        length: (next_char.offset - self.start) + 1,
                     },
                 }),
             }
