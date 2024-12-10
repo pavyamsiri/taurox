@@ -1,0 +1,2 @@
+NUMBER 123 123.0
+EOF  null

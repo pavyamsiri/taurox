@@ -1,0 +1,4 @@
+IDENTIFIER foo null
+IDENTIFIER bar null
+IDENTIFIER _hello null
+EOF  null

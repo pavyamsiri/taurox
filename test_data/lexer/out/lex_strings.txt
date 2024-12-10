@@ -1,0 +1,2 @@
+STRING "foo baz" foo baz
+EOF  null

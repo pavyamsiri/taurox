@@ -1,0 +1,2 @@
+IDENTIFIER _abc null
+EOF  null

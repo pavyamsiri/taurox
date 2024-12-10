@@ -1,0 +1,6 @@
+VAR var null
+IDENTIFIER language null
+EQUAL = null
+STRING "lox" lox
+SEMICOLON ; null
+EOF  null
