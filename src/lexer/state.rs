@@ -21,39 +21,7 @@ pub trait LexerStateExecutor {
     fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition;
 }
 
-#[derive(Debug)]
-pub struct DoubleCharacterTokenSpec {
-    first: char,
-    second: char,
-    single_token: TokenKind,
-    double_token: TokenKind,
-}
-
-const BANG_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
-    first: '!',
-    second: '=',
-    single_token: TokenKind::Bang,
-    double_token: TokenKind::BangEqual,
-};
-const EQUAL_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
-    first: '=',
-    second: '=',
-    single_token: TokenKind::Equal,
-    double_token: TokenKind::EqualEqual,
-};
-const LESS_THAN_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
-    first: '<',
-    second: '=',
-    single_token: TokenKind::LessThan,
-    double_token: TokenKind::LessThanEqual,
-};
-const GREATER_THAN_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
-    first: '>',
-    second: '=',
-    single_token: TokenKind::GreaterThan,
-    double_token: TokenKind::GreaterThanEqual,
-};
-
+// States
 #[derive(Debug)]
 pub enum LexerState {
     Normal(NormalState),
@@ -70,6 +38,61 @@ pub enum LexerState {
     // Slash and comment
     Slash(SlashState),
     Comment(CommentState),
+}
+
+#[derive(Debug)]
+pub struct NormalState {
+    location: SpanIndex,
+}
+
+#[derive(Debug)]
+pub struct IdentState {
+    start: SpanIndex,
+}
+
+#[derive(Debug)]
+pub struct StringState {
+    start: SpanIndex,
+}
+
+#[derive(Debug)]
+pub struct IntegerState {
+    start: SpanIndex,
+}
+
+#[derive(Debug)]
+pub struct PeriodState {
+    start: SpanIndex,
+}
+
+#[derive(Debug)]
+pub struct DecimalState {
+    start: SpanIndex,
+}
+
+#[derive(Debug)]
+pub struct SlashState {
+    start: SpanIndex,
+}
+
+#[derive(Debug)]
+pub struct CommentState {
+    start: SpanIndex,
+}
+
+// Double character state
+#[derive(Debug)]
+pub struct DoubleCharacterState {
+    start: SpanIndex,
+    spec: DoubleCharacterTokenSpec,
+}
+
+#[derive(Debug)]
+pub struct DoubleCharacterTokenSpec {
+    first: char,
+    second: char,
+    single_token: TokenKind,
+    double_token: TokenKind,
 }
 
 impl LexerState {
@@ -96,11 +119,6 @@ impl std::default::Default for LexerState {
     fn default() -> Self {
         Self::Normal(NormalState { location: 0.into() })
     }
-}
-
-#[derive(Debug)]
-pub struct NormalState {
-    location: SpanIndex,
 }
 
 impl NormalState {
@@ -195,11 +213,6 @@ impl LexerStateExecutor for NormalState {
     }
 }
 
-#[derive(Debug)]
-pub struct IdentState {
-    start: SpanIndex,
-}
-
 impl IdentState {
     fn lex_ident_or_keyword(&self, source: &str, offset: SpanIndex) -> Token {
         let span = Span {
@@ -243,11 +256,6 @@ impl LexerStateExecutor for IdentState {
     }
 }
 
-#[derive(Debug)]
-pub struct StringState {
-    start: SpanIndex,
-}
-
 impl LexerStateExecutor for StringState {
     fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
@@ -282,11 +290,6 @@ impl LexerStateExecutor for StringState {
             LexerStateTransition::Stay
         }
     }
-}
-
-#[derive(Debug)]
-pub struct IntegerState {
-    start: SpanIndex,
 }
 
 impl LexerStateExecutor for IntegerState {
@@ -327,11 +330,6 @@ impl LexerStateExecutor for IntegerState {
     }
 }
 
-#[derive(Debug)]
-pub struct PeriodState {
-    start: SpanIndex,
-}
-
 impl LexerStateExecutor for PeriodState {
     fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
@@ -370,11 +368,6 @@ impl LexerStateExecutor for PeriodState {
     }
 }
 
-#[derive(Debug)]
-pub struct DecimalState {
-    start: SpanIndex,
-}
-
 impl LexerStateExecutor for DecimalState {
     fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
@@ -411,36 +404,55 @@ impl LexerStateExecutor for DecimalState {
     }
 }
 
-#[derive(Debug)]
-pub struct DoubleCharacterState {
-    start: SpanIndex,
-    spec: DoubleCharacterTokenSpec,
-}
-
 impl DoubleCharacterState {
+    const BANG_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+        first: '!',
+        second: '=',
+        single_token: TokenKind::Bang,
+        double_token: TokenKind::BangEqual,
+    };
+    const EQUAL_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+        first: '=',
+        second: '=',
+        single_token: TokenKind::Equal,
+        double_token: TokenKind::EqualEqual,
+    };
+    const LESS_THAN_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+        first: '<',
+        second: '=',
+        single_token: TokenKind::LessThan,
+        double_token: TokenKind::LessThanEqual,
+    };
+    const GREATER_THAN_SPEC: DoubleCharacterTokenSpec = DoubleCharacterTokenSpec {
+        first: '>',
+        second: '=',
+        single_token: TokenKind::GreaterThan,
+        double_token: TokenKind::GreaterThanEqual,
+    };
+
     pub fn new_bang_state(start: SpanIndex) -> Self {
         Self {
             start,
-            spec: BANG_SPEC,
+            spec: DoubleCharacterState::BANG_SPEC,
         }
     }
 
     pub fn new_equal_state(start: SpanIndex) -> Self {
         Self {
             start,
-            spec: EQUAL_SPEC,
+            spec: DoubleCharacterState::EQUAL_SPEC,
         }
     }
     pub fn new_less_than_state(start: SpanIndex) -> Self {
         Self {
             start,
-            spec: LESS_THAN_SPEC,
+            spec: DoubleCharacterState::LESS_THAN_SPEC,
         }
     }
     pub fn new_greater_than_state(start: SpanIndex) -> Self {
         Self {
             start,
-            spec: GREATER_THAN_SPEC,
+            spec: DoubleCharacterState::GREATER_THAN_SPEC,
         }
     }
 }
@@ -491,11 +503,6 @@ impl LexerStateExecutor for DoubleCharacterState {
     }
 }
 
-#[derive(Debug)]
-pub struct SlashState {
-    start: SpanIndex,
-}
-
 impl LexerStateExecutor for SlashState {
     fn execute(&self, source: &str, next_char: Option<(SpanIndex, char)>) -> LexerStateTransition {
         let Some((offset, c)) = next_char else {
@@ -533,11 +540,6 @@ impl LexerStateExecutor for SlashState {
             }
         }
     }
-}
-
-#[derive(Debug)]
-pub struct CommentState {
-    start: SpanIndex,
 }
 
 impl LexerStateExecutor for CommentState {
