@@ -93,7 +93,7 @@ impl<'src> Parser<'src> {
             .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
-    fn peek_operator(&mut self) -> Result<Option<BinaryOperator>, ParserError> {
+    fn peek_binary_operator(&mut self) -> Result<Option<BinaryOperator>, ParserError> {
         let token = self.peek()?;
 
         match token.kind {
@@ -165,18 +165,18 @@ impl<'src> Parser<'src> {
         let mut lhs = self.expect_left_expression(tree)?;
 
         loop {
-            let Some(operator) = self.peek_operator()? else {
-                break;
-            };
+            if let Some(operator) = self.peek_binary_operator()? {
+                let (lbp, rbp) = operator.get_binding_power();
+                if lbp < min_bp {
+                    break;
+                }
+                let _ = self.next_token()?;
 
-            let (lbp, rbp) = operator.get_binding_power();
-            if lbp < min_bp {
-                break;
+                let rhs = self.parse_expression_pratt(rbp, tree)?;
+                lhs = tree.push(ExpressionTreeNode::Binary { operator, lhs, rhs });
+                continue;
             }
-            let _ = self.next_token()?;
-
-            let rhs = self.parse_expression_pratt(rbp, tree)?;
-            lhs = tree.push(ExpressionTreeNode::Binary { operator, lhs, rhs });
+            break;
         }
         Ok(lhs)
     }
