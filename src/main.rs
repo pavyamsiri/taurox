@@ -2,9 +2,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
-use taurox::lexer::Lexer;
-use taurox::token::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
-use taurox::token::TokenKind;
 
 #[derive(Debug, Parser)]
 #[clap(name = "taurox", version)]
@@ -89,6 +86,10 @@ fn taurox_main() -> Result<ExitCode> {
 }
 
 fn tokenize(src: &str, format: &TokenFormat) -> Result<bool> {
+    use taurox::lexer::Lexer;
+    use taurox::token::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
+    use taurox::token::TokenKind;
+
     let mut scanner = Lexer::new(src);
     let formatter: Box<dyn TokenFormatter> = match format {
         TokenFormat::Debug => Box::new(ToFormatter::<DebugFormatter>::create_formatter(&scanner)),
@@ -116,6 +117,7 @@ fn parse(src: &str, format: &ExpressionFormat) -> Result<bool> {
         DebugFormatter, ExpressionFormatter, SExpressionFormatter,
     };
     use taurox::parser::Parser;
+
     let mut parser = Parser::new(src);
     let formatter: Box<dyn ExpressionFormatter> = match format {
         ExpressionFormat::Debug => Box::new(DebugFormatter {}),
