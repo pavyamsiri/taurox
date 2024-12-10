@@ -54,7 +54,7 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
                 let value: f64 = lexeme
                     .parse()
                     .expect("Numeric literals are guaranteed to be parseable into f64.");
-                format!("NUMBER {lexeme} {value}")
+                format!("NUMBER {lexeme} {value:?}")
             }
             TokenKind::StringLiteral => {
                 let lexeme = &self.text[token.span.range()];
