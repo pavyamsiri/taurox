@@ -63,16 +63,16 @@ fn tokenize(src: &str) -> Result<()> {
     let mut scanner = Lexer::new(src);
     let formatter: BasicFormatter = scanner.create_formatter();
     loop {
-        let token = match scanner.next_token() {
-            Ok(t) => t,
+        match scanner.next_token() {
+            Ok(token) => {
+                eprintln!("{}", formatter.format(&token));
+                if matches!(token.kind, TokenKind::Eof) {
+                    return Ok(());
+                }
+            }
             Err(e) => {
-                eprintln!("Lexical {e}");
-                return Err(e).wrap_err("Lexical error");
+                eprintln!("{e}");
             }
         };
-        eprintln!("{}", formatter.format(&token));
-        if matches!(token.kind, TokenKind::Eof) {
-            return Ok(());
-        }
     }
 }

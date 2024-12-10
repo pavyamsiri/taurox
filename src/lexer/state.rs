@@ -53,6 +53,7 @@ pub struct IdentState {
 #[derive(Debug)]
 pub struct StringState {
     start: SpanIndex,
+    line: u32,
 }
 
 #[derive(Debug)]
@@ -190,6 +191,7 @@ impl LexerStateExecutor for NormalState {
             // String literal
             '"' => LexerStateTransition::ChangeState(LexerState::String(StringState {
                 start: next_char.offset,
+                line: next_char.line,
             })),
             // Numeric literal
             '0'..='9' => LexerStateTransition::ChangeState(LexerState::Integer(IntegerState {
@@ -207,6 +209,7 @@ impl LexerStateExecutor for NormalState {
                                 start: next_char.offset,
                                 length: c.len_utf8().into(),
                             },
+                            line: next_char.line,
                         }),
                     }
                 }
@@ -271,6 +274,7 @@ impl LexerStateExecutor for StringState {
                         start: self.start,
                         length: source.len() - self.start,
                     },
+                    line: self.line,
                 }),
             };
         };

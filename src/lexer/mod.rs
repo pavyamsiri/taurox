@@ -14,11 +14,12 @@ pub enum LexicalErrorKind {
 }
 
 #[derive(Debug, Error)]
-#[error("Error: {kind}")]
+#[error("[line {line}] Error: {kind}")]
 pub struct LexicalError {
     #[source]
     pub kind: LexicalErrorKind,
     pub span: Span,
+    pub line: u32,
 }
 
 #[derive(Debug)]
