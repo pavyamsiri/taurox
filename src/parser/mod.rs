@@ -103,6 +103,12 @@ impl<'src> Parser<'src> {
             TokenKind::Minus => Ok(Some(BinaryOperator::Subtract)),
             TokenKind::Star => Ok(Some(BinaryOperator::Multiply)),
             TokenKind::Slash => Ok(Some(BinaryOperator::Divide)),
+            TokenKind::LessThan => Ok(Some(BinaryOperator::LessThan)),
+            TokenKind::LessThanEqual => Ok(Some(BinaryOperator::LessThanEqual)),
+            TokenKind::GreaterThan => Ok(Some(BinaryOperator::GreaterThan)),
+            TokenKind::GreaterThanEqual => Ok(Some(BinaryOperator::GreaterThanEqual)),
+            TokenKind::EqualEqual => Ok(Some(BinaryOperator::EqualEqual)),
+            TokenKind::BangEqual => Ok(Some(BinaryOperator::BangEqual)),
             _ => Ok(None),
         }
     }

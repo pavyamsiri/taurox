@@ -66,6 +66,12 @@ impl SExpressionFormatter {
             BinaryOperator::Subtract => "-",
             BinaryOperator::Multiply => "*",
             BinaryOperator::Divide => "/",
+            BinaryOperator::LessThan => "<",
+            BinaryOperator::LessThanEqual => "<=",
+            BinaryOperator::GreaterThan => ">",
+            BinaryOperator::GreaterThanEqual => ">=",
+            BinaryOperator::EqualEqual => "==",
+            BinaryOperator::BangEqual => "!=",
         }
         .into()
     }

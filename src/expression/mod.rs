@@ -11,7 +11,7 @@ pub enum UnaryOperator {
 impl UnaryOperator {
     pub fn get_binding_power(&self) -> u8 {
         match self {
-            UnaryOperator::Bang | UnaryOperator::Minus => 5,
+            UnaryOperator::Bang | UnaryOperator::Minus => 7,
         }
     }
 }
@@ -22,13 +22,28 @@ pub enum BinaryOperator {
     Subtract,
     Multiply,
     Divide,
+    LessThan,
+    LessThanEqual,
+    GreaterThan,
+    GreaterThanEqual,
+    EqualEqual,
+    BangEqual,
 }
 
 impl BinaryOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
-            BinaryOperator::Add | BinaryOperator::Subtract => (1, 2),
-            BinaryOperator::Multiply | BinaryOperator::Divide => (3, 4),
+            // 1. Multiplicative operators
+            BinaryOperator::Multiply | BinaryOperator::Divide => (5, 6),
+            // 2. Additive operators
+            BinaryOperator::Add | BinaryOperator::Subtract => (3, 4),
+            // 3. Comparison operators
+            BinaryOperator::LessThan
+            | BinaryOperator::LessThanEqual
+            | BinaryOperator::GreaterThan
+            | BinaryOperator::GreaterThanEqual => (2, 3),
+            // 4. Equality operators
+            BinaryOperator::EqualEqual | BinaryOperator::BangEqual => (1, 2),
         }
     }
 }
