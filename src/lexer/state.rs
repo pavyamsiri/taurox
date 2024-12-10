@@ -501,7 +501,7 @@ impl LexerStateExecutor for DoubleCharacterState {
                     location: next_char.offset,
                 }),
                 token_or_error: Ok(Token {
-                    kind: self.spec.double_token,
+                    kind: self.spec.single_token,
                     span: Span {
                         start: self.start,
                         length: next_char.offset - self.start,
