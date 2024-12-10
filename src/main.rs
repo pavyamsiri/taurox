@@ -1,13 +1,10 @@
-mod lexer;
-mod token;
-
 use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
-use lexer::Lexer;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
-use token::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
-use token::TokenKind;
+use taurox::lexer::Lexer;
+use taurox::token::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
+use taurox::token::TokenKind;
 
 #[derive(Debug, Parser)]
 #[clap(name = "taurox", version)]
