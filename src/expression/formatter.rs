@@ -1,5 +1,6 @@
 use super::{
-    ExpressionOperator, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
+    ExpressionOperator, ExpressionTreeAtom, ExpressionTreeNode, ExpressionTreeNodeRef,
+    ExpressionTreeWithRoot,
 };
 
 pub trait ExpressionFormatter {
@@ -21,7 +22,11 @@ impl SExpressionFormatter {
         let current_node = &tree.nodes[node.0 as usize];
 
         match current_node {
-            ExpressionTreeNode::Number(value) => format!("{value:?}"),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom::Number(value)) => format!("{value:?}"),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom::Identifier(value)) => format!("{value}"),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value)) => {
+                format!("{value}")
+            }
             ExpressionTreeNode::Expression(operator, expressions) => {
                 let mut buffer = format!("({}", SExpressionFormatter::format_operator(operator));
                 for expression in expressions {

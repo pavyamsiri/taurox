@@ -1,5 +1,7 @@
 pub mod formatter;
 
+use compact_str::CompactString;
+
 #[derive(Debug, Clone)]
 pub enum ExpressionOperator {
     Add,
@@ -21,8 +23,15 @@ impl ExpressionOperator {
 pub struct ExpressionTreeNodeRef(u32);
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeNode {
-    Number(f64),
+    Atom(ExpressionTreeAtom),
     Expression(ExpressionOperator, Vec<ExpressionTreeNodeRef>),
+}
+
+#[derive(Debug, Clone)]
+pub enum ExpressionTreeAtom {
+    Number(f64),
+    Identifier(CompactString),
+    StringLiteral(CompactString),
 }
 
 #[derive(Debug, Clone)]

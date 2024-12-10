@@ -1,7 +1,7 @@
 use crate::{
     expression::{
-        ExpressionOperator, ExpressionTree, ExpressionTreeNode, ExpressionTreeNodeRef,
-        ExpressionTreeWithRoot,
+        ExpressionOperator, ExpressionTree, ExpressionTreeAtom, ExpressionTreeNode,
+        ExpressionTreeNodeRef, ExpressionTreeWithRoot,
     },
     lexer::{Lexer, LexicalError},
     token::{Token, TokenKind},
@@ -109,20 +109,48 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn next_expression_atom(&mut self) -> Result<ExpressionTreeAtom, ParserError> {
+        let token = self.next_token()?;
+
+        let atom = match token.kind {
+            TokenKind::NumericLiteral => {
+                let lexeme = self
+                    .lexer
+                    .get_lexeme(&token.span)
+                    .expect("Lexed token has a valid span");
+                ExpressionTreeAtom::Number(
+                    lexeme
+                        .parse::<f64>()
+                        .expect("Numeric literal tokens can always be parsed into a `f64`."),
+                )
+            }
+            TokenKind::StringLiteral => {
+                let lexeme = self
+                    .lexer
+                    .get_lexeme(&token.span)
+                    .expect("Lexed token has a valid span");
+                let value = lexeme
+                    .get(1..lexeme.len() - 1)
+                    .expect("String literal tokens are at least length 2.");
+                ExpressionTreeAtom::StringLiteral(value.into())
+            }
+            TokenKind::Ident => ExpressionTreeAtom::Identifier(
+                self.lexer
+                    .get_lexeme(&token.span)
+                    .expect("Lexed token has a valid span.")
+                    .into(),
+            ),
+            _ => panic!(),
+        };
+        Ok(atom)
+    }
+
     fn parse_expression_pratt(
         &mut self,
         min_bp: u8,
         tree: &mut ExpressionTree,
     ) -> Result<ExpressionTreeNodeRef, ParserError> {
-        let current_token = self.expect(TokenKind::NumericLiteral)?;
-
-        let value: f64 = self
-            .lexer
-            .get_lexeme(&current_token.span)
-            .expect("The token came from the lexer and so its lexeme must exist.")
-            .parse()
-            .expect("Numeric literal tokens can always be parsed into doubles.");
-        let mut lhs = tree.push(ExpressionTreeNode::Number(value));
+        let mut lhs = tree.push(ExpressionTreeNode::Atom(self.next_expression_atom()?));
 
         loop {
             let Some(operator) = self.peek_operator()? else {
