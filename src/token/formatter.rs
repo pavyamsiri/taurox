@@ -43,7 +43,7 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
             TokenKind::BangEqual => "BANG_EQUAL != null".into(),
             TokenKind::Equal => "EQUAL = null".into(),
             TokenKind::EqualEqual => "EQUAL_EQUAL == null".into(),
-            TokenKind::LessThan => "LESS_THAN < null".into(),
+            TokenKind::LessThan => "LESS < null".into(),
             TokenKind::LessThanEqual => "LESS_EQUAL <= null".into(),
             TokenKind::GreaterThan => "GREATER > null".into(),
             TokenKind::GreaterThanEqual => "GREATER_EQUAL >= null".into(),
