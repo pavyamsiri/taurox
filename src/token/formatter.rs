@@ -1,9 +1,10 @@
-use crate::lexer::Lexer;
+use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
 
 use super::{Token, TokenKind};
 
 pub trait TokenFormatter {
     fn format(&self, token: &Token) -> String;
+    fn format_lexical_error(&self, error: &LexicalError) -> String;
 }
 
 pub trait ToFormatter<F>
@@ -82,6 +83,17 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
             TokenKind::KeywordWhile => "WHILE while null".into(),
         }
     }
+
+    fn format_lexical_error(&self, error: &LexicalError) -> String {
+        match error.kind {
+            LexicalErrorKind::Unrecognized(c) => {
+                format!("[line {}]: Error: Unexpected character: {c}", error.line)
+            }
+            LexicalErrorKind::UnclosedString => {
+                format!("[line {}]: Error: Unterminated string", error.line)
+            }
+        }
+    }
 }
 
 pub struct DebugFormatter;
@@ -95,5 +107,9 @@ impl<'src> ToFormatter<DebugFormatter> for Lexer<'src> {
 impl TokenFormatter for DebugFormatter {
     fn format(&self, token: &Token) -> String {
         format!("{token:?}")
+    }
+
+    fn format_lexical_error(&self, error: &LexicalError) -> String {
+        format!("{error:?}")
     }
 }

@@ -7,14 +7,14 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum LexicalErrorKind {
-    #[error("Unexpected character: {0}")]
+    #[error("Unrecognized character {0}")]
     Unrecognized(char),
-    #[error("Unterminated string literal.")]
+    #[error("Unterminated string literal")]
     UnclosedString,
 }
 
 #[derive(Debug, Error)]
-#[error("[line {line}] Error: {kind}")]
+#[error("[line {line}] {kind}")]
 pub struct LexicalError {
     #[source]
     pub kind: LexicalErrorKind,

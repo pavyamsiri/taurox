@@ -1,12 +1,12 @@
 mod lexer;
 mod token;
 
-use clap::{Parser, Subcommand};
-use color_eyre::eyre::{Context, Result};
+use clap::{Parser, Subcommand, ValueEnum};
+use color_eyre::eyre::Result;
 use lexer::Lexer;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
-use token::formatter::{BasicFormatter, ToFormatter, TokenFormatter};
+use token::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
 use token::TokenKind;
 
 #[derive(Debug, Parser)]
@@ -18,10 +18,26 @@ pub struct CLArgs {
 
 #[derive(Debug, Subcommand)]
 pub enum TauroxCommand {
-    Tokenize { path: PathBuf },
-    Parse { path: PathBuf },
-    Evaluate { path: PathBuf },
-    Run { path: PathBuf },
+    Tokenize {
+        path: PathBuf,
+        #[clap(long = "format", value_enum, default_value = "basic")]
+        format: TokenFormat,
+    },
+    Parse {
+        path: PathBuf,
+    },
+    Evaluate {
+        path: PathBuf,
+    },
+    Run {
+        path: PathBuf,
+    },
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum TokenFormat {
+    Debug,
+    Basic,
 }
 
 fn main() -> ExitCode {
@@ -32,10 +48,10 @@ fn taurox_main() -> Result<ExitCode> {
     color_eyre::install().expect("Can't fail at first call!");
     let args = CLArgs::parse();
     match args.routine {
-        TauroxCommand::Tokenize { path } => {
+        TauroxCommand::Tokenize { path, format } => {
             eprintln!("Tokenizing {:?}...", path);
             let src = read_to_string(path)?;
-            let res = tokenize(&src);
+            let res = tokenize(&src, &format);
             match res {
                 Ok(_) => {}
                 Err(_) => {
@@ -59,9 +75,12 @@ fn taurox_main() -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn tokenize(src: &str) -> Result<()> {
+fn tokenize(src: &str, format: &TokenFormat) -> Result<()> {
     let mut scanner = Lexer::new(src);
-    let formatter: BasicFormatter = scanner.create_formatter();
+    let formatter: Box<dyn TokenFormatter> = match format {
+        TokenFormat::Debug => Box::new(ToFormatter::<DebugFormatter>::create_formatter(&scanner)),
+        TokenFormat::Basic => Box::new(ToFormatter::<BasicFormatter>::create_formatter(&scanner)),
+    };
     loop {
         match scanner.next_token() {
             Ok(token) => {
@@ -70,8 +89,8 @@ fn tokenize(src: &str) -> Result<()> {
                     return Ok(());
                 }
             }
-            Err(e) => {
-                eprintln!("{e}");
+            Err(error) => {
+                eprintln!("{}", formatter.format_lexical_error(&error));
             }
         };
     }
