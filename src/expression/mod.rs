@@ -3,6 +3,20 @@ pub mod formatter;
 use compact_str::CompactString;
 
 #[derive(Debug, Clone)]
+pub enum UnaryOperator {
+    Bang,
+    Minus,
+}
+
+impl UnaryOperator {
+    pub fn get_binding_power(&self) -> u8 {
+        match self {
+            UnaryOperator::Bang | UnaryOperator::Minus => 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum BinaryOperator {
     Add,
     Subtract,
@@ -24,6 +38,10 @@ pub struct ExpressionTreeNodeRef(u32);
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeNode {
     Atom(ExpressionTreeAtom),
+    Unary {
+        operator: UnaryOperator,
+        rhs: ExpressionTreeNodeRef,
+    },
     Binary {
         operator: BinaryOperator,
         lhs: ExpressionTreeNodeRef,

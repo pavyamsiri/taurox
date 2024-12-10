@@ -1,7 +1,7 @@
 use crate::{
     expression::{
         BinaryOperator, ExpressionTree, ExpressionTreeAtom, ExpressionTreeNode,
-        ExpressionTreeNodeRef, ExpressionTreeWithRoot,
+        ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
     token::{Token, TokenKind},
@@ -109,40 +109,52 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn next_expression_atom(&mut self) -> Result<ExpressionTreeAtom, ParserError> {
+    fn expect_left_expression(
+        &mut self,
+        tree: &mut ExpressionTree,
+    ) -> Result<ExpressionTreeNodeRef, ParserError> {
         let token = self.next_token()?;
+        let lexeme = self
+            .lexer
+            .get_lexeme(&token.span)
+            .expect("Lexed token has a valid span");
 
-        let atom = match token.kind {
+        let node = match token.kind {
             TokenKind::NumericLiteral => {
-                let lexeme = self
-                    .lexer
-                    .get_lexeme(&token.span)
-                    .expect("Lexed token has a valid span");
-                ExpressionTreeAtom::Number(
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Number(
                     lexeme
                         .parse::<f64>()
                         .expect("Numeric literal tokens can always be parsed into a `f64`."),
-                )
+                ));
+                tree.push(node)
+            }
+            TokenKind::Ident => {
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Identifier(lexeme.into()));
+                tree.push(node)
             }
             TokenKind::StringLiteral => {
-                let lexeme = self
-                    .lexer
-                    .get_lexeme(&token.span)
-                    .expect("Lexed token has a valid span");
                 let value = lexeme
                     .get(1..lexeme.len() - 1)
                     .expect("String literal tokens are at least length 2.");
-                ExpressionTreeAtom::StringLiteral(value.into())
+                let node =
+                    ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value.into()));
+                tree.push(node)
             }
-            TokenKind::Ident => ExpressionTreeAtom::Identifier(
-                self.lexer
-                    .get_lexeme(&token.span)
-                    .expect("Lexed token has a valid span.")
-                    .into(),
-            ),
+            TokenKind::Minus => {
+                let operator = UnaryOperator::Minus;
+                let rbp = operator.get_binding_power();
+                let rhs = self.parse_expression_pratt(rbp, tree)?;
+                tree.push(ExpressionTreeNode::Unary { operator, rhs })
+            }
+            TokenKind::Bang => {
+                let operator = UnaryOperator::Bang;
+                let rbp = operator.get_binding_power();
+                let rhs = self.parse_expression_pratt(rbp, tree)?;
+                tree.push(ExpressionTreeNode::Unary { operator, rhs })
+            }
             _ => panic!(),
         };
-        Ok(atom)
+        Ok(node)
     }
 
     fn parse_expression_pratt(
@@ -150,7 +162,7 @@ impl<'src> Parser<'src> {
         min_bp: u8,
         tree: &mut ExpressionTree,
     ) -> Result<ExpressionTreeNodeRef, ParserError> {
-        let mut lhs = tree.push(ExpressionTreeNode::Atom(self.next_expression_atom()?));
+        let mut lhs = self.expect_left_expression(tree)?;
 
         loop {
             let Some(operator) = self.peek_operator()? else {

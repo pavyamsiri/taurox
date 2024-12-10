@@ -1,6 +1,6 @@
 use super::{
     BinaryOperator, ExpressionTreeAtom, ExpressionTreeNode, ExpressionTreeNodeRef,
-    ExpressionTreeWithRoot,
+    ExpressionTreeWithRoot, UnaryOperator,
 };
 
 pub trait ExpressionFormatter {
@@ -27,10 +27,17 @@ impl SExpressionFormatter {
             ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value)) => {
                 format!("{value}")
             }
+            ExpressionTreeNode::Unary { operator, rhs } => {
+                format!(
+                    "({} {})",
+                    SExpressionFormatter::format_unary_operator(operator),
+                    SExpressionFormatter::format_node(tree, &rhs),
+                )
+            }
             ExpressionTreeNode::Binary { operator, lhs, rhs } => {
                 format!(
                     "({} {} {})",
-                    SExpressionFormatter::format_operator(operator),
+                    SExpressionFormatter::format_binary_operator(operator),
                     SExpressionFormatter::format_node(tree, &lhs),
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
@@ -38,7 +45,14 @@ impl SExpressionFormatter {
         }
     }
 
-    fn format_operator(operator: &BinaryOperator) -> String {
+    fn format_unary_operator(operator: &UnaryOperator) -> String {
+        match operator {
+            UnaryOperator::Bang => "!",
+            UnaryOperator::Minus => "-",
+        }
+        .into()
+    }
+    fn format_binary_operator(operator: &BinaryOperator) -> String {
         match operator {
             BinaryOperator::Add => "+",
             BinaryOperator::Subtract => "-",
