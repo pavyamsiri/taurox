@@ -5,7 +5,7 @@ use state::{LexerState, LexerStateTransition};
 use std::str::Chars;
 use thiserror::Error;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 pub enum LexicalErrorKind {
     #[error("Unrecognized character {0}")]
     Unrecognized(char),
@@ -13,7 +13,7 @@ pub enum LexicalErrorKind {
     UnclosedString,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone)]
 #[error("[line {line}] {kind}")]
 pub struct LexicalError {
     #[source]
@@ -59,6 +59,14 @@ impl<'src> Lexer<'src> {
 
     pub fn get_source(&self) -> &'src str {
         self.source
+    }
+
+    pub fn get_lexeme(&self, span: &Span) -> Option<&'src str> {
+        let start: usize = span.start.into();
+        match start <= self.source.len() {
+            true => Some(&self.source[span.range()]),
+            false => None,
+        }
     }
 }
 

@@ -1,0 +1,98 @@
+use crate::{
+    expression::{
+        ExpressionOperator, ExpressionTree, ExpressionTreeNode, ExpressionTreeNodeRef,
+        ExpressionTreeWithRoot,
+    },
+    lexer::{Lexer, LexicalError},
+    token::{Token, TokenKind},
+};
+
+pub struct Parser<'src> {
+    lexer: Lexer<'src>,
+    lookahead: Option<Result<Token, LexicalError>>,
+}
+
+impl<'src> Parser<'src> {
+    pub fn new(source: &'src str) -> Self {
+        Self {
+            lexer: Lexer::new(source),
+            lookahead: None,
+        }
+    }
+
+    fn peek(&mut self) -> Result<Token, LexicalError> {
+        match self.lookahead {
+            Some(ref token_or_error) => token_or_error.clone(),
+            None => {
+                let next_token = self.lexer.next_token();
+                self.lookahead = Some(next_token.clone());
+                next_token
+            }
+        }
+    }
+
+    fn next_token(&mut self) -> Result<Token, LexicalError> {
+        match self.lookahead.take() {
+            Some(token_or_error) => token_or_error,
+            None => {
+                let next_token = self.lexer.next_token();
+                next_token
+            }
+        }
+    }
+}
+
+// Pratt parser for expressions
+impl<'src> Parser<'src> {
+    pub fn parse_expression(&mut self) -> ExpressionTreeWithRoot {
+        let mut tree = ExpressionTree::new();
+        let res = self.parse_expression_pratt(0, &mut tree);
+
+        ExpressionTreeWithRoot::new(tree, res)
+            .expect("Root was obtained from the tree itself so it must be valid.")
+    }
+
+    fn parse_expression_pratt(
+        &mut self,
+        min_bp: u8,
+        tree: &mut ExpressionTree,
+    ) -> ExpressionTreeNodeRef {
+        let current_token = self.next_token().unwrap();
+
+        if !matches!(current_token.kind, TokenKind::NumericLiteral) {
+            panic!("Not a numeric!");
+        };
+
+        let value: f64 = self
+            .lexer
+            .get_lexeme(&current_token.span)
+            .unwrap()
+            .parse()
+            .unwrap();
+        let mut lhs = tree.push(ExpressionTreeNode::Number(value));
+
+        loop {
+            let operator = {
+                let next_token = self.peek().unwrap();
+                match next_token.kind {
+                    TokenKind::Plus => ExpressionOperator::Add,
+                    TokenKind::Eof => {
+                        break;
+                    }
+                    _ => {
+                        panic!("Unexpected token!");
+                    }
+                }
+            };
+            let (lbp, rbp) = operator.get_binding_power();
+            if lbp < min_bp {
+                break;
+            }
+            let _ = self.next_token();
+
+            let rhs = self.parse_expression_pratt(rbp, tree);
+            lhs = tree.push(ExpressionTreeNode::Expression(operator, vec![lhs, rhs]));
+        }
+        lhs
+    }
+}

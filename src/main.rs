@@ -22,6 +22,8 @@ pub enum TauroxCommand {
     },
     Parse {
         path: PathBuf,
+        #[clap(long = "format", value_enum, default_value = "sexpr")]
+        format: ExpressionFormat,
     },
     Evaluate {
         path: PathBuf,
@@ -35,6 +37,13 @@ pub enum TauroxCommand {
 pub enum TokenFormat {
     Debug,
     Basic,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum ExpressionFormat {
+    Debug,
+    #[clap(name = "sexpr")]
+    SExpr,
 }
 
 fn main() -> ExitCode {
@@ -56,9 +65,16 @@ fn taurox_main() -> Result<ExitCode> {
                 }
             }
         }
-        TauroxCommand::Parse { path } => {
+        TauroxCommand::Parse { path, format } => {
             eprintln!("Parsing {:?}...", path);
-            todo!();
+            let src = read_to_string(path)?;
+            let res = parse(&src, &format);
+            match res {
+                Ok(true) => {}
+                Ok(false) | Err(_) => {
+                    return Ok(ExitCode::from(65));
+                }
+            }
         }
         TauroxCommand::Evaluate { path } => {
             eprintln!("Evaluating {:?}...", path);
@@ -93,4 +109,19 @@ fn tokenize(src: &str, format: &TokenFormat) -> Result<bool> {
             }
         };
     }
+}
+
+fn parse(src: &str, format: &ExpressionFormat) -> Result<bool> {
+    use taurox::expression::formatter::{
+        DebugFormatter, ExpressionFormatter, SExpressionFormatter,
+    };
+    use taurox::parser::Parser;
+    let mut parser = Parser::new(src);
+    let formatter: Box<dyn ExpressionFormatter> = match format {
+        ExpressionFormat::Debug => Box::new(DebugFormatter {}),
+        ExpressionFormat::SExpr => Box::new(SExpressionFormatter {}),
+    };
+    let expression = parser.parse_expression();
+    eprintln!("{}", formatter.format(&expression));
+    Ok(true)
 }
