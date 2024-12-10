@@ -1,0 +1,4 @@
+LEFT_PAREN ( null
+NUMBER 100.540 100.54
+RIGHT_PAREN ) null
+EOF  null

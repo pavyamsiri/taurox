@@ -68,6 +68,7 @@ fn test_all() -> Result<()> {
             let output_path = output_dir.join(output_file_name);
             read_to_string(output_path).context("Failed to open output test data file")?
         };
+        eprintln!("Testing {test_name:?}");
         check(&input, &expected, &test_name.to_string_lossy());
     }
     Ok(())

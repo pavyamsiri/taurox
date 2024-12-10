@@ -15,6 +15,11 @@ pub enum LexerStateTransition {
         token_or_error: Result<Token, LexicalError>,
         put_back: SourceChar,
     },
+    ChangeStateAndEmitAndPutBackTwo {
+        new_state: LexerState,
+        token_or_error: Result<Token, LexicalError>,
+        put_back: (SourceChar, SourceChar),
+    },
 }
 
 pub trait LexerStateExecutor {
@@ -149,7 +154,7 @@ impl LexerStateExecutor for NormalState {
                     kind: TokenKind::Eof,
                     span: Span {
                         start: self.location,
-                        length: source.len() - self.location,
+                        length: source.len() + 1 - self.location,
                     },
                     line: self.line,
                 }),
@@ -398,9 +403,10 @@ impl LexerStateExecutor for PeriodState {
                 line: self.line,
             }))
         } else {
-            LexerStateTransition::ChangeStateAndEmitAndPutBack {
+            let current_offset: usize = next_char.offset.into();
+            LexerStateTransition::ChangeStateAndEmitAndPutBackTwo {
                 new_state: LexerState::Normal(NormalState {
-                    location: next_char.offset,
+                    location: (current_offset - '.'.len_utf8()).into(),
                     line: self.line,
                 }),
                 token_or_error: Ok(Token {
@@ -411,7 +417,14 @@ impl LexerStateExecutor for PeriodState {
                     },
                     line: self.line,
                 }),
-                put_back: next_char.clone(),
+                put_back: (
+                    SourceChar {
+                        value: '.',
+                        offset: current_offset.into(),
+                        line: self.line,
+                    },
+                    next_char.clone(),
+                ),
             }
         }
     }
@@ -439,7 +452,7 @@ impl LexerStateExecutor for DecimalState {
         if next_char.value.is_ascii_digit() {
             LexerStateTransition::Stay
         } else {
-            LexerStateTransition::ChangeStateAndEmit {
+            LexerStateTransition::ChangeStateAndEmitAndPutBack {
                 new_state: LexerState::Normal(NormalState {
                     location: next_char.next_offset(),
                     line: next_char.line,
@@ -452,6 +465,7 @@ impl LexerStateExecutor for DecimalState {
                     },
                     line: self.line,
                 }),
+                put_back: next_char.clone(),
             }
         }
     }
