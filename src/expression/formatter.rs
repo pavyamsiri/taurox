@@ -36,8 +36,12 @@ impl SExpressionFormatter {
 
     fn format_operator(operator: &ExpressionOperator) -> String {
         match operator {
-            ExpressionOperator::Add => "+".into(),
+            ExpressionOperator::Add => "+",
+            ExpressionOperator::Subtract => "-",
+            ExpressionOperator::Multiply => "*",
+            ExpressionOperator::Divide => "/",
         }
+        .into()
     }
 }
 

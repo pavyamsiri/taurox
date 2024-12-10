@@ -3,12 +3,16 @@ pub mod formatter;
 #[derive(Debug, Clone)]
 pub enum ExpressionOperator {
     Add,
+    Subtract,
+    Multiply,
+    Divide,
 }
 
 impl ExpressionOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
-            ExpressionOperator::Add => (1, 2),
+            ExpressionOperator::Add | ExpressionOperator::Subtract => (1, 2),
+            ExpressionOperator::Multiply | ExpressionOperator::Divide => (3, 4),
         }
     }
 }

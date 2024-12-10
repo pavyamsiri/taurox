@@ -98,6 +98,9 @@ impl<'src> Parser<'src> {
 
         match token.kind {
             TokenKind::Plus => Ok(Some(ExpressionOperator::Add)),
+            TokenKind::Minus => Ok(Some(ExpressionOperator::Subtract)),
+            TokenKind::Star => Ok(Some(ExpressionOperator::Multiply)),
+            TokenKind::Slash => Ok(Some(ExpressionOperator::Divide)),
             TokenKind::Eof => Ok(None),
             _ => Err(ParserError {
                 kind: ParserErrorKind::NonOperator(token.kind),
