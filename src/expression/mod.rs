@@ -11,7 +11,7 @@ pub enum UnaryOperator {
 impl UnaryOperator {
     pub fn get_binding_power(&self) -> u8 {
         match self {
-            UnaryOperator::Bang | UnaryOperator::Minus => 1,
+            UnaryOperator::Bang | UnaryOperator::Minus => 5,
         }
     }
 }
