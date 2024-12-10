@@ -111,10 +111,6 @@ impl Span {
     pub fn range(&self) -> Range<usize> {
         self.start.into()..(self.start + self.length).into()
     }
-
-    pub fn next_offset(&self) -> SpanIndex {
-        self.start + self.length
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
