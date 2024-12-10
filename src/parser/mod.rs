@@ -18,6 +18,8 @@ pub enum ParserErrorKind {
     },
     #[error("Expected an operator but got token {0:?}")]
     NonOperator(TokenKind),
+    #[error("Expected an left hand side to expression but got token {0:?}")]
+    NonLeftHandSide(TokenKind),
     #[error("Encountered a lexer error {0}")]
     LexicalError(#[from] LexicalError),
 }
@@ -101,11 +103,7 @@ impl<'src> Parser<'src> {
             TokenKind::Minus => Ok(Some(BinaryOperator::Subtract)),
             TokenKind::Star => Ok(Some(BinaryOperator::Multiply)),
             TokenKind::Slash => Ok(Some(BinaryOperator::Divide)),
-            TokenKind::Eof => Ok(None),
-            _ => Err(ParserError {
-                kind: ParserErrorKind::NonOperator(token.kind),
-                line: 0,
-            }),
+            _ => Ok(None),
         }
     }
 
@@ -152,7 +150,17 @@ impl<'src> Parser<'src> {
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
                 tree.push(ExpressionTreeNode::Unary { operator, rhs })
             }
-            _ => panic!(),
+            TokenKind::LeftParenthesis => {
+                let inner = self.parse_expression_pratt(0, tree)?;
+                self.expect(TokenKind::RightParenthesis)?;
+                inner
+            }
+            kind => {
+                return Err(ParserError {
+                    kind: ParserErrorKind::NonLeftHandSide(kind),
+                    line: 0,
+                })
+            }
         };
         Ok(node)
     }
