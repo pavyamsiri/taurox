@@ -90,7 +90,7 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
                 format!("[line {}] Error: Unexpected character: {c}", error.line)
             }
             LexicalErrorKind::UnclosedString => {
-                format!("[line {}] Error: Unterminated string", error.line)
+                format!("[line {}] Error: Unterminated string.", error.line)
             }
         }
     }
