@@ -22,12 +22,26 @@ pub struct LexicalError {
 }
 
 #[derive(Debug)]
+pub struct SourceChar {
+    value: char,
+    offset: SpanIndex,
+    line: u32,
+}
+
+impl SourceChar {
+    pub fn next_offset(&self) -> SpanIndex {
+        self.offset + self.value.len_utf8()
+    }
+}
+
+#[derive(Debug)]
 pub struct Lexer<'src> {
     source: &'src str,
     chars: Chars<'src>,
     state: LexerState,
     offset: SpanIndex,
-    lookahead: Option<(SpanIndex, char)>,
+    lookahead: Option<SourceChar>,
+    line: u32,
 }
 
 impl<'src> Lexer<'src> {
@@ -38,6 +52,7 @@ impl<'src> Lexer<'src> {
             state: LexerState::default(),
             lookahead: None,
             offset: 0.into(),
+            line: 1,
         }
     }
 
@@ -47,14 +62,22 @@ impl<'src> Lexer<'src> {
 }
 
 impl<'src> Lexer<'src> {
-    fn next_char(&mut self) -> Option<(SpanIndex, char)> {
+    fn next_char(&mut self) -> Option<SourceChar> {
         if self.lookahead.is_some() {
             self.lookahead.take()
         } else {
             if let Some(c) = self.chars.next() {
+                if c == '\n' {
+                    self.line += 1;
+                }
+
                 let old_location = self.offset;
                 self.offset = self.offset + c.len_utf8();
-                Some((old_location, c))
+                Some(SourceChar {
+                    value: c,
+                    offset: old_location,
+                    line: self.line,
+                })
             } else {
                 None
             }
@@ -62,7 +85,11 @@ impl<'src> Lexer<'src> {
     }
 
     fn put_back_char(&mut self, c: char) {
-        self.lookahead = Some((self.offset, c));
+        self.lookahead = Some(SourceChar {
+            value: c,
+            offset: self.offset,
+            line: self.line,
+        });
     }
 
     pub fn next_token(&mut self) -> Result<Token, LexicalError> {
