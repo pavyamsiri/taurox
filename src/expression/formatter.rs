@@ -22,6 +22,8 @@ impl SExpressionFormatter {
         let current_node = &tree.nodes[node.0 as usize];
 
         match current_node {
+            ExpressionTreeNode::Atom(ExpressionTreeAtom::Nil) => "nil".into(),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom::Bool(value)) => format!("{value}"),
             ExpressionTreeNode::Atom(ExpressionTreeAtom::Number(value)) => format!("{value:?}"),
             ExpressionTreeNode::Atom(ExpressionTreeAtom::Identifier(value)) => format!("{value}"),
             ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value)) => {

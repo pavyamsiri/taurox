@@ -138,6 +138,19 @@ impl<'src> Parser<'src> {
                     ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value.into()));
                 tree.push(node)
             }
+            TokenKind::KeywordNil => {
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Nil);
+                tree.push(node)
+            }
+            TokenKind::KeywordTrue => {
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Bool(true));
+                tree.push(node)
+            }
+            TokenKind::KeywordFalse => {
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Bool(false));
+                tree.push(node)
+            }
+            // Unary operators
             TokenKind::Minus => {
                 let operator = UnaryOperator::Minus;
                 let rbp = operator.get_binding_power();
@@ -150,6 +163,7 @@ impl<'src> Parser<'src> {
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
                 tree.push(ExpressionTreeNode::Unary { operator, rhs })
             }
+            // Bracketed expression
             TokenKind::LeftParenthesis => {
                 let inner = self.parse_expression_pratt(0, tree)?;
                 self.expect(TokenKind::RightParenthesis)?;

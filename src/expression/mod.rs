@@ -52,6 +52,8 @@ pub enum ExpressionTreeNode {
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeAtom {
     Number(f64),
+    Bool(bool),
+    Nil,
     Identifier(CompactString),
     StringLiteral(CompactString),
 }
