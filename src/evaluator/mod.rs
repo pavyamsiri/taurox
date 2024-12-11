@@ -1,10 +1,11 @@
 pub mod formatter;
 
-use std::collections::HashMap;
-
-use crate::expression::{
-    BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode,
-    ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+use crate::{
+    expression::{
+        BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode,
+        ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+    },
+    interpreter::Environment,
 };
 use compact_str::{CompactString, CompactStringExt};
 use thiserror::Error;
@@ -152,7 +153,7 @@ impl ExpressionEvaluator {
     fn evaluate_expression_node(
         tree: &ExpressionTreeWithRoot,
         node: &ExpressionTreeNodeRef,
-        environment: &HashMap<CompactString, Option<LoxValue>>,
+        environment: &Environment,
     ) -> Result<LoxValue, RuntimeError> {
         let current_node = tree
             .get_node(node)
@@ -178,8 +179,7 @@ impl ExpressionEvaluator {
                 kind: ExpressionTreeAtomKind::Identifier(name),
                 ..
             }) => environment
-                .get(name)
-                .and_then(|v| v.as_ref())
+                .get_global(name)
                 .ok_or(RuntimeError {
                     kind: RuntimeErrorKind::InvalidAccess(name.clone()),
                     line,
@@ -209,7 +209,7 @@ impl ExpressionEvaluator {
 
     pub fn evaluate_expression(
         tree: &ExpressionTreeWithRoot,
-        environment: &HashMap<CompactString, Option<LoxValue>>,
+        environment: &Environment,
     ) -> Result<LoxValue, RuntimeError> {
         ExpressionEvaluator::evaluate_expression_node(tree, &tree.get_root_ref(), environment)
     }

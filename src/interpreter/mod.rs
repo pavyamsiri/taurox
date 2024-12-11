@@ -15,13 +15,34 @@ pub enum ProgramState {
     Terminate,
 }
 
+#[derive(Debug)]
+pub struct Environment {
+    globals: HashMap<CompactString, LoxValue>,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Self {
+            globals: HashMap::new(),
+        }
+    }
+
+    pub fn get_global(&self, name: &str) -> Option<&LoxValue> {
+        self.globals.get(name)
+    }
+
+    pub fn set_global(&mut self, name: &str, value: LoxValue) {
+        self.globals.insert(name.to_compact_string(), value);
+    }
+}
+
 pub trait Interpreter {
     fn step(&mut self) -> Result<ProgramState, RuntimeError>;
 }
 
 pub struct TreeWalkInterpreter {
     program: Program,
-    environment: HashMap<CompactString, Option<LoxValue>>,
+    environment: Environment,
     counter: usize,
 }
 
@@ -29,7 +50,7 @@ impl TreeWalkInterpreter {
     pub fn new(program: Program) -> Self {
         Self {
             program,
-            environment: HashMap::new(),
+            environment: Environment::new(),
             counter: 0,
         }
     }
@@ -46,14 +67,11 @@ impl Interpreter for TreeWalkInterpreter {
         match statement {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
                 let initial = if let Some(expr) = initial {
-                    Some(ExpressionEvaluator::evaluate_expression(
-                        expr,
-                        &self.environment,
-                    )?)
+                    ExpressionEvaluator::evaluate_expression(expr, &self.environment)?
                 } else {
-                    None
+                    LoxValue::Nil
                 };
-                self.environment.insert(name.clone(), initial);
+                self.environment.set_global(name, initial);
             }
             Statement::NonDeclaration(NonDeclaration::Expression(ref expr)) => {
                 let result = ExpressionEvaluator::evaluate_expression(expr, &self.environment)?;
