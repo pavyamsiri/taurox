@@ -48,7 +48,7 @@ impl BinaryOperator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ExpressionTreeNodeRef(u32);
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeNode {
@@ -108,5 +108,13 @@ impl ExpressionTreeWithRoot {
                 root,
             })
         }
+    }
+
+    pub fn get_root(&self) -> ExpressionTreeNodeRef {
+        self.root
+    }
+
+    pub fn get_node(&self, node: &ExpressionTreeNodeRef) -> Option<&ExpressionTreeNode> {
+        self.nodes.get(node.0 as usize)
     }
 }

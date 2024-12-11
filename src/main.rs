@@ -72,7 +72,15 @@ fn taurox_main() -> Result<ExitCode> {
         }
         TauroxCommand::Evaluate { path } => {
             eprintln!("Evaluating {:?}...", path);
-            todo!();
+            let src = read_to_string(path)?;
+            let res = evaluate(&src);
+            match res {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("{e}");
+                    return Ok(ExitCode::from(65));
+                }
+            }
         }
         TauroxCommand::Run { path } => {
             eprintln!("Running {:?}...", path);
@@ -122,5 +130,20 @@ fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
     };
     let expression = parser.parse_expression()?;
     eprintln!("{}", formatter.format(&expression));
+    Ok(())
+}
+
+fn evaluate(src: &str) -> Result<()> {
+    use taurox::evaluator::ExpressionEvaluator;
+    use taurox::parser::Parser;
+
+    let mut parser = Parser::new(src);
+    let expression = parser.parse_expression()?;
+    let mut evaluator = ExpressionEvaluator::new();
+
+    let result = evaluator.evaluate(&expression)?;
+
+    eprintln!("{}", result);
+
     Ok(())
 }
