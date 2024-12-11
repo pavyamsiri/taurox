@@ -182,7 +182,6 @@ fn run(src: &str) -> std::result::Result<(), ProgramError> {
             .map_err(|e| ProgramError::RuntimeError(e))?;
         match state {
             ProgramState::Run => {}
-            ProgramState::Write(output) => eprintln!("{output}"),
             ProgramState::Terminate => break,
         }
     }

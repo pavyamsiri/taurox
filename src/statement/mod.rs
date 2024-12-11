@@ -20,4 +20,5 @@ pub enum Declaration {
 pub enum NonDeclaration {
     Expression(ExpressionTreeWithRoot),
     Print(ExpressionTreeWithRoot),
+    Block(Vec<Statement>),
 }

@@ -330,48 +330,70 @@ impl<'src> Parser<'src> {
     pub fn parse(&mut self) -> Result<Program, ParserError> {
         let mut statements = Vec::new();
 
-        loop {
-            let first = self.peek()?;
-            match first.kind {
-                TokenKind::KeywordPrint => {
-                    let _ = self
-                        .expect(TokenKind::KeywordPrint)
-                        .expect("Just checked it.");
-                    let rhs = self.parse_expression()?;
-                    statements.push(Statement::NonDeclaration(NonDeclaration::Print(rhs)));
-                    let _ = self.expect(TokenKind::Semicolon)?;
-                }
-                TokenKind::KeywordVar => {
-                    let _ = self
-                        .expect(TokenKind::KeywordVar)
-                        .expect("Just checked it.");
-                    let place = self.expect_ident()?;
-
-                    let mut initial = None;
-
-                    // Assignment
-                    if let Some(_) = self.eat_if(TokenKind::Equal)? {
-                        let rhs = self.parse_expression()?;
-                        initial = Some(rhs);
-                    }
-
-                    statements.push(Statement::Declaration(Declaration::Variable {
-                        name: place.clone(),
-                        initial,
-                    }));
-                    let _ = self.expect(TokenKind::Semicolon)?;
-                }
-                TokenKind::Eof => {
-                    break;
-                }
-                _ => {
-                    let expr = self.parse_expression()?;
-                    let _ = self.expect(TokenKind::Semicolon)?;
-                    statements.push(Statement::NonDeclaration(NonDeclaration::Expression(expr)));
-                }
-            }
+        while let Some(statement) = self.parse_statement()? {
+            statements.push(statement);
         }
 
         Ok(Program { statements })
+    }
+
+    pub fn parse_statement(&mut self) -> Result<Option<Statement>, ParserError> {
+        let first = self.peek()?;
+        let statement = match first.kind {
+            TokenKind::KeywordPrint => {
+                let _ = self
+                    .expect(TokenKind::KeywordPrint)
+                    .expect("Just checked it.");
+                let rhs = self.parse_expression()?;
+                let statement = Statement::NonDeclaration(NonDeclaration::Print(rhs));
+                let _ = self.expect(TokenKind::Semicolon)?;
+                statement
+            }
+            TokenKind::KeywordVar => {
+                let _ = self
+                    .expect(TokenKind::KeywordVar)
+                    .expect("Just checked it.");
+                let place = self.expect_ident()?;
+
+                let mut initial = None;
+
+                // Assignment
+                if let Some(_) = self.eat_if(TokenKind::Equal)? {
+                    let rhs = self.parse_expression()?;
+                    initial = Some(rhs);
+                }
+
+                let statement = Statement::Declaration(Declaration::Variable {
+                    name: place.clone(),
+                    initial,
+                });
+                let _ = self.expect(TokenKind::Semicolon)?;
+                statement
+            }
+            TokenKind::LeftBrace => {
+                let _ = self.expect(TokenKind::LeftBrace).expect("Just checked it.");
+                let mut statements = Vec::new();
+                loop {
+                    let statement = self.parse_statement()?.ok_or(ParserError {
+                        kind: ParserErrorKind::UnexpectedEof,
+                        line: first.line,
+                    })?;
+                    statements.push(statement);
+                    if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
+                        break;
+                    }
+                }
+                Statement::NonDeclaration(NonDeclaration::Block(statements))
+            }
+            TokenKind::Eof => {
+                return Ok(None);
+            }
+            _ => {
+                let expr = self.parse_expression()?;
+                let _ = self.expect(TokenKind::Semicolon)?;
+                Statement::NonDeclaration(NonDeclaration::Expression(expr))
+            }
+        };
+        Ok(Some(statement))
     }
 }

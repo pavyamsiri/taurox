@@ -4,6 +4,7 @@ use compact_str::{CompactString, ToCompactString};
 
 use crate::{
     evaluator::{ExpressionEvaluator, LoxValue, RuntimeError},
+    expression::ExpressionTreeWithRoot,
     parser::Program,
     statement::{Declaration, NonDeclaration, Statement},
 };
@@ -11,7 +12,6 @@ use crate::{
 #[derive(Debug)]
 pub enum ProgramState {
     Run,
-    Write(CompactString),
     Terminate,
 }
 
@@ -54,36 +54,88 @@ impl TreeWalkInterpreter {
             counter: 0,
         }
     }
+
+    // Visitors
+
+    fn handle_statement(
+        statement: &Statement,
+        environment: &mut Environment,
+    ) -> Result<ProgramState, RuntimeError> {
+        let state = match statement {
+            Statement::Declaration(Declaration::Variable { name, initial }) => {
+                TreeWalkInterpreter::interpret_variable_declaration(
+                    environment,
+                    name,
+                    initial.as_ref(),
+                )?
+            }
+            Statement::NonDeclaration(NonDeclaration::Expression(ref expr)) => {
+                TreeWalkInterpreter::interpret_expression_statement(environment, expr)?
+            }
+            Statement::NonDeclaration(NonDeclaration::Print(ref expr)) => {
+                TreeWalkInterpreter::interpret_print_statement(environment, expr)?
+            }
+            Statement::NonDeclaration(NonDeclaration::Block(statements)) => {
+                TreeWalkInterpreter::interpret_block_statement(environment, statements)?
+            }
+        };
+        Ok(state)
+    }
+
+    fn interpret_variable_declaration(
+        environment: &mut Environment,
+        name: &str,
+        initial: Option<&ExpressionTreeWithRoot>,
+    ) -> Result<ProgramState, RuntimeError> {
+        let initial = if let Some(expr) = initial {
+            ExpressionEvaluator::evaluate_expression(expr, environment)?
+        } else {
+            LoxValue::Nil
+        };
+        environment.set_global(name, initial);
+        Ok(ProgramState::Run)
+    }
+
+    fn interpret_print_statement(
+        environment: &mut Environment,
+        expr: &ExpressionTreeWithRoot,
+    ) -> Result<ProgramState, RuntimeError> {
+        let result = ExpressionEvaluator::evaluate_expression(expr, environment)?;
+        println!("{result}");
+        Ok(ProgramState::Run)
+    }
+
+    fn interpret_expression_statement(
+        environment: &mut Environment,
+        expr: &ExpressionTreeWithRoot,
+    ) -> Result<ProgramState, RuntimeError> {
+        let result = ExpressionEvaluator::evaluate_expression(expr, environment)?;
+        eprintln!("SIDE EFFECTLESS: {result:?}");
+        Ok(ProgramState::Run)
+    }
+
+    fn interpret_block_statement(
+        environment: &mut Environment,
+        statements: &Vec<Statement>,
+    ) -> Result<ProgramState, RuntimeError> {
+        // TODO(pavyamsiri): This write out program state doesn't make sense for block statements
+        let mut state = ProgramState::Run;
+        for statement in statements {
+            state = TreeWalkInterpreter::handle_statement(statement, environment)?;
+        }
+        Ok(state)
+    }
 }
 
 impl Interpreter for TreeWalkInterpreter {
     fn step(&mut self) -> Result<ProgramState, RuntimeError> {
-        let Some(statement) = self.program.get_statement(self.counter) else {
-            return Ok(ProgramState::Terminate);
-        };
+        if let Some(statement) = { self.program.get_statement(self.counter) } {
+            let state = TreeWalkInterpreter::handle_statement(statement, &mut self.environment)?;
+            self.counter += 1;
 
-        let mut state = ProgramState::Run;
-
-        match statement {
-            Statement::Declaration(Declaration::Variable { name, initial }) => {
-                let initial = if let Some(expr) = initial {
-                    ExpressionEvaluator::evaluate_expression(expr, &mut self.environment)?
-                } else {
-                    LoxValue::Nil
-                };
-                self.environment.set_global(name, initial);
-            }
-            Statement::NonDeclaration(NonDeclaration::Expression(ref expr)) => {
-                let result = ExpressionEvaluator::evaluate_expression(expr, &mut self.environment)?;
-                eprintln!("SIDE EFFECTLESS: {result:?}");
-            }
-            Statement::NonDeclaration(NonDeclaration::Print(ref expr)) => {
-                let result = ExpressionEvaluator::evaluate_expression(expr, &mut self.environment)?;
-                state = ProgramState::Write(format!("{result}").to_compact_string())
-            }
+            Ok(state)
+        } else {
+            Ok(ProgramState::Terminate)
         }
-        self.counter += 1;
-
-        Ok(state)
     }
 }
