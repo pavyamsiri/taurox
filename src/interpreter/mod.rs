@@ -6,7 +6,7 @@ use crate::{
     evaluator::{ExpressionEvaluator, LoxValue, RuntimeError},
     expression::ExpressionTreeWithRoot,
     parser::Program,
-    statement::{Declaration, NonDeclaration, Statement},
+    statement::{Declaration, Initializer, NonDeclaration, Statement},
 };
 
 #[derive(Debug)]
@@ -118,35 +118,42 @@ impl TreeWalkInterpreter {
     ) -> Result<ProgramState, RuntimeError> {
         let state = match statement {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
-                TreeWalkInterpreter::interpret_variable_declaration(
-                    environment,
-                    name,
-                    initial.as_ref(),
-                )?
+                Self::interpret_variable_declaration(environment, name, initial.as_ref())?
             }
             Statement::NonDeclaration(NonDeclaration::Expression(ref expr)) => {
-                TreeWalkInterpreter::interpret_expression_statement(environment, expr)?
+                Self::interpret_expression_statement(environment, expr)?
             }
             Statement::NonDeclaration(NonDeclaration::Print(ref expr)) => {
-                TreeWalkInterpreter::interpret_print_statement(environment, expr)?
+                Self::interpret_print_statement(environment, expr)?
             }
             Statement::NonDeclaration(NonDeclaration::Block(statements)) => {
-                TreeWalkInterpreter::interpret_block_statement(environment, statements)?
+                Self::interpret_block_statement(environment, statements)?
             }
             Statement::NonDeclaration(NonDeclaration::If {
                 condition,
                 success,
                 failure,
-            }) => TreeWalkInterpreter::interpret_if_statement(
+            }) => Self::interpret_if_statement(
                 environment,
                 condition,
                 success,
                 failure.as_ref().as_ref(),
             )?,
-
             Statement::NonDeclaration(NonDeclaration::While { condition, body }) => {
-                TreeWalkInterpreter::interpret_while_statement(environment, condition, body)?
+                Self::interpret_while_statement(environment, condition, body)?
             }
+            Statement::NonDeclaration(NonDeclaration::For {
+                initializer,
+                condition,
+                increment,
+                body,
+            }) => Self::interpret_for_statement(
+                environment,
+                initializer.as_ref(),
+                condition.as_ref(),
+                increment.as_ref(),
+                body,
+            )?,
         };
         Ok(state)
     }
@@ -217,10 +224,53 @@ impl TreeWalkInterpreter {
         let mut state = ProgramState::Run;
         environment.enter_scope();
         for statement in statements {
-            state = TreeWalkInterpreter::handle_statement(statement, environment)?;
+            state = Self::handle_statement(statement, environment)?;
         }
         environment.exit_scope();
         Ok(state)
+    }
+
+    fn interpret_for_statement(
+        environment: &mut Environment,
+        initializer: Option<&Initializer>,
+        condition: Option<&ExpressionTreeWithRoot>,
+        increment: Option<&ExpressionTreeWithRoot>,
+        body: &Statement,
+    ) -> Result<ProgramState, RuntimeError> {
+        // Run the initializer
+        environment.enter_scope();
+        match initializer {
+            Some(Initializer::VarDecl { name, initial }) => {
+                Self::interpret_variable_declaration(environment, name, initial.as_ref())?;
+            }
+            Some(Initializer::Expression(expr)) => {
+                ExpressionEvaluator::evaluate_expression(expr, environment)?;
+            }
+            _ => {}
+        };
+
+        loop {
+            let flag = match condition {
+                Some(condition) => {
+                    ExpressionEvaluator::evaluate_expression(condition, environment)?.is_truthy()
+                }
+                None => true,
+            };
+
+            if !flag {
+                break;
+            }
+
+            Self::handle_statement(body, environment)?;
+            match increment {
+                Some(increment) => {
+                    ExpressionEvaluator::evaluate_expression(increment, environment)?;
+                }
+                None => {}
+            }
+        }
+        environment.exit_scope();
+        Ok(ProgramState::Run)
     }
 }
 

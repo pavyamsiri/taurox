@@ -5,7 +5,7 @@ use crate::{
         ExpressionTreeWithRoot, UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
-    statement::{Declaration, NonDeclaration, Statement},
+    statement::{Declaration, Initializer, NonDeclaration, Statement},
     token::{Token, TokenKind},
 };
 
@@ -450,6 +450,75 @@ impl<'src> Parser<'src> {
 
                 Statement::NonDeclaration(NonDeclaration::While {
                     condition,
+                    body: Box::new(body),
+                })
+            }
+            TokenKind::KeywordFor => {
+                let _ = self
+                    .expect(TokenKind::KeywordFor)
+                    .expect("Just checked it.");
+                let _ = self.expect(TokenKind::LeftParenthesis)?;
+
+                // Parse initializer
+                let initializer: Option<Initializer> = {
+                    if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
+                        None
+                    }
+                    // Initializer exists
+                    else {
+                        let statement = self.parse_statement()?.ok_or(ParserError {
+                            kind: ParserErrorKind::UnexpectedEof,
+                            line: first.line,
+                        })?;
+                        let initializer = match statement {
+                            Statement::Declaration(Declaration::Variable { name, initial }) => {
+                                Some(Initializer::VarDecl { name, initial })
+                            }
+                            Statement::NonDeclaration(NonDeclaration::Expression(expr)) => {
+                                Some(Initializer::Expression(expr))
+                            }
+                            _ => None,
+                        };
+                        initializer
+                    }
+                };
+
+                // Parse condition
+                let condition: Option<ExpressionTreeWithRoot> = {
+                    if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
+                        None
+                    }
+                    // Condition exists
+                    else {
+                        let expr = self.parse_expression()?;
+                        self.expect(TokenKind::Semicolon)?;
+                        Some(expr)
+                    }
+                };
+
+                // Parse increment
+                let increment: Option<ExpressionTreeWithRoot> = {
+                    if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                        None
+                    }
+                    // Increment exists
+                    else {
+                        let expr = self.parse_expression()?;
+                        self.expect(TokenKind::RightParenthesis)?;
+                        Some(expr)
+                    }
+                };
+
+                // Parse body
+                let body = self.parse_statement()?.ok_or(ParserError {
+                    kind: ParserErrorKind::UnexpectedEof,
+                    line: first.line,
+                })?;
+
+                Statement::NonDeclaration(NonDeclaration::For {
+                    initializer,
+                    condition,
+                    increment,
                     body: Box::new(body),
                 })
             }

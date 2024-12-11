@@ -17,6 +17,15 @@ pub enum Declaration {
 }
 
 #[derive(Debug)]
+pub enum Initializer {
+    VarDecl {
+        name: CompactString,
+        initial: Option<ExpressionTreeWithRoot>,
+    },
+    Expression(ExpressionTreeWithRoot),
+}
+
+#[derive(Debug)]
 pub enum NonDeclaration {
     Expression(ExpressionTreeWithRoot),
     Print(ExpressionTreeWithRoot),
@@ -28,6 +37,12 @@ pub enum NonDeclaration {
     },
     While {
         condition: ExpressionTreeWithRoot,
+        body: Box<Statement>,
+    },
+    For {
+        initializer: Option<Initializer>,
+        condition: Option<ExpressionTreeWithRoot>,
+        increment: Option<ExpressionTreeWithRoot>,
         body: Box<Statement>,
     },
 }
