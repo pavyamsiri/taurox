@@ -1,7 +1,8 @@
 use crate::{
     expression::{
-        BinaryOperator, ExpressionTree, ExpressionTreeAtom, ExpressionTreeAtomKind,
-        ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+        BinaryAssignmentOperator, BinaryOperator, ExpressionTree, ExpressionTreeAtom,
+        ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
+        UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
     statement::{Declaration, NonDeclaration, Statement},
@@ -141,6 +142,16 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn peek_binary_assignment_operator(
+        &mut self,
+    ) -> Result<Option<BinaryAssignmentOperator>, ParserError> {
+        let token = self.peek()?;
+
+        match token.kind {
+            TokenKind::Equal => Ok(Some(BinaryAssignmentOperator::Assign)),
+            _ => Ok(None),
+        }
+    }
     fn expect_left_expression(
         &mut self,
         tree: &mut ExpressionTree,
@@ -246,6 +257,36 @@ impl<'src> Parser<'src> {
         let mut lhs = self.expect_left_expression(tree)?;
 
         loop {
+            if let Some(operator) = self.peek_binary_assignment_operator()? {
+                let place = {
+                    let lhs_node = tree
+                        .get_node(&lhs)
+                        .expect("The node ref is valid because it came from pushing to the tree.");
+                    lhs_node.get_l_value().ok_or(ParserError {
+                        kind: ParserErrorKind::InvalidLValue(tree.get_kind(&lhs).expect(
+                            "The node ref is valid because it came from pushing to the tree.",
+                        )),
+                        line: tree.get_line(&lhs).expect(
+                            "The node ref is valid because it came from pushing to the tree.",
+                        ),
+                    })?
+                };
+
+                let (lbp, rbp) = operator.get_binding_power();
+                if lbp < min_bp {
+                    break;
+                }
+                let _ = self.next_token()?;
+
+                let rhs = self.parse_expression_pratt(rbp, tree)?;
+                lhs = tree.push(ExpressionTreeNode::BinaryAssignment {
+                    operator,
+                    lhs: place,
+                    rhs,
+                });
+                continue;
+            }
+
             if let Some(operator) = self.peek_binary_operator()? {
                 let (lbp, rbp) = operator.get_binding_power();
                 if lbp < min_bp {

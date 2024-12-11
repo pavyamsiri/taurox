@@ -155,8 +155,8 @@ fn evaluate(src: &str) -> Result<()> {
     let mut parser = Parser::new(src);
     let expression = parser.parse_expression()?;
 
-    let environment = Environment::new();
-    let result = ExpressionEvaluator::evaluate_expression(&expression, &environment)?;
+    let mut environment = Environment::new();
+    let result = ExpressionEvaluator::evaluate_expression(&expression, &mut environment)?;
 
     eprintln!("{}", result);
 

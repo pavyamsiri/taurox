@@ -67,18 +67,18 @@ impl Interpreter for TreeWalkInterpreter {
         match statement {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
                 let initial = if let Some(expr) = initial {
-                    ExpressionEvaluator::evaluate_expression(expr, &self.environment)?
+                    ExpressionEvaluator::evaluate_expression(expr, &mut self.environment)?
                 } else {
                     LoxValue::Nil
                 };
                 self.environment.set_global(name, initial);
             }
             Statement::NonDeclaration(NonDeclaration::Expression(ref expr)) => {
-                let result = ExpressionEvaluator::evaluate_expression(expr, &self.environment)?;
+                let result = ExpressionEvaluator::evaluate_expression(expr, &mut self.environment)?;
                 eprintln!("SIDE EFFECTLESS: {result:?}");
             }
             Statement::NonDeclaration(NonDeclaration::Print(ref expr)) => {
-                let result = ExpressionEvaluator::evaluate_expression(expr, &self.environment)?;
+                let result = ExpressionEvaluator::evaluate_expression(expr, &mut self.environment)?;
                 state = ProgramState::Write(format!("{result}").to_compact_string())
             }
         }

@@ -2,6 +2,8 @@ pub mod formatter;
 
 use compact_str::CompactString;
 
+use crate::token::TokenKind;
+
 #[derive(Debug, Clone)]
 pub enum UnaryOperator {
     Bang,
@@ -11,7 +13,8 @@ pub enum UnaryOperator {
 impl UnaryOperator {
     pub fn get_binding_power(&self) -> u8 {
         match self {
-            UnaryOperator::Bang | UnaryOperator::Minus => 7,
+            // 1. Unary operators
+            UnaryOperator::Bang | UnaryOperator::Minus => 9,
         }
     }
 }
@@ -33,17 +36,30 @@ pub enum BinaryOperator {
 impl BinaryOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
-            // 1. Multiplicative operators
-            BinaryOperator::Multiply | BinaryOperator::Divide => (5, 6),
-            // 2. Additive operators
-            BinaryOperator::Add | BinaryOperator::Subtract => (3, 4),
-            // 3. Comparison operators
+            // 2. Multiplicative operators
+            BinaryOperator::Multiply | BinaryOperator::Divide => (7, 8),
+            // 3. Additive operators
+            BinaryOperator::Add | BinaryOperator::Subtract => (5, 6),
+            // 4. Comparison operators
             BinaryOperator::LessThan
             | BinaryOperator::LessThanEqual
             | BinaryOperator::GreaterThan
-            | BinaryOperator::GreaterThanEqual => (2, 3),
-            // 4. Equality operators
-            BinaryOperator::EqualEqual | BinaryOperator::BangEqual => (1, 2),
+            | BinaryOperator::GreaterThanEqual => (4, 5),
+            // 5. Equality operators
+            BinaryOperator::EqualEqual | BinaryOperator::BangEqual => (3, 4),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum BinaryAssignmentOperator {
+    Assign,
+}
+
+impl BinaryAssignmentOperator {
+    pub fn get_binding_power(&self) -> (u8, u8) {
+        match self {
+            BinaryAssignmentOperator::Assign => (2, 1),
         }
     }
 }
@@ -65,6 +81,23 @@ pub enum ExpressionTreeNode {
     Group {
         inner: ExpressionTreeNodeRef,
     },
+    BinaryAssignment {
+        operator: BinaryAssignmentOperator,
+        lhs: CompactString,
+        rhs: ExpressionTreeNodeRef,
+    },
+}
+
+impl ExpressionTreeNode {
+    pub fn get_l_value(&self) -> Option<CompactString> {
+        match self {
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Identifier(name),
+                ..
+            }) => Some(name.clone()),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +120,12 @@ pub struct ExpressionTree {
     nodes: Vec<ExpressionTreeNode>,
 }
 
+#[derive(Debug, Clone)]
+pub struct ExpressionTreeWithRoot {
+    nodes: Vec<ExpressionTreeNode>,
+    root: ExpressionTreeNodeRef,
+}
+
 impl ExpressionTree {
     pub fn new() -> Self {
         Self { nodes: Vec::new() }
@@ -96,12 +135,39 @@ impl ExpressionTree {
         self.nodes.push(node);
         ExpressionTreeNodeRef(self.nodes.len() as u32 - 1)
     }
-}
 
-#[derive(Debug, Clone)]
-pub struct ExpressionTreeWithRoot {
-    nodes: Vec<ExpressionTreeNode>,
-    root: ExpressionTreeNodeRef,
+    pub fn get_node(&self, index: &ExpressionTreeNodeRef) -> Option<&ExpressionTreeNode> {
+        self.nodes.get(index.0 as usize)
+    }
+
+    pub fn get_line(&self, node: &ExpressionTreeNodeRef) -> Option<u32> {
+        let node = self.nodes.get(node.0 as usize)?;
+        match node {
+            ExpressionTreeNode::Atom(ExpressionTreeAtom { line, .. }) => Some(*line),
+            ExpressionTreeNode::Unary { rhs, .. } => self.get_line(rhs),
+            ExpressionTreeNode::Binary { lhs, .. } => self.get_line(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_line(inner),
+            ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_line(rhs),
+        }
+    }
+
+    pub fn get_kind(&self, node: &ExpressionTreeNodeRef) -> Option<TokenKind> {
+        let node = self.nodes.get(node.0 as usize)?;
+        match node {
+            ExpressionTreeNode::Atom(ExpressionTreeAtom { kind, .. }) => match kind {
+                ExpressionTreeAtomKind::Number(_) => Some(TokenKind::NumericLiteral),
+                ExpressionTreeAtomKind::Bool(true) => Some(TokenKind::KeywordTrue),
+                ExpressionTreeAtomKind::Bool(false) => Some(TokenKind::KeywordFalse),
+                ExpressionTreeAtomKind::Nil => Some(TokenKind::KeywordNil),
+                ExpressionTreeAtomKind::Identifier(_) => Some(TokenKind::Ident),
+                ExpressionTreeAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
+            },
+            ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
+            ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_kind(inner),
+            ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_kind(rhs),
+        }
+    }
 }
 
 impl ExpressionTreeWithRoot {
@@ -136,6 +202,7 @@ impl ExpressionTreeWithRoot {
             ExpressionTreeNode::Unary { rhs, .. } => self.get_line(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_line(lhs),
             ExpressionTreeNode::Group { inner } => self.get_line(inner),
+            ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_line(rhs),
         }
     }
 }

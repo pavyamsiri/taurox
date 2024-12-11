@@ -19,10 +19,10 @@ fn check(input: &str, expected: &str, test_name: &str) {
     let result = parser.parse_expression();
     let expression_formatter = SExpressionFormatter;
     let value_formatter = BasicFormatter;
-    let environment = Environment::new();
+    let mut environment = Environment::new();
     let actual = match result {
         Ok(ref t) => {
-            let v = ExpressionEvaluator::evaluate_expression(t, &environment);
+            let v = ExpressionEvaluator::evaluate_expression(t, &mut environment);
             match v {
                 Ok(ref v) => format!("{}", value_formatter.format(v)),
                 Err(ref e) => format!("{}", value_formatter.format_error(e)),

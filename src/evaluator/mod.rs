@@ -2,8 +2,8 @@ pub mod formatter;
 
 use crate::{
     expression::{
-        BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode,
-        ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+        BinaryAssignmentOperator, BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind,
+        ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
     },
     interpreter::Environment,
 };
@@ -153,7 +153,7 @@ impl ExpressionEvaluator {
     fn evaluate_expression_node(
         tree: &ExpressionTreeWithRoot,
         node: &ExpressionTreeNodeRef,
-        environment: &Environment,
+        environment: &mut Environment,
     ) -> Result<LoxValue, RuntimeError> {
         let current_node = tree
             .get_node(node)
@@ -203,13 +203,22 @@ impl ExpressionEvaluator {
             ExpressionTreeNode::Group { inner } => {
                 ExpressionEvaluator::evaluate_expression_node(tree, inner, environment)?
             }
+            ExpressionTreeNode::BinaryAssignment {
+                operator: BinaryAssignmentOperator::Assign,
+                lhs,
+                rhs,
+            } => {
+                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs, environment)?;
+                environment.set_global(lhs, rhs.clone());
+                rhs
+            }
         };
         Ok(result)
     }
 
     pub fn evaluate_expression(
         tree: &ExpressionTreeWithRoot,
-        environment: &Environment,
+        environment: &mut Environment,
     ) -> Result<LoxValue, RuntimeError> {
         ExpressionEvaluator::evaluate_expression_node(tree, &tree.get_root_ref(), environment)
     }
