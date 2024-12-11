@@ -257,9 +257,10 @@ impl<'src> Parser<'src> {
         let mut statements = Vec::new();
 
         loop {
-            let first = self.next_token()?;
+            let first = self.peek()?;
             match first.kind {
                 TokenKind::KeywordPrint => {
+                    let _ = self.expect(TokenKind::KeywordPrint)?;
                     let rhs = self.parse_expression()?;
                     statements.push(Statement::Print(rhs));
                     let _ = self.expect(TokenKind::Semicolon)?;
@@ -268,10 +269,9 @@ impl<'src> Parser<'src> {
                     break;
                 }
                 _ => {
-                    return Err(ParserError {
-                        kind: ParserErrorKind::InvalidStatement(first.kind),
-                        line: first.line,
-                    })
+                    let expr = self.parse_expression()?;
+                    let _ = self.expect(TokenKind::Semicolon)?;
+                    statements.push(Statement::Expression(expr));
                 }
             }
         }
