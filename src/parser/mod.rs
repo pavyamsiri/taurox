@@ -398,17 +398,23 @@ impl<'src> Parser<'src> {
             TokenKind::LeftBrace => {
                 let _ = self.expect(TokenKind::LeftBrace).expect("Just checked it.");
                 let mut statements = Vec::new();
-                loop {
-                    let statement = self.parse_statement()?.ok_or(ParserError {
-                        kind: ParserErrorKind::UnexpectedEof,
-                        line: first.line,
-                    })?;
-                    statements.push(statement);
-                    if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
-                        break;
+
+                // Check if we are empty
+                if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
+                    Statement::NonDeclaration(NonDeclaration::Block(statements))
+                } else {
+                    loop {
+                        let statement = self.parse_statement()?.ok_or(ParserError {
+                            kind: ParserErrorKind::UnexpectedEof,
+                            line: first.line,
+                        })?;
+                        statements.push(statement);
+                        if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
+                            break;
+                        }
                     }
+                    Statement::NonDeclaration(NonDeclaration::Block(statements))
                 }
-                Statement::NonDeclaration(NonDeclaration::Block(statements))
             }
 
             TokenKind::KeywordIf => {
