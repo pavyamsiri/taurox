@@ -21,4 +21,9 @@ pub enum NonDeclaration {
     Expression(ExpressionTreeWithRoot),
     Print(ExpressionTreeWithRoot),
     Block(Vec<Statement>),
+    If {
+        condition: ExpressionTreeWithRoot,
+        success: Box<Statement>,
+        failure: Box<Option<Statement>>,
+    },
 }

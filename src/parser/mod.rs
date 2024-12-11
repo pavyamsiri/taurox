@@ -385,6 +385,32 @@ impl<'src> Parser<'src> {
                 }
                 Statement::NonDeclaration(NonDeclaration::Block(statements))
             }
+
+            TokenKind::KeywordIf => {
+                let _ = self.expect(TokenKind::KeywordIf).expect("Just checked it.");
+                let _ = self.expect(TokenKind::LeftParenthesis)?;
+                let condition = self.parse_expression()?;
+                let _ = self.expect(TokenKind::RightParenthesis)?;
+                let success = self.parse_statement()?.ok_or(ParserError {
+                    kind: ParserErrorKind::UnexpectedEof,
+                    line: first.line,
+                })?;
+
+                let failure = if let Some(_) = self.eat_if(TokenKind::KeywordElse)? {
+                    Some(self.parse_statement()?.ok_or(ParserError {
+                        kind: ParserErrorKind::UnexpectedEof,
+                        line: first.line,
+                    })?)
+                } else {
+                    None
+                };
+
+                Statement::NonDeclaration(NonDeclaration::If {
+                    condition,
+                    success: Box::new(success),
+                    failure: Box::new(failure),
+                })
+            }
             TokenKind::Eof => {
                 return Ok(None);
             }

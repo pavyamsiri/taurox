@@ -133,6 +133,16 @@ impl TreeWalkInterpreter {
             Statement::NonDeclaration(NonDeclaration::Block(statements)) => {
                 TreeWalkInterpreter::interpret_block_statement(environment, statements)?
             }
+            Statement::NonDeclaration(NonDeclaration::If {
+                condition,
+                success,
+                failure,
+            }) => TreeWalkInterpreter::interpret_if_statement(
+                environment,
+                condition,
+                success,
+                failure.as_ref().as_ref(),
+            )?,
         };
         Ok(state)
     }
@@ -168,6 +178,21 @@ impl TreeWalkInterpreter {
         Ok(ProgramState::Run)
     }
 
+    fn interpret_if_statement(
+        environment: &mut Environment,
+        condition: &ExpressionTreeWithRoot,
+        success: &Statement,
+        failure: Option<&Statement>,
+    ) -> Result<ProgramState, RuntimeError> {
+        if ExpressionEvaluator::evaluate_expression(condition, environment)?.is_truthy() {
+            Self::handle_statement(success, environment)?;
+        } else {
+            if let Some(failure) = failure {
+                Self::handle_statement(failure, environment)?;
+            }
+        }
+        Ok(ProgramState::Run)
+    }
     fn interpret_block_statement(
         environment: &mut Environment,
         statements: &Vec<Statement>,

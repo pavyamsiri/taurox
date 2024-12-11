@@ -51,7 +51,7 @@ impl std::fmt::Display for LoxValue {
 
 // Unary operators
 impl LoxValue {
-    fn is_truthy(&self) -> bool {
+    pub fn is_truthy(&self) -> bool {
         match self {
             LoxValue::Bool(false) | LoxValue::Nil => false,
             _ => true,
