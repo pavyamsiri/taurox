@@ -1,8 +1,10 @@
 pub mod formatter;
 
+use std::sync::Arc;
+
 use compact_str::CompactString;
 
-use crate::token::TokenKind;
+use crate::{evaluator::NativeFunction, token::TokenKind};
 
 #[derive(Debug, Clone)]
 pub enum UnaryOperator {
@@ -86,10 +88,6 @@ pub struct ExpressionTreeNodeRef(u32);
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeNode {
     Atom(ExpressionTreeAtom),
-    Unary {
-        operator: UnaryOperator,
-        rhs: ExpressionTreeNodeRef,
-    },
     Binary {
         operator: BinaryOperator,
         lhs: ExpressionTreeNodeRef,
@@ -107,6 +105,10 @@ pub enum ExpressionTreeNode {
     },
     Group {
         inner: ExpressionTreeNodeRef,
+    },
+    Unary {
+        operator: UnaryOperator,
+        rhs: ExpressionTreeNodeRef,
     },
 }
 
@@ -129,6 +131,7 @@ pub enum ExpressionTreeAtomKind {
     Nil,
     Identifier(CompactString),
     StringLiteral(CompactString),
+    NativeFunction(Arc<dyn NativeFunction>),
 }
 
 #[derive(Debug, Clone)]
@@ -184,6 +187,7 @@ impl ExpressionTree {
                 ExpressionTreeAtomKind::Nil => Some(TokenKind::KeywordNil),
                 ExpressionTreeAtomKind::Identifier(_) => Some(TokenKind::Ident),
                 ExpressionTreeAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
+                ExpressionTreeAtomKind::NativeFunction(_) => Some(TokenKind::Ident),
             },
             ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),
@@ -241,6 +245,7 @@ impl ExpressionTreeWithRoot {
                 ExpressionTreeAtomKind::Nil => Some(TokenKind::KeywordNil),
                 ExpressionTreeAtomKind::Identifier(_) => Some(TokenKind::Ident),
                 ExpressionTreeAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
+                ExpressionTreeAtomKind::NativeFunction(_) => Some(TokenKind::Ident),
             },
             ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),

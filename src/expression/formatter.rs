@@ -26,30 +26,22 @@ impl ExpressionFormatter for DebugFormatter {
 pub struct SExpressionFormatter;
 
 impl SExpressionFormatter {
+    fn format_atom(atom: &ExpressionTreeAtom) -> String {
+        match atom.kind {
+            ExpressionTreeAtomKind::Number(v) => format!("{v:?}"),
+            ExpressionTreeAtomKind::Bool(v) => format!("{v}"),
+            ExpressionTreeAtomKind::Nil => "nil".into(),
+            ExpressionTreeAtomKind::Identifier(ref name) => format!("{name}"),
+            ExpressionTreeAtomKind::StringLiteral(ref v) => format!("{v}"),
+            ExpressionTreeAtomKind::NativeFunction(ref fun) => format!("{}", fun.get_name()),
+        }
+    }
+
     fn format_node(tree: &ExpressionTreeWithRoot, node: &ExpressionTreeNodeRef) -> String {
         let current_node = &tree.nodes[node.0 as usize];
 
         match current_node {
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Nil,
-                ..
-            }) => "nil".into(),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Bool(value),
-                ..
-            }) => format!("{value}"),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Number(value),
-                ..
-            }) => format!("{value:?}"),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Identifier(value),
-                ..
-            }) => format!("{value}"),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::StringLiteral(value),
-                ..
-            }) => format!("{value}"),
+            ExpressionTreeNode::Atom(atom) => Self::format_atom(atom),
             ExpressionTreeNode::Unary { operator, rhs } => {
                 format!(
                     "({} {})",

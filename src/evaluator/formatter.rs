@@ -26,6 +26,7 @@ impl BasicFormatter {
             LoxValue::String(v) => format!("String(\"{v}\")"),
             LoxValue::Nil => format!("Nil"),
             LoxValue::Bool(v) => format!("Bool({v})"),
+            LoxValue::NativeFunction(fun) => format!("NativeFunction({})", fun.get_name()),
         }
     }
 }

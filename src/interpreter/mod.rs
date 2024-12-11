@@ -1,10 +1,11 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use compact_str::{CompactString, ToCompactString};
 
 use crate::{
-    evaluator::{ExpressionEvaluator, LoxValue, RuntimeError},
+    evaluator::{ExpressionEvaluator, LoxValue, NativeFunction, RuntimeError},
     expression::ExpressionTreeWithRoot,
+    native::NativeClock,
     parser::Program,
     statement::{Declaration, Initializer, NonDeclaration, Statement},
 };
@@ -23,8 +24,20 @@ pub struct Environment {
 
 impl Environment {
     pub fn new() -> Self {
+        let mut globals = HashMap::new();
+
+        // Inject native functions here
+        {
+            let clock = NativeClock;
+
+            globals.insert(
+                clock.get_name().to_compact_string(),
+                LoxValue::NativeFunction(Arc::new(clock)),
+            );
+        }
+
         Self {
-            globals: HashMap::new(),
+            globals,
             scopes: Vec::new(),
         }
     }

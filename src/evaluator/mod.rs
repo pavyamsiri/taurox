@@ -1,5 +1,7 @@
 pub mod formatter;
 
+use std::sync::Arc;
+
 use crate::{
     expression::{
         BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom,
@@ -31,12 +33,18 @@ pub struct RuntimeError {
     line: u32,
 }
 
+pub trait NativeFunction: std::fmt::Debug + Send + Sync {
+    fn get_name(&self) -> &'static str;
+    fn call(&self, arguments: &[LoxValue]) -> Result<LoxValue, RuntimeError>;
+}
+
 #[derive(Debug, Clone)]
 pub enum LoxValue {
     Number(f64),
     String(CompactString),
     Nil,
     Bool(bool),
+    NativeFunction(Arc<dyn NativeFunction>),
 }
 
 impl std::fmt::Display for LoxValue {
@@ -46,6 +54,9 @@ impl std::fmt::Display for LoxValue {
             LoxValue::String(v) => write!(f, "{v}"),
             LoxValue::Nil => write!(f, "nil"),
             LoxValue::Bool(v) => write!(f, "{v}"),
+            LoxValue::NativeFunction(fun) => {
+                write!(f, "<native fn `{}`>", fun.get_name())
+            }
         }
     }
 }
@@ -151,6 +162,24 @@ impl LoxValue {
 pub struct ExpressionEvaluator;
 
 impl ExpressionEvaluator {
+    fn evaluate_expression_atom(
+        atom: &ExpressionTreeAtom,
+        environment: &mut Environment,
+    ) -> Result<LoxValue, RuntimeErrorKind> {
+        let result = match &atom.kind {
+            ExpressionTreeAtomKind::Number(v) => LoxValue::Number(*v),
+            ExpressionTreeAtomKind::Bool(v) => LoxValue::Bool(*v),
+            ExpressionTreeAtomKind::Nil => LoxValue::Nil,
+            ExpressionTreeAtomKind::StringLiteral(ref v) => LoxValue::String(v.clone()),
+            ExpressionTreeAtomKind::Identifier(ref name) => environment
+                .access(name)
+                .ok_or(RuntimeErrorKind::InvalidAccess(name.clone()))?
+                .clone(),
+            ExpressionTreeAtomKind::NativeFunction(fun) => LoxValue::NativeFunction(fun.clone()),
+        };
+        Ok(result)
+    }
+
     fn evaluate_expression_node(
         tree: &ExpressionTreeWithRoot,
         node: &ExpressionTreeNodeRef,
@@ -164,32 +193,8 @@ impl ExpressionEvaluator {
             .expect("Node ref came from the tree so it must exist.");
 
         let result = match current_node {
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Nil,
-                ..
-            }) => LoxValue::Nil,
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Bool(value),
-                ..
-            }) => LoxValue::Bool(*value),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Number(value),
-                ..
-            }) => LoxValue::Number(*value),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Identifier(name),
-                ..
-            }) => environment
-                .access(name)
-                .ok_or(RuntimeError {
-                    kind: RuntimeErrorKind::InvalidAccess(name.clone()),
-                    line,
-                })?
-                .clone(),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::StringLiteral(value),
-                ..
-            }) => LoxValue::String(value.clone()),
+            ExpressionTreeNode::Atom(atom) => Self::evaluate_expression_atom(atom, environment)
+                .map_err(|kind| RuntimeError { kind, line })?,
             ExpressionTreeNode::Unary { operator, rhs } => {
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 Self::evaluate_unary(operator, &rhs).map_err(|kind| RuntimeError { kind, line })?
