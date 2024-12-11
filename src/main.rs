@@ -2,6 +2,8 @@ use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
+use taurox::evaluator::RuntimeError;
+use taurox::parser::ParserError;
 
 #[derive(Debug, Parser)]
 #[clap(name = "taurox", version)]
@@ -86,12 +88,15 @@ fn taurox_main() -> Result<ExitCode> {
             eprintln!("Running {:?}...", path);
             let src = read_to_string(path)?;
             let res = run(&src);
-            // TODO(pavyamsiri): Differentiate between runtime error (70) and compile errors (65).
             match res {
                 Ok(_) => {}
-                Err(e) => {
+                Err(ProgramError::CompileError(e)) => {
                     eprintln!("{e}");
                     return Ok(ExitCode::from(65));
+                }
+                Err(ProgramError::RuntimeError(e)) => {
+                    eprintln!("{e}");
+                    return Ok(ExitCode::from(70));
                 }
             }
         }
@@ -156,16 +161,23 @@ fn evaluate(src: &str) -> Result<()> {
     Ok(())
 }
 
-fn run(src: &str) -> Result<()> {
+enum ProgramError {
+    CompileError(ParserError),
+    RuntimeError(RuntimeError),
+}
+
+fn run(src: &str) -> std::result::Result<(), ProgramError> {
     use taurox::interpreter::ProgramState;
     use taurox::interpreter::{Interpreter, TreeWalkInterpreter};
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src);
-    let program = parser.parse()?;
+    let program = parser.parse().map_err(|e| ProgramError::CompileError(e))?;
     let mut interpreter = TreeWalkInterpreter::new(program);
     loop {
-        let state = interpreter.step()?;
+        let state = interpreter
+            .step()
+            .map_err(|e| ProgramError::RuntimeError(e))?;
         match state {
             ProgramState::Run => {}
             ProgramState::Write(output) => eprintln!("{output}"),
