@@ -44,6 +44,7 @@ fn test_all() -> Result<()> {
     let input_dir = Path::new("./test_data/lexer/in");
     let output_dir = Path::new("./test_data/lexer/out");
 
+    let mut succeeded = true;
     for entry in read_dir(input_dir).context("Failed to open input test data folder")? {
         let entry = entry?;
         let path = entry.path();
@@ -68,8 +69,18 @@ fn test_all() -> Result<()> {
             let output_path = output_dir.join(output_file_name);
             read_to_string(output_path).context("Failed to open output test data file")?
         };
-        eprintln!("Testing {test_name:?}");
-        check(&input, &expected, &test_name.to_string_lossy());
+
+        let res = std::panic::catch_unwind(|| {
+            check(&input, &expected, &test_name.to_string_lossy());
+        });
+        if res.is_err() {
+            succeeded = false;
+        }
     }
+
+    if !succeeded {
+        assert!(false);
+    }
+
     Ok(())
 }
