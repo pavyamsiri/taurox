@@ -157,6 +157,9 @@ impl ExpressionFormatter for SExpressionFormatter {
             ParserErrorKind::InvalidLValue(token) => {
                 format!("({line}) Invalid l-value: {token}")
             }
+            ParserErrorKind::InvalidNonDeclaration(ref declaration) => {
+                format!("({line}) Invalid non-declaration: {declaration:?}")
+            }
         }
     }
 }

@@ -120,34 +120,44 @@ impl TreeWalkInterpreter {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
                 Self::interpret_variable_declaration(environment, name, initial.as_ref())?
             }
-            Statement::NonDeclaration(NonDeclaration::Expression(ref expr)) => {
+            Statement::NonDeclaration(statement) => {
+                Self::handle_non_declaration(statement, environment)?
+            }
+        };
+        Ok(state)
+    }
+
+    fn handle_non_declaration(
+        statement: &NonDeclaration,
+        environment: &mut Environment,
+    ) -> Result<ProgramState, RuntimeError> {
+        let state = match statement {
+            NonDeclaration::Expression(expr) => {
                 Self::interpret_expression_statement(environment, expr)?
             }
-            Statement::NonDeclaration(NonDeclaration::Print(ref expr)) => {
-                Self::interpret_print_statement(environment, expr)?
-            }
-            Statement::NonDeclaration(NonDeclaration::Block(statements)) => {
+            NonDeclaration::Print(expr) => Self::interpret_print_statement(environment, expr)?,
+            NonDeclaration::Block(statements) => {
                 Self::interpret_block_statement(environment, statements)?
             }
-            Statement::NonDeclaration(NonDeclaration::If {
+            NonDeclaration::If {
                 condition,
                 success,
                 failure,
-            }) => Self::interpret_if_statement(
+            } => Self::interpret_if_statement(
                 environment,
                 condition,
                 success,
                 failure.as_ref().as_ref(),
             )?,
-            Statement::NonDeclaration(NonDeclaration::While { condition, body }) => {
-                Self::interpret_while_statement(environment, condition, body)?
+            NonDeclaration::While { condition, body } => {
+                Self::interpret_while_statement(environment, condition, body.as_ref())?
             }
-            Statement::NonDeclaration(NonDeclaration::For {
+            NonDeclaration::For {
                 initializer,
                 condition,
                 increment,
                 body,
-            }) => Self::interpret_for_statement(
+            } => Self::interpret_for_statement(
                 environment,
                 initializer.as_ref(),
                 condition.as_ref(),
@@ -235,7 +245,7 @@ impl TreeWalkInterpreter {
         initializer: Option<&Initializer>,
         condition: Option<&ExpressionTreeWithRoot>,
         increment: Option<&ExpressionTreeWithRoot>,
-        body: &Statement,
+        body: &NonDeclaration,
     ) -> Result<ProgramState, RuntimeError> {
         // Run the initializer
         // NOTE(pavyamsiri): I don't really understanding how for loops are scoped.
@@ -262,7 +272,7 @@ impl TreeWalkInterpreter {
                 break;
             }
 
-            Self::handle_statement(body, environment)?;
+            Self::handle_non_declaration(body, environment)?;
             match increment {
                 Some(increment) => {
                     ExpressionEvaluator::evaluate_expression(increment, environment)?;

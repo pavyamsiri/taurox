@@ -27,6 +27,8 @@ pub enum ParserErrorKind {
     UnexpectedEof,
     #[error("Expected a statement but got {0}.")]
     InvalidStatement(TokenKind),
+    #[error("Expected a non-declaration but got {0:?}.")]
+    InvalidNonDeclaration(Declaration),
     #[error("Encountered an invalid l-value {0}.")]
     InvalidLValue(TokenKind),
     #[error("Encountered a lexer error {0}.")]
@@ -520,6 +522,14 @@ impl<'src> Parser<'src> {
                     kind: ParserErrorKind::UnexpectedEof,
                     line: first.line,
                 })?;
+
+                let body = match body {
+                    Statement::Declaration(declaration) => Err(ParserError {
+                        kind: ParserErrorKind::InvalidNonDeclaration(declaration),
+                        line: first.line,
+                    }),
+                    Statement::NonDeclaration(non_declaration) => Ok(non_declaration),
+                }?;
 
                 Statement::NonDeclaration(NonDeclaration::For {
                     initializer,

@@ -8,7 +8,7 @@ pub enum Statement {
     NonDeclaration(NonDeclaration),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Declaration {
     Variable {
         name: CompactString,
@@ -43,6 +43,6 @@ pub enum NonDeclaration {
         initializer: Option<Initializer>,
         condition: Option<ExpressionTreeWithRoot>,
         increment: Option<ExpressionTreeWithRoot>,
-        body: Box<Statement>,
+        body: Box<NonDeclaration>,
     },
 }
