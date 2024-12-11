@@ -1,3 +1,5 @@
+use crate::parser::{ParserError, ParserErrorKind};
+
 use super::{
     BinaryOperator, ExpressionTreeAtom, ExpressionTreeNode, ExpressionTreeNodeRef,
     ExpressionTreeWithRoot, UnaryOperator,
@@ -5,6 +7,7 @@ use super::{
 
 pub trait ExpressionFormatter {
     fn format(&self, tree: &ExpressionTreeWithRoot) -> String;
+    fn format_error(&self, error: &ParserError) -> String;
 }
 
 pub struct DebugFormatter;
@@ -12,6 +15,10 @@ pub struct DebugFormatter;
 impl ExpressionFormatter for DebugFormatter {
     fn format(&self, tree: &ExpressionTreeWithRoot) -> String {
         format!("{tree:?}")
+    }
+
+    fn format_error(&self, error: &ParserError) -> String {
+        format!("{error:?}")
     }
 }
 
@@ -80,5 +87,25 @@ impl SExpressionFormatter {
 impl ExpressionFormatter for SExpressionFormatter {
     fn format(&self, tree: &ExpressionTreeWithRoot) -> String {
         SExpressionFormatter::format_node(tree, &tree.root)
+    }
+
+    fn format_error(&self, error: &ParserError) -> String {
+        match error.kind {
+            ParserErrorKind::UnexpectedToken { actual, expected } => {
+                format!("Unexpected: A = {actual:?} E = {expected:?}")
+            }
+            ParserErrorKind::NonOperator(token) => {
+                format!("Non-operator: {token:?}")
+            }
+            ParserErrorKind::NonLeftHandSide(token) => {
+                format!("Non-LHS: {token:?}")
+            }
+            ParserErrorKind::LexicalError(ref error) => {
+                format!("Lexical error: {error:?}")
+            }
+            ParserErrorKind::UnexpectedEof => {
+                format!("Unexpected EOF")
+            }
+        }
     }
 }

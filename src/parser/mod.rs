@@ -11,16 +11,18 @@ use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
 pub enum ParserErrorKind {
-    #[error("Expected {expected:?} but got token {actual:?}")]
+    #[error("Expected {expected:?} but got token {actual:?}.")]
     UnexpectedToken {
         actual: TokenKind,
         expected: TokenKind,
     },
-    #[error("Expected an operator but got token {0:?}")]
+    #[error("Expected an operator but got token {0:?}.")]
     NonOperator(TokenKind),
-    #[error("Expected an left hand side to expression but got token {0:?}")]
+    #[error("Expected an left hand side to expression but got token {0:?}.")]
     NonLeftHandSide(TokenKind),
-    #[error("Encountered a lexer error {0}")]
+    #[error("Expected a non-EOF token.")]
+    UnexpectedEof,
+    #[error("Encountered a lexer error {0}.")]
     LexicalError(#[from] LexicalError),
 }
 
@@ -118,6 +120,14 @@ impl<'src> Parser<'src> {
         tree: &mut ExpressionTree,
     ) -> Result<ExpressionTreeNodeRef, ParserError> {
         let token = self.next_token()?;
+
+        if matches!(token.kind, TokenKind::Eof) {
+            return Err(ParserError {
+                kind: ParserErrorKind::UnexpectedEof,
+                line: token.line,
+            });
+        }
+
         let lexeme = self
             .lexer
             .get_lexeme(&token.span)
