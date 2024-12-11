@@ -27,7 +27,7 @@ pub enum LoxValue {
 impl std::fmt::Display for LoxValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LoxValue::Number(v) => write!(f, "{v:?}"),
+            LoxValue::Number(v) => write!(f, "{v}"),
             LoxValue::String(v) => write!(f, "{v}"),
             LoxValue::Nil => write!(f, "nil"),
             LoxValue::Bool(v) => write!(f, "{v}"),
