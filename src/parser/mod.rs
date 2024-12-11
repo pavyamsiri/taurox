@@ -9,6 +9,7 @@ use crate::{
     token::{Token, TokenKind},
 };
 
+use compact_str::{CompactString, ToCompactString};
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
@@ -86,6 +87,26 @@ impl<'src> Parser<'src> {
                 })
             }
         }
+    }
+
+    fn expect_ident(&mut self) -> Result<CompactString, ParserError> {
+        let next_token = self.next_token()?;
+        if next_token.kind != TokenKind::Ident {
+            return Err(ParserError {
+                line: next_token.line,
+                kind: ParserErrorKind::UnexpectedToken {
+                    actual: next_token.kind,
+                    expected: TokenKind::Ident,
+                },
+            });
+        }
+
+        let name = self
+            .lexer
+            .get_lexeme(&next_token.span)
+            .expect("Token came from lexer so it is valid.");
+
+        Ok(name.to_compact_string())
     }
 
     fn expect(&mut self, expected: TokenKind) -> Result<Token, ParserError> {
@@ -324,20 +345,7 @@ impl<'src> Parser<'src> {
                     let _ = self
                         .expect(TokenKind::KeywordVar)
                         .expect("Just checked it.");
-                    let lhs = self.parse_expression()?;
-                    let kind = lhs.get_root();
-                    let name = match kind {
-                        ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                            kind: ExpressionTreeAtomKind::Identifier(name),
-                            ..
-                        }) => name,
-                        _ => {
-                            return Err(ParserError {
-                                kind: ParserErrorKind::InvalidLValue(first.kind),
-                                line: first.line,
-                            })
-                        }
-                    };
+                    let place = self.expect_ident()?;
 
                     let mut initial = None;
 
@@ -348,7 +356,7 @@ impl<'src> Parser<'src> {
                     }
 
                     statements.push(Statement::Declaration(Declaration::Variable {
-                        name: name.clone(),
+                        name: place.clone(),
                         initial,
                     }));
                     let _ = self.expect(TokenKind::Semicolon)?;

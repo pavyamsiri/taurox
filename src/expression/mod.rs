@@ -205,4 +205,22 @@ impl ExpressionTreeWithRoot {
             ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_line(rhs),
         }
     }
+
+    pub fn get_kind(&self, node: &ExpressionTreeNodeRef) -> Option<TokenKind> {
+        let node = self.nodes.get(node.0 as usize)?;
+        match node {
+            ExpressionTreeNode::Atom(ExpressionTreeAtom { kind, .. }) => match kind {
+                ExpressionTreeAtomKind::Number(_) => Some(TokenKind::NumericLiteral),
+                ExpressionTreeAtomKind::Bool(true) => Some(TokenKind::KeywordTrue),
+                ExpressionTreeAtomKind::Bool(false) => Some(TokenKind::KeywordFalse),
+                ExpressionTreeAtomKind::Nil => Some(TokenKind::KeywordNil),
+                ExpressionTreeAtomKind::Identifier(_) => Some(TokenKind::Ident),
+                ExpressionTreeAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
+            },
+            ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
+            ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_kind(inner),
+            ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_kind(rhs),
+        }
+    }
 }
