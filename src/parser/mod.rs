@@ -19,7 +19,7 @@ pub enum ParserErrorKind {
     #[error("Expected an operator but got token {0:?}.")]
     NonOperator(TokenKind),
     #[error("Expected an left hand side to expression but got token {0:?}.")]
-    NonLeftHandSide(TokenKind),
+    NonExpression(TokenKind),
     #[error("Expected a non-EOF token.")]
     UnexpectedEof,
     #[error("Encountered a lexer error {0}.")]
@@ -187,7 +187,7 @@ impl<'src> Parser<'src> {
             }
             kind => {
                 return Err(ParserError {
-                    kind: ParserErrorKind::NonLeftHandSide(kind),
+                    kind: ParserErrorKind::NonExpression(kind),
                     line: token.line,
                 })
             }

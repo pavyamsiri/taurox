@@ -90,21 +90,22 @@ impl ExpressionFormatter for SExpressionFormatter {
     }
 
     fn format_error(&self, error: &ParserError) -> String {
+        let line = error.line;
         match error.kind {
             ParserErrorKind::UnexpectedToken { actual, expected } => {
-                format!("Unexpected: A = {actual} E = {expected}")
+                format!("({line}) Unexpected: A = {actual} E = {expected}")
             }
             ParserErrorKind::NonOperator(token) => {
-                format!("Non-operator: {token}")
+                format!("({line}) Non-operator: {token}")
             }
-            ParserErrorKind::NonLeftHandSide(token) => {
-                format!("Non-LHS: {token}")
+            ParserErrorKind::NonExpression(token) => {
+                format!("({line}) Non-Expression: {token}")
             }
             ParserErrorKind::LexicalError(ref error) => {
-                format!("Lexical error: {error:?}")
+                format!("({line}) Lexical error: {error:?}")
             }
             ParserErrorKind::UnexpectedEof => {
-                format!("Unexpected EOF")
+                format!("({line}) Unexpected EOF")
             }
         }
     }

@@ -1,1 +1,1 @@
-Non-LHS: RIGHT_PAREN
+(1) Non-Expression: RIGHT_PAREN

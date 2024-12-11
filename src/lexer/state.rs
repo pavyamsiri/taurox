@@ -130,7 +130,7 @@ impl std::default::Default for LexerState {
     fn default() -> Self {
         Self::Normal(NormalState {
             location: 0.into(),
-            line: 0,
+            line: 1,
         })
     }
 }

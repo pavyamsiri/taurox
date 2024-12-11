@@ -23,7 +23,7 @@ fn check(input: &str, expected: &str, test_name: &str) {
 
 #[test]
 fn smoke_test() {
-    check("", "Unexpected EOF", "smoke");
+    check("", "(1) Unexpected EOF", "smoke");
 }
 
 #[test]
