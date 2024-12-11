@@ -92,13 +92,13 @@ impl ExpressionFormatter for SExpressionFormatter {
     fn format_error(&self, error: &ParserError) -> String {
         match error.kind {
             ParserErrorKind::UnexpectedToken { actual, expected } => {
-                format!("Unexpected: A = {actual:?} E = {expected:?}")
+                format!("Unexpected: A = {actual} E = {expected}")
             }
             ParserErrorKind::NonOperator(token) => {
-                format!("Non-operator: {token:?}")
+                format!("Non-operator: {token}")
             }
             ParserErrorKind::NonLeftHandSide(token) => {
-                format!("Non-LHS: {token:?}")
+                format!("Non-LHS: {token}")
             }
             ParserErrorKind::LexicalError(ref error) => {
                 format!("Lexical error: {error:?}")
