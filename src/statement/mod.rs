@@ -26,4 +26,8 @@ pub enum NonDeclaration {
         success: Box<Statement>,
         failure: Box<Option<Statement>>,
     },
+    While {
+        condition: ExpressionTreeWithRoot,
+        body: Box<Statement>,
+    },
 }

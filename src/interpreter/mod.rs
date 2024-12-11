@@ -143,6 +143,10 @@ impl TreeWalkInterpreter {
                 success,
                 failure.as_ref().as_ref(),
             )?,
+
+            Statement::NonDeclaration(NonDeclaration::While { condition, body }) => {
+                TreeWalkInterpreter::interpret_while_statement(environment, condition, body)?
+            }
         };
         Ok(state)
     }
@@ -193,6 +197,19 @@ impl TreeWalkInterpreter {
         }
         Ok(ProgramState::Run)
     }
+
+    fn interpret_while_statement(
+        environment: &mut Environment,
+        condition: &ExpressionTreeWithRoot,
+        body: &Statement,
+    ) -> Result<ProgramState, RuntimeError> {
+        while ExpressionEvaluator::evaluate_expression(condition, environment)?.is_truthy() {
+            Self::handle_statement(body, environment)?;
+        }
+
+        Ok(ProgramState::Run)
+    }
+
     fn interpret_block_statement(
         environment: &mut Environment,
         statements: &Vec<Statement>,

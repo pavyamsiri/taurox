@@ -436,6 +436,23 @@ impl<'src> Parser<'src> {
                     failure: Box::new(failure),
                 })
             }
+            TokenKind::KeywordWhile => {
+                let _ = self
+                    .expect(TokenKind::KeywordWhile)
+                    .expect("Just checked it.");
+                let _ = self.expect(TokenKind::LeftParenthesis)?;
+                let condition = self.parse_expression()?;
+                let _ = self.expect(TokenKind::RightParenthesis)?;
+                let body = self.parse_statement()?.ok_or(ParserError {
+                    kind: ParserErrorKind::UnexpectedEof,
+                    line: first.line,
+                })?;
+
+                Statement::NonDeclaration(NonDeclaration::While {
+                    condition,
+                    body: Box::new(body),
+                })
+            }
             TokenKind::Eof => {
                 return Ok(None);
             }
