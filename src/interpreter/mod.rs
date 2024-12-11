@@ -18,21 +18,76 @@ pub enum ProgramState {
 #[derive(Debug)]
 pub struct Environment {
     globals: HashMap<CompactString, LoxValue>,
+    scopes: Vec<HashMap<CompactString, LoxValue>>,
 }
 
 impl Environment {
     pub fn new() -> Self {
         Self {
             globals: HashMap::new(),
+            scopes: Vec::new(),
         }
     }
 
-    pub fn get_global(&self, name: &str) -> Option<&LoxValue> {
+    fn get_global(&self, name: &str) -> Option<&LoxValue> {
         self.globals.get(name)
     }
 
-    pub fn set_global(&mut self, name: &str, value: LoxValue) {
+    fn declare_global(&mut self, name: &str, value: LoxValue) {
         self.globals.insert(name.to_compact_string(), value);
+    }
+
+    fn assign_global(&mut self, name: &str, value: LoxValue) -> Result<(), ()> {
+        if self.globals.contains_key(name) {
+            self.globals.insert(name.to_compact_string(), value);
+            Ok(())
+        } else {
+            Err(())
+        }
+    }
+
+    pub fn access(&self, name: &str) -> Option<&LoxValue> {
+        // Go from the innermost scope to the outermost scope
+        for scope in self.scopes.iter().rev() {
+            // Found the variable
+            if scope.contains_key(name) {
+                return scope.get(name);
+            }
+        }
+
+        // Now return from globals
+        self.get_global(name)
+    }
+
+    pub fn assign(&mut self, name: &str, value: LoxValue) -> Result<(), ()> {
+        // Go from the innermost scope to the outermost scope
+        for scope in self.scopes.iter_mut().rev() {
+            // Found the variable
+            if scope.contains_key(name) {
+                scope.insert(name.to_compact_string(), value);
+                return Ok(());
+            }
+        }
+
+        // Check global
+        self.assign_global(name, value)
+    }
+
+    pub fn declare(&mut self, name: &str, value: LoxValue) {
+        // Add to outermost scope
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(name.to_compact_string(), value);
+        } else {
+            self.declare_global(name, value);
+        }
+    }
+
+    pub fn enter_scope(&mut self) {
+        self.scopes.push(HashMap::new());
+    }
+
+    pub fn exit_scope(&mut self) {
+        self.scopes.pop();
     }
 }
 
@@ -92,7 +147,7 @@ impl TreeWalkInterpreter {
         } else {
             LoxValue::Nil
         };
-        environment.set_global(name, initial);
+        environment.declare(name, initial);
         Ok(ProgramState::Run)
     }
 
@@ -109,8 +164,7 @@ impl TreeWalkInterpreter {
         environment: &mut Environment,
         expr: &ExpressionTreeWithRoot,
     ) -> Result<ProgramState, RuntimeError> {
-        let result = ExpressionEvaluator::evaluate_expression(expr, environment)?;
-        eprintln!("SIDE EFFECTLESS: {result:?}");
+        let _ = ExpressionEvaluator::evaluate_expression(expr, environment)?;
         Ok(ProgramState::Run)
     }
 
@@ -118,11 +172,12 @@ impl TreeWalkInterpreter {
         environment: &mut Environment,
         statements: &Vec<Statement>,
     ) -> Result<ProgramState, RuntimeError> {
-        // TODO(pavyamsiri): This write out program state doesn't make sense for block statements
         let mut state = ProgramState::Run;
+        environment.enter_scope();
         for statement in statements {
             state = TreeWalkInterpreter::handle_statement(statement, environment)?;
         }
+        environment.exit_scope();
         Ok(state)
     }
 }

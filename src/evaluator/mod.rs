@@ -179,7 +179,7 @@ impl ExpressionEvaluator {
                 kind: ExpressionTreeAtomKind::Identifier(name),
                 ..
             }) => environment
-                .get_global(name)
+                .access(name)
                 .ok_or(RuntimeError {
                     kind: RuntimeErrorKind::InvalidAccess(name.clone()),
                     line,
@@ -209,7 +209,12 @@ impl ExpressionEvaluator {
                 rhs,
             } => {
                 let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs, environment)?;
-                environment.set_global(lhs, rhs.clone());
+                let _ = environment
+                    .assign(lhs, rhs.clone())
+                    .map_err(|_| RuntimeError {
+                        kind: RuntimeErrorKind::InvalidAccess(lhs.clone()),
+                        line,
+                    })?;
                 rhs
             }
         };
