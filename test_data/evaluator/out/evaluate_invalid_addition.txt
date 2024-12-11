@@ -1,0 +1,1 @@
+(1) Non-Numbers/Non-Strings {Binary}: [Bool(false), Number(0)]
