@@ -120,6 +120,9 @@ impl ExpressionFormatter for SExpressionFormatter {
             ParserErrorKind::UnexpectedEof => {
                 format!("({line}) Unexpected EOF")
             }
+            ParserErrorKind::InvalidStatement(token) => {
+                format!("({line}) Invalid statement token: {token}")
+            }
         }
     }
 }

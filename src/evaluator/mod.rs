@@ -145,18 +145,13 @@ impl LoxValue {
 pub struct ExpressionEvaluator;
 
 impl ExpressionEvaluator {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    fn evaluate_node(
-        &mut self,
+    fn evaluate_expression_node(
         tree: &ExpressionTreeWithRoot,
         node: &ExpressionTreeNodeRef,
     ) -> Result<LoxValue, RuntimeError> {
         let current_node = tree
             .get_node(node)
-            .expect("Node ref came from the tree itself so it must exist.");
+            .expect("Node ref came from the tree so it must exist.");
         let line = tree
             .get_line(node)
             .expect("Node ref came from the tree so it must exist.");
@@ -183,27 +178,28 @@ impl ExpressionEvaluator {
                 ..
             }) => LoxValue::String(value.clone()),
             ExpressionTreeNode::Unary { operator, rhs } => {
-                let rhs = self.evaluate_node(tree, rhs)?;
-                self.evaluate_unary(operator, &rhs)
+                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs)?;
+                ExpressionEvaluator::evaluate_unary(operator, &rhs)
                     .map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionTreeNode::Binary { operator, lhs, rhs } => {
-                let lhs = self.evaluate_node(tree, lhs)?;
-                let rhs = self.evaluate_node(tree, rhs)?;
-                self.evaluate_binary(operator, &lhs, &rhs)
+                let lhs = ExpressionEvaluator::evaluate_expression_node(tree, lhs)?;
+                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs)?;
+                ExpressionEvaluator::evaluate_binary(operator, &lhs, &rhs)
                     .map_err(|kind| RuntimeError { kind, line })?
             }
-            ExpressionTreeNode::Group { inner } => self.evaluate_node(tree, inner)?,
+            ExpressionTreeNode::Group { inner } => {
+                ExpressionEvaluator::evaluate_expression_node(tree, inner)?
+            }
         };
         Ok(result)
     }
 
-    pub fn evaluate(&mut self, tree: &ExpressionTreeWithRoot) -> Result<LoxValue, RuntimeError> {
-        self.evaluate_node(tree, &tree.get_root())
+    pub fn evaluate_expression(tree: &ExpressionTreeWithRoot) -> Result<LoxValue, RuntimeError> {
+        ExpressionEvaluator::evaluate_expression_node(tree, &tree.get_root())
     }
 
     fn evaluate_unary(
-        &self,
         operator: &UnaryOperator,
         rhs: &LoxValue,
     ) -> Result<LoxValue, RuntimeErrorKind> {
@@ -214,7 +210,6 @@ impl ExpressionEvaluator {
     }
 
     fn evaluate_binary(
-        &self,
         operator: &BinaryOperator,
         lhs: &LoxValue,
         rhs: &LoxValue,

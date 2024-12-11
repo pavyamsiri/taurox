@@ -84,7 +84,15 @@ fn taurox_main() -> Result<ExitCode> {
         }
         TauroxCommand::Run { path } => {
             eprintln!("Running {:?}...", path);
-            todo!();
+            let src = read_to_string(path)?;
+            let res = run(&src);
+            match res {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("{e}");
+                    return Ok(ExitCode::from(70));
+                }
+            }
         }
     }
     Ok(ExitCode::SUCCESS)
@@ -139,11 +147,30 @@ fn evaluate(src: &str) -> Result<()> {
 
     let mut parser = Parser::new(src);
     let expression = parser.parse_expression()?;
-    let mut evaluator = ExpressionEvaluator::new();
 
-    let result = evaluator.evaluate(&expression)?;
+    let result = ExpressionEvaluator::evaluate_expression(&expression)?;
 
     eprintln!("{}", result);
+
+    Ok(())
+}
+
+fn run(src: &str) -> Result<()> {
+    use taurox::interpreter::ProgramState;
+    use taurox::interpreter::{Interpreter, TreeWalkInterpreter};
+    use taurox::parser::Parser;
+
+    let mut parser = Parser::new(src);
+    let program = parser.parse()?;
+    let mut interpreter = TreeWalkInterpreter::new(program);
+    loop {
+        let state = interpreter.step()?;
+        match state {
+            ProgramState::Run => {}
+            ProgramState::Write(output) => eprintln!("{output}"),
+            ProgramState::Terminate => break,
+        }
+    }
 
     Ok(())
 }

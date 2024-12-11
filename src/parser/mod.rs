@@ -4,6 +4,7 @@ use crate::{
         ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
+    statement::Statement,
     token::{Token, TokenKind},
 };
 
@@ -22,6 +23,8 @@ pub enum ParserErrorKind {
     NonExpression(TokenKind),
     #[error("Expected a non-EOF token.")]
     UnexpectedEof,
+    #[error("Expected a statement but got {0}.")]
+    InvalidStatement(TokenKind),
     #[error("Encountered a lexer error {0}.")]
     LexicalError(#[from] LexicalError),
 }
@@ -32,6 +35,17 @@ pub struct ParserError {
     #[source]
     pub kind: ParserErrorKind,
     pub line: u32,
+}
+
+#[derive(Debug)]
+pub struct Program {
+    statements: Vec<Statement>,
+}
+
+impl Program {
+    pub fn get_statement(&self, index: usize) -> Option<&Statement> {
+        self.statements.get(index)
+    }
 }
 
 pub struct Parser<'src> {
@@ -234,5 +248,34 @@ impl<'src> Parser<'src> {
             break;
         }
         Ok(lhs)
+    }
+}
+
+// Parse program/statements
+impl<'src> Parser<'src> {
+    pub fn parse(&mut self) -> Result<Program, ParserError> {
+        let mut statements = Vec::new();
+
+        loop {
+            let first = self.next_token()?;
+            match first.kind {
+                TokenKind::KeywordPrint => {
+                    let rhs = self.parse_expression()?;
+                    statements.push(Statement::Print(rhs));
+                    let _ = self.expect(TokenKind::Semicolon)?;
+                }
+                TokenKind::Eof => {
+                    break;
+                }
+                _ => {
+                    return Err(ParserError {
+                        kind: ParserErrorKind::InvalidStatement(first.kind),
+                        line: first.line,
+                    })
+                }
+            }
+        }
+
+        Ok(Program { statements })
     }
 }
