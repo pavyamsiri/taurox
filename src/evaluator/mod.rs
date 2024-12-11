@@ -1,19 +1,28 @@
+pub mod formatter;
+
 use crate::expression::{
-    BinaryOperator, ExpressionTreeAtom, ExpressionTreeNode, ExpressionTreeNodeRef,
-    ExpressionTreeWithRoot, UnaryOperator,
+    BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode,
+    ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
 };
 use compact_str::{CompactString, CompactStringExt};
-use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
-pub enum RuntimeError {
-    #[error("Expected a number but got {0:?}.")]
+pub enum RuntimeErrorKind {
+    #[error("Non-Number {{Unary}}: {0}")]
     NonNumeric(LoxValue),
-    #[error("Expected two numbers but got {0:?} and {1:?}")]
+    #[error("Non-Numbers {{Binary}}: [{0} , {1}]")]
     NonNumerics(LoxValue, LoxValue),
-    #[error("Expected two numbers or two strings but got {0:?} and {1:?}.")]
+    #[error("Non-Numbers/Non-Strings {{Binary}}: [{0} , {1}]")]
     NonAddable(LoxValue, LoxValue),
+}
+
+#[derive(Debug, Error, Clone)]
+#[error("({line}) {kind}")]
+pub struct RuntimeError {
+    #[source]
+    kind: RuntimeErrorKind,
+    line: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -48,73 +57,73 @@ impl LoxValue {
         !self.is_truthy()
     }
 
-    pub fn numeric_negate(&self) -> Result<LoxValue, RuntimeError> {
+    pub fn numeric_negate(&self) -> Result<LoxValue, RuntimeErrorKind> {
         match self {
             LoxValue::Number(v) => Ok(LoxValue::Number(-v)),
-            v => Err(RuntimeError::NonNumeric(v.clone())),
+            v => Err(RuntimeErrorKind::NonNumeric(v.clone())),
         }
     }
 }
 
 impl LoxValue {
     // Arithmetic + string concatenation
-    pub fn add(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn add(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs + rhs)),
             (LoxValue::String(lhs), LoxValue::String(rhs)) => {
                 Ok(LoxValue::String([lhs, rhs].concat_compact()))
             }
-            (lhs, rhs) => Err(RuntimeError::NonAddable(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonAddable(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn subtract(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn subtract(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs - rhs)),
-            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn multiply(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn multiply(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs * rhs)),
-            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn divide(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn divide(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs / rhs)),
-            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
     // Comparison
-    pub fn less_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn less_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs < rhs)),
-            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn less_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn less_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs <= rhs)),
-            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn greater_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn greater_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs > rhs)),
-            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn greater_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
+    pub fn greater_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs >= rhs)),
-            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
@@ -133,15 +142,11 @@ impl LoxValue {
         !self.is_equal(other)
     }
 }
-pub struct ExpressionEvaluator {
-    scope: HashMap<CompactString, LoxValue>,
-}
+pub struct ExpressionEvaluator;
 
 impl ExpressionEvaluator {
     pub fn new() -> Self {
-        Self {
-            scope: HashMap::new(),
-        }
+        Self {}
     }
 
     fn evaluate_node(
@@ -152,25 +157,41 @@ impl ExpressionEvaluator {
         let current_node = tree
             .get_node(node)
             .expect("Node ref came from the tree itself so it must exist.");
+        let line = tree
+            .get_line(node)
+            .expect("Node ref came from the tree so it must exist.");
 
         let result = match current_node {
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Nil) => LoxValue::Nil,
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Bool(value)) => LoxValue::Bool(*value),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Number(value)) => LoxValue::Number(*value),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Identifier(value)) => {
-                self.scope.get(value).cloned().unwrap_or(LoxValue::Nil)
-            }
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value)) => {
-                LoxValue::String(value.clone())
-            }
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Nil,
+                ..
+            }) => LoxValue::Nil,
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Bool(value),
+                ..
+            }) => LoxValue::Bool(*value),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Number(value),
+                ..
+            }) => LoxValue::Number(*value),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Identifier(_),
+                ..
+            }) => todo!(),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::StringLiteral(value),
+                ..
+            }) => LoxValue::String(value.clone()),
             ExpressionTreeNode::Unary { operator, rhs } => {
                 let rhs = self.evaluate_node(tree, rhs)?;
-                self.evaluate_unary(operator, &rhs)?
+                self.evaluate_unary(operator, &rhs)
+                    .map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionTreeNode::Binary { operator, lhs, rhs } => {
                 let lhs = self.evaluate_node(tree, lhs)?;
                 let rhs = self.evaluate_node(tree, rhs)?;
-                self.evaluate_binary(operator, &lhs, &rhs)?
+                self.evaluate_binary(operator, &lhs, &rhs)
+                    .map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionTreeNode::Group { inner } => self.evaluate_node(tree, inner)?,
         };
@@ -185,7 +206,7 @@ impl ExpressionEvaluator {
         &self,
         operator: &UnaryOperator,
         rhs: &LoxValue,
-    ) -> Result<LoxValue, RuntimeError> {
+    ) -> Result<LoxValue, RuntimeErrorKind> {
         match operator {
             UnaryOperator::Bang => Ok(LoxValue::Bool(rhs.logical_not())),
             UnaryOperator::Minus => rhs.numeric_negate(),
@@ -197,7 +218,7 @@ impl ExpressionEvaluator {
         operator: &BinaryOperator,
         lhs: &LoxValue,
         rhs: &LoxValue,
-    ) -> Result<LoxValue, RuntimeError> {
+    ) -> Result<LoxValue, RuntimeErrorKind> {
         match operator {
             BinaryOperator::Add => lhs.add(rhs),
             BinaryOperator::Subtract => lhs.subtract(rhs),

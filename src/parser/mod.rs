@@ -1,7 +1,7 @@
 use crate::{
     expression::{
-        BinaryOperator, ExpressionTree, ExpressionTreeAtom, ExpressionTreeNode,
-        ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+        BinaryOperator, ExpressionTree, ExpressionTreeAtom, ExpressionTreeAtomKind,
+        ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
     token::{Token, TokenKind},
@@ -135,35 +135,52 @@ impl<'src> Parser<'src> {
 
         let node = match token.kind {
             TokenKind::NumericLiteral => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Number(
-                    lexeme
-                        .parse::<f64>()
-                        .expect("Numeric literal tokens can always be parsed into a `f64`."),
-                ));
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                    kind: ExpressionTreeAtomKind::Number(
+                        lexeme
+                            .parse()
+                            .expect("Numeric literal tokens are valid `f64`"),
+                    ),
+                    line: token.line,
+                });
                 tree.push(node)
             }
             TokenKind::Ident => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Identifier(lexeme.into()));
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                    kind: ExpressionTreeAtomKind::Identifier(lexeme.into()),
+                    line: token.line,
+                });
                 tree.push(node)
             }
             TokenKind::StringLiteral => {
                 let value = lexeme
                     .get(1..lexeme.len() - 1)
                     .expect("String literal tokens are at least length 2.");
-                let node =
-                    ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value.into()));
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                    kind: ExpressionTreeAtomKind::StringLiteral(value.into()),
+                    line: token.line,
+                });
                 tree.push(node)
             }
             TokenKind::KeywordNil => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Nil);
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                    kind: ExpressionTreeAtomKind::Nil,
+                    line: token.line,
+                });
                 tree.push(node)
             }
             TokenKind::KeywordTrue => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Bool(true));
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                    kind: ExpressionTreeAtomKind::Bool(true),
+                    line: token.line,
+                });
                 tree.push(node)
             }
             TokenKind::KeywordFalse => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom::Bool(false));
+                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                    kind: ExpressionTreeAtomKind::Bool(false),
+                    line: token.line,
+                });
                 tree.push(node)
             }
             // Unary operators

@@ -68,12 +68,18 @@ pub enum ExpressionTreeNode {
 }
 
 #[derive(Debug, Clone)]
-pub enum ExpressionTreeAtom {
+pub enum ExpressionTreeAtomKind {
     Number(f64),
     Bool(bool),
     Nil,
     Identifier(CompactString),
     StringLiteral(CompactString),
+}
+
+#[derive(Debug, Clone)]
+pub struct ExpressionTreeAtom {
+    pub kind: ExpressionTreeAtomKind,
+    pub line: u32,
 }
 
 #[derive(Debug, Clone)]
@@ -116,5 +122,15 @@ impl ExpressionTreeWithRoot {
 
     pub fn get_node(&self, node: &ExpressionTreeNodeRef) -> Option<&ExpressionTreeNode> {
         self.nodes.get(node.0 as usize)
+    }
+
+    pub fn get_line(&self, node: &ExpressionTreeNodeRef) -> Option<u32> {
+        let node = self.nodes.get(node.0 as usize)?;
+        match node {
+            ExpressionTreeNode::Atom(ExpressionTreeAtom { line, .. }) => Some(*line),
+            ExpressionTreeNode::Unary { rhs, .. } => self.get_line(rhs),
+            ExpressionTreeNode::Binary { lhs, .. } => self.get_line(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_line(inner),
+        }
     }
 }

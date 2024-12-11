@@ -4,23 +4,30 @@ use std::{
     path::Path,
 };
 
-use taurox::{evaluator::ExpressionEvaluator, parser::Parser};
+use taurox::{
+    evaluator::{
+        formatter::{BasicFormatter, ValueFormatter},
+        ExpressionEvaluator,
+    },
+    expression::formatter::{ExpressionFormatter, SExpressionFormatter},
+    parser::Parser,
+};
 
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut parser = Parser::new(input);
     let result = parser.parse_expression();
+    let expression_formatter = SExpressionFormatter;
+    let value_formatter = BasicFormatter;
     let mut evaluator = ExpressionEvaluator::new();
     let actual = match result {
         Ok(ref t) => {
             let v = evaluator.evaluate(t);
             match v {
-                Ok(v) => {
-                    format!("{v}")
-                }
-                Err(e) => format!("{e}"),
+                Ok(ref v) => format!("{}", value_formatter.format(v)),
+                Err(ref e) => format!("{}", value_formatter.format_error(e)),
             }
         }
-        Err(e) => format!("{e}"),
+        Err(ref e) => format!("{}", expression_formatter.format_error(e)),
     };
 
     assert_eq!(actual, expected, "Failed the test {test_name}");

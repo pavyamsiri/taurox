@@ -1,8 +1,8 @@
 use crate::parser::{ParserError, ParserErrorKind};
 
 use super::{
-    BinaryOperator, ExpressionTreeAtom, ExpressionTreeNode, ExpressionTreeNodeRef,
-    ExpressionTreeWithRoot, UnaryOperator,
+    BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode,
+    ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
 };
 
 pub trait ExpressionFormatter {
@@ -29,13 +29,26 @@ impl SExpressionFormatter {
         let current_node = &tree.nodes[node.0 as usize];
 
         match current_node {
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Nil) => "nil".into(),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Bool(value)) => format!("{value}"),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Number(value)) => format!("{value:?}"),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::Identifier(value)) => format!("{value}"),
-            ExpressionTreeNode::Atom(ExpressionTreeAtom::StringLiteral(value)) => {
-                format!("{value}")
-            }
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Nil,
+                ..
+            }) => "nil".into(),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Bool(value),
+                ..
+            }) => format!("{value}"),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Number(value),
+                ..
+            }) => format!("{value:?}"),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::Identifier(value),
+                ..
+            }) => format!("{value}"),
+            ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                kind: ExpressionTreeAtomKind::StringLiteral(value),
+                ..
+            }) => format!("{value}"),
             ExpressionTreeNode::Unary { operator, rhs } => {
                 format!(
                     "({} {})",
