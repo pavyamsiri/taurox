@@ -51,6 +51,9 @@ impl ValueFormatter for BasicFormatter {
                 self.format_verbose(lhs),
                 self.format_verbose(rhs)
             ),
+            RuntimeErrorKind::InvalidAccess(ref name) => {
+                format!("({line}) Invalid Access: {name}",)
+            }
         }
     }
 }

@@ -5,7 +5,7 @@ use compact_str::{CompactString, ToCompactString};
 use crate::{
     evaluator::{ExpressionEvaluator, LoxValue, RuntimeError},
     parser::Program,
-    statement::Statement,
+    statement::{Declaration, NonDeclaration, Statement},
 };
 
 #[derive(Debug)]
@@ -21,7 +21,7 @@ pub trait Interpreter {
 
 pub struct TreeWalkInterpreter {
     program: Program,
-    environment: HashMap<CompactString, LoxValue>,
+    environment: HashMap<CompactString, Option<LoxValue>>,
     counter: usize,
 }
 
@@ -44,12 +44,23 @@ impl Interpreter for TreeWalkInterpreter {
         let mut state = ProgramState::Run;
 
         match statement {
-            Statement::Expression(ref expr) => {
-                let result = ExpressionEvaluator::evaluate_expression(expr)?;
+            Statement::Declaration(Declaration::Variable { name, initial }) => {
+                let initial = if let Some(expr) = initial {
+                    Some(ExpressionEvaluator::evaluate_expression(
+                        expr,
+                        &self.environment,
+                    )?)
+                } else {
+                    None
+                };
+                self.environment.insert(name.clone(), initial);
+            }
+            Statement::NonDeclaration(NonDeclaration::Expression(ref expr)) => {
+                let result = ExpressionEvaluator::evaluate_expression(expr, &self.environment)?;
                 eprintln!("SIDE EFFECTLESS: {result:?}");
             }
-            Statement::Print(expr) => {
-                let result = ExpressionEvaluator::evaluate_expression(expr)?;
+            Statement::NonDeclaration(NonDeclaration::Print(ref expr)) => {
+                let result = ExpressionEvaluator::evaluate_expression(expr, &self.environment)?;
                 state = ProgramState::Write(format!("{result}").to_compact_string())
             }
         }

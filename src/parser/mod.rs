@@ -4,7 +4,7 @@ use crate::{
         ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
-    statement::Statement,
+    statement::{Declaration, NonDeclaration, Statement},
     token::{Token, TokenKind},
 };
 
@@ -25,6 +25,8 @@ pub enum ParserErrorKind {
     UnexpectedEof,
     #[error("Expected a statement but got {0}.")]
     InvalidStatement(TokenKind),
+    #[error("Encountered an invalid l-value {0}.")]
+    InvalidLValue(TokenKind),
     #[error("Encountered a lexer error {0}.")]
     LexicalError(#[from] LexicalError),
 }
@@ -97,6 +99,16 @@ impl<'src> Parser<'src> {
             })
         } else {
             Ok(next_token)
+        }
+    }
+
+    fn eat_if(&mut self, next: TokenKind) -> Result<Option<Token>, ParserError> {
+        let next_token = self.peek()?;
+        if next_token.kind != next {
+            Ok(None)
+        } else {
+            let _ = self.next_token().expect("Just peeked.");
+            Ok(Some(next_token))
         }
     }
 }
@@ -260,9 +272,44 @@ impl<'src> Parser<'src> {
             let first = self.peek()?;
             match first.kind {
                 TokenKind::KeywordPrint => {
-                    let _ = self.expect(TokenKind::KeywordPrint)?;
+                    let _ = self
+                        .expect(TokenKind::KeywordPrint)
+                        .expect("Just checked it.");
                     let rhs = self.parse_expression()?;
-                    statements.push(Statement::Print(rhs));
+                    statements.push(Statement::NonDeclaration(NonDeclaration::Print(rhs)));
+                    let _ = self.expect(TokenKind::Semicolon)?;
+                }
+                TokenKind::KeywordVar => {
+                    let _ = self
+                        .expect(TokenKind::KeywordVar)
+                        .expect("Just checked it.");
+                    let lhs = self.parse_expression()?;
+                    let kind = lhs.get_root();
+                    let name = match kind {
+                        ExpressionTreeNode::Atom(ExpressionTreeAtom {
+                            kind: ExpressionTreeAtomKind::Identifier(name),
+                            ..
+                        }) => name,
+                        _ => {
+                            return Err(ParserError {
+                                kind: ParserErrorKind::InvalidLValue(first.kind),
+                                line: first.line,
+                            })
+                        }
+                    };
+
+                    let mut initial = None;
+
+                    // Assignment
+                    if let Some(_) = self.eat_if(TokenKind::Equal)? {
+                        let rhs = self.parse_expression()?;
+                        initial = Some(rhs);
+                    }
+
+                    statements.push(Statement::Declaration(Declaration::Variable {
+                        name: name.clone(),
+                        initial,
+                    }));
                     let _ = self.expect(TokenKind::Semicolon)?;
                 }
                 TokenKind::Eof => {
@@ -271,7 +318,7 @@ impl<'src> Parser<'src> {
                 _ => {
                     let expr = self.parse_expression()?;
                     let _ = self.expect(TokenKind::Semicolon)?;
-                    statements.push(Statement::Expression(expr));
+                    statements.push(Statement::NonDeclaration(NonDeclaration::Expression(expr)));
                 }
             }
         }

@@ -1,5 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
 use taurox::evaluator::RuntimeError;
@@ -154,7 +155,8 @@ fn evaluate(src: &str) -> Result<()> {
     let mut parser = Parser::new(src);
     let expression = parser.parse_expression()?;
 
-    let result = ExpressionEvaluator::evaluate_expression(&expression)?;
+    let environment = HashMap::new();
+    let result = ExpressionEvaluator::evaluate_expression(&expression, &environment)?;
 
     eprintln!("{}", result);
 

@@ -116,8 +116,13 @@ impl ExpressionTreeWithRoot {
         }
     }
 
-    pub fn get_root(&self) -> ExpressionTreeNodeRef {
+    pub fn get_root_ref(&self) -> ExpressionTreeNodeRef {
         self.root
+    }
+
+    pub fn get_root(&self) -> &ExpressionTreeNode {
+        self.get_node(&self.get_root_ref())
+            .expect("The root exists within the tree.")
     }
 
     pub fn get_node(&self, node: &ExpressionTreeNodeRef) -> Option<&ExpressionTreeNode> {

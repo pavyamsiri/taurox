@@ -1,5 +1,7 @@
 pub mod formatter;
 
+use std::collections::HashMap;
+
 use crate::expression::{
     BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode,
     ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
@@ -15,6 +17,8 @@ pub enum RuntimeErrorKind {
     NonNumerics(LoxValue, LoxValue),
     #[error("Non-Numbers/Non-Strings {{Binary}}: [{0} , {1}]")]
     NonAddable(LoxValue, LoxValue),
+    #[error("Invalid Access: {0}")]
+    InvalidAccess(CompactString),
 }
 
 #[derive(Debug, Error, Clone)]
@@ -148,6 +152,7 @@ impl ExpressionEvaluator {
     fn evaluate_expression_node(
         tree: &ExpressionTreeWithRoot,
         node: &ExpressionTreeNodeRef,
+        environment: &HashMap<CompactString, Option<LoxValue>>,
     ) -> Result<LoxValue, RuntimeError> {
         let current_node = tree
             .get_node(node)
@@ -170,33 +175,43 @@ impl ExpressionEvaluator {
                 ..
             }) => LoxValue::Number(*value),
             ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                kind: ExpressionTreeAtomKind::Identifier(_),
+                kind: ExpressionTreeAtomKind::Identifier(name),
                 ..
-            }) => todo!(),
+            }) => environment
+                .get(name)
+                .and_then(|v| v.as_ref())
+                .ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::InvalidAccess(name.clone()),
+                    line,
+                })?
+                .clone(),
             ExpressionTreeNode::Atom(ExpressionTreeAtom {
                 kind: ExpressionTreeAtomKind::StringLiteral(value),
                 ..
             }) => LoxValue::String(value.clone()),
             ExpressionTreeNode::Unary { operator, rhs } => {
-                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs)?;
+                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs, environment)?;
                 ExpressionEvaluator::evaluate_unary(operator, &rhs)
                     .map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionTreeNode::Binary { operator, lhs, rhs } => {
-                let lhs = ExpressionEvaluator::evaluate_expression_node(tree, lhs)?;
-                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs)?;
+                let lhs = ExpressionEvaluator::evaluate_expression_node(tree, lhs, environment)?;
+                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs, environment)?;
                 ExpressionEvaluator::evaluate_binary(operator, &lhs, &rhs)
                     .map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionTreeNode::Group { inner } => {
-                ExpressionEvaluator::evaluate_expression_node(tree, inner)?
+                ExpressionEvaluator::evaluate_expression_node(tree, inner, environment)?
             }
         };
         Ok(result)
     }
 
-    pub fn evaluate_expression(tree: &ExpressionTreeWithRoot) -> Result<LoxValue, RuntimeError> {
-        ExpressionEvaluator::evaluate_expression_node(tree, &tree.get_root())
+    pub fn evaluate_expression(
+        tree: &ExpressionTreeWithRoot,
+        environment: &HashMap<CompactString, Option<LoxValue>>,
+    ) -> Result<LoxValue, RuntimeError> {
+        ExpressionEvaluator::evaluate_expression_node(tree, &tree.get_root_ref(), environment)
     }
 
     fn evaluate_unary(
