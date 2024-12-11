@@ -86,11 +86,12 @@ fn taurox_main() -> Result<ExitCode> {
             eprintln!("Running {:?}...", path);
             let src = read_to_string(path)?;
             let res = run(&src);
+            // TODO(pavyamsiri): Differentiate between runtime error (70) and compile errors (65).
             match res {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!("{e}");
-                    return Ok(ExitCode::from(70));
+                    return Ok(ExitCode::from(65));
                 }
             }
         }
