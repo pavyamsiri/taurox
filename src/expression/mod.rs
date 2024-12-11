@@ -14,17 +14,17 @@ impl UnaryOperator {
     pub fn get_binding_power(&self) -> u8 {
         match self {
             // 1. Unary operators
-            UnaryOperator::Bang | UnaryOperator::Minus => 9,
+            UnaryOperator::Bang | UnaryOperator::Minus => 15,
         }
     }
 }
 
 #[derive(Debug, Clone)]
 pub enum BinaryOperator {
-    Add,
-    Subtract,
     Multiply,
     Divide,
+    Add,
+    Subtract,
     LessThan,
     LessThanEqual,
     GreaterThan,
@@ -37,16 +37,32 @@ impl BinaryOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
             // 2. Multiplicative operators
-            BinaryOperator::Multiply | BinaryOperator::Divide => (7, 8),
+            Self::Multiply | Self::Divide => (13, 14),
             // 3. Additive operators
-            BinaryOperator::Add | BinaryOperator::Subtract => (5, 6),
+            Self::Add | Self::Subtract => (11, 12),
             // 4. Comparison operators
-            BinaryOperator::LessThan
-            | BinaryOperator::LessThanEqual
-            | BinaryOperator::GreaterThan
-            | BinaryOperator::GreaterThanEqual => (4, 5),
+            Self::LessThan | Self::LessThanEqual | Self::GreaterThan | Self::GreaterThanEqual => {
+                (9, 10)
+            }
             // 5. Equality operators
-            BinaryOperator::EqualEqual | BinaryOperator::BangEqual => (3, 4),
+            Self::EqualEqual | Self::BangEqual => (7, 9),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum BinaryShortCircuitOperator {
+    And,
+    Or,
+}
+
+impl BinaryShortCircuitOperator {
+    pub fn get_binding_power(&self) -> (u8, u8) {
+        match self {
+            // 6. Logical AND operator
+            Self::And => (5, 6),
+            // 7. Logical OR operator
+            Self::Or => (3, 4),
         }
     }
 }
@@ -59,7 +75,8 @@ pub enum BinaryAssignmentOperator {
 impl BinaryAssignmentOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
-            BinaryAssignmentOperator::Assign => (2, 1),
+            // 8. Assignment operator
+            Self::Assign => (2, 1),
         }
     }
 }
@@ -78,13 +95,18 @@ pub enum ExpressionTreeNode {
         lhs: ExpressionTreeNodeRef,
         rhs: ExpressionTreeNodeRef,
     },
-    Group {
-        inner: ExpressionTreeNodeRef,
-    },
     BinaryAssignment {
         operator: BinaryAssignmentOperator,
         lhs: CompactString,
         rhs: ExpressionTreeNodeRef,
+    },
+    BinaryShortCircuit {
+        operator: BinaryShortCircuitOperator,
+        lhs: ExpressionTreeNodeRef,
+        rhs: ExpressionTreeNodeRef,
+    },
+    Group {
+        inner: ExpressionTreeNodeRef,
     },
 }
 
@@ -146,8 +168,9 @@ impl ExpressionTree {
             ExpressionTreeNode::Atom(ExpressionTreeAtom { line, .. }) => Some(*line),
             ExpressionTreeNode::Unary { rhs, .. } => self.get_line(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_line(lhs),
-            ExpressionTreeNode::Group { inner } => self.get_line(inner),
             ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_line(rhs),
+            ExpressionTreeNode::BinaryShortCircuit { lhs, .. } => self.get_line(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_line(inner),
         }
     }
 
@@ -164,8 +187,9 @@ impl ExpressionTree {
             },
             ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),
-            ExpressionTreeNode::Group { inner } => self.get_kind(inner),
             ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_kind(rhs),
+            ExpressionTreeNode::BinaryShortCircuit { lhs, .. } => self.get_kind(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_kind(inner),
         }
     }
 }
@@ -201,8 +225,9 @@ impl ExpressionTreeWithRoot {
             ExpressionTreeNode::Atom(ExpressionTreeAtom { line, .. }) => Some(*line),
             ExpressionTreeNode::Unary { rhs, .. } => self.get_line(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_line(lhs),
-            ExpressionTreeNode::Group { inner } => self.get_line(inner),
             ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_line(rhs),
+            ExpressionTreeNode::BinaryShortCircuit { lhs, .. } => self.get_line(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_line(inner),
         }
     }
 
@@ -219,8 +244,9 @@ impl ExpressionTreeWithRoot {
             },
             ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),
-            ExpressionTreeNode::Group { inner } => self.get_kind(inner),
             ExpressionTreeNode::BinaryAssignment { rhs, .. } => self.get_kind(rhs),
+            ExpressionTreeNode::BinaryShortCircuit { lhs, .. } => self.get_kind(lhs),
+            ExpressionTreeNode::Group { inner } => self.get_kind(inner),
         }
     }
 }

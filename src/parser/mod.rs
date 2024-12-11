@@ -1,8 +1,8 @@
 use crate::{
     expression::{
-        BinaryAssignmentOperator, BinaryOperator, ExpressionTree, ExpressionTreeAtom,
-        ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
-        UnaryOperator,
+        BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,
+        ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef,
+        ExpressionTreeWithRoot, UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
     statement::{Declaration, NonDeclaration, Statement},
@@ -173,6 +173,19 @@ impl<'src> Parser<'src> {
             _ => Ok(None),
         }
     }
+
+    fn peek_binary_short_circuit_operator(
+        &mut self,
+    ) -> Result<Option<BinaryShortCircuitOperator>, ParserError> {
+        let token = self.peek()?;
+
+        match token.kind {
+            TokenKind::KeywordAnd => Ok(Some(BinaryShortCircuitOperator::And)),
+            TokenKind::KeywordOr => Ok(Some(BinaryShortCircuitOperator::Or)),
+            _ => Ok(None),
+        }
+    }
+
     fn expect_left_expression(
         &mut self,
         tree: &mut ExpressionTree,
@@ -305,6 +318,18 @@ impl<'src> Parser<'src> {
                     lhs: place,
                     rhs,
                 });
+                continue;
+            }
+
+            if let Some(operator) = self.peek_binary_short_circuit_operator()? {
+                let (lbp, rbp) = operator.get_binding_power();
+                if lbp < min_bp {
+                    break;
+                }
+                let _ = self.next_token()?;
+
+                let rhs = self.parse_expression_pratt(rbp, tree)?;
+                lhs = tree.push(ExpressionTreeNode::BinaryShortCircuit { operator, lhs, rhs });
                 continue;
             }
 

@@ -1,8 +1,9 @@
 use crate::parser::{ParserError, ParserErrorKind};
 
 use super::{
-    BinaryAssignmentOperator, BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind,
-    ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom,
+    ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
+    UnaryOperator,
 };
 
 pub trait ExpressionFormatter {
@@ -64,17 +65,25 @@ impl SExpressionFormatter {
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
-            ExpressionTreeNode::Group { inner } => {
-                format!(
-                    "(group {})",
-                    SExpressionFormatter::format_node(tree, &inner)
-                )
-            }
             ExpressionTreeNode::BinaryAssignment { operator, lhs, rhs } => {
                 format!(
                     "({} {lhs} {})",
                     SExpressionFormatter::format_binary_assignment_operator(operator),
                     SExpressionFormatter::format_node(tree, &rhs)
+                )
+            }
+            ExpressionTreeNode::BinaryShortCircuit { operator, lhs, rhs } => {
+                format!(
+                    "({} {} {})",
+                    SExpressionFormatter::format_binary_short_circuit_operator(operator),
+                    SExpressionFormatter::format_node(tree, &lhs),
+                    SExpressionFormatter::format_node(tree, &rhs),
+                )
+            }
+            ExpressionTreeNode::Group { inner } => {
+                format!(
+                    "(group {})",
+                    SExpressionFormatter::format_node(tree, &inner)
                 )
             }
         }
@@ -106,6 +115,14 @@ impl SExpressionFormatter {
     fn format_binary_assignment_operator(operator: &BinaryAssignmentOperator) -> String {
         match operator {
             BinaryAssignmentOperator::Assign => "=",
+        }
+        .into()
+    }
+
+    fn format_binary_short_circuit_operator(operator: &BinaryShortCircuitOperator) -> String {
+        match operator {
+            BinaryShortCircuitOperator::And => "and",
+            BinaryShortCircuitOperator::Or => "or",
         }
         .into()
     }

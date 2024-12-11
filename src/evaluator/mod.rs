@@ -2,8 +2,9 @@ pub mod formatter;
 
 use crate::{
     expression::{
-        BinaryAssignmentOperator, BinaryOperator, ExpressionTreeAtom, ExpressionTreeAtomKind,
-        ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+        BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom,
+        ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
+        UnaryOperator,
     },
     interpreter::Environment,
 };
@@ -190,25 +191,24 @@ impl ExpressionEvaluator {
                 ..
             }) => LoxValue::String(value.clone()),
             ExpressionTreeNode::Unary { operator, rhs } => {
-                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs, environment)?;
-                ExpressionEvaluator::evaluate_unary(operator, &rhs)
-                    .map_err(|kind| RuntimeError { kind, line })?
-            }
-            ExpressionTreeNode::Binary { operator, lhs, rhs } => {
-                let lhs = ExpressionEvaluator::evaluate_expression_node(tree, lhs, environment)?;
-                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs, environment)?;
-                ExpressionEvaluator::evaluate_binary(operator, &lhs, &rhs)
-                    .map_err(|kind| RuntimeError { kind, line })?
+                let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
+                Self::evaluate_unary(operator, &rhs).map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionTreeNode::Group { inner } => {
-                ExpressionEvaluator::evaluate_expression_node(tree, inner, environment)?
+                Self::evaluate_expression_node(tree, inner, environment)?
+            }
+            ExpressionTreeNode::Binary { operator, lhs, rhs } => {
+                let lhs = Self::evaluate_expression_node(tree, lhs, environment)?;
+                let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
+                Self::evaluate_binary(operator, &lhs, &rhs)
+                    .map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionTreeNode::BinaryAssignment {
                 operator: BinaryAssignmentOperator::Assign,
                 lhs,
                 rhs,
             } => {
-                let rhs = ExpressionEvaluator::evaluate_expression_node(tree, rhs, environment)?;
+                let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 let _ = environment
                     .assign(lhs, rhs.clone())
                     .map_err(|_| RuntimeError {
@@ -216,6 +216,9 @@ impl ExpressionEvaluator {
                         line,
                     })?;
                 rhs
+            }
+            ExpressionTreeNode::BinaryShortCircuit { operator, lhs, rhs } => {
+                Self::evaluate_binary_short_circuit(operator, lhs, rhs, tree, environment)?
             }
         };
         Ok(result)
@@ -225,7 +228,7 @@ impl ExpressionEvaluator {
         tree: &ExpressionTreeWithRoot,
         environment: &mut Environment,
     ) -> Result<LoxValue, RuntimeError> {
-        ExpressionEvaluator::evaluate_expression_node(tree, &tree.get_root_ref(), environment)
+        Self::evaluate_expression_node(tree, &tree.get_root_ref(), environment)
     }
 
     fn evaluate_unary(
@@ -254,6 +257,35 @@ impl ExpressionEvaluator {
             BinaryOperator::GreaterThanEqual => lhs.greater_than_or_equal(rhs),
             BinaryOperator::EqualEqual => Ok(LoxValue::Bool(lhs.is_equal(rhs))),
             BinaryOperator::BangEqual => Ok(LoxValue::Bool(lhs.is_not_equal(rhs))),
+        }
+    }
+
+    fn evaluate_binary_short_circuit(
+        operator: &BinaryShortCircuitOperator,
+        lhs: &ExpressionTreeNodeRef,
+        rhs: &ExpressionTreeNodeRef,
+        tree: &ExpressionTreeWithRoot,
+        environment: &mut Environment,
+    ) -> Result<LoxValue, RuntimeError> {
+        let lhs = { Self::evaluate_expression_node(tree, lhs, environment)? };
+
+        match operator {
+            BinaryShortCircuitOperator::And => {
+                if !lhs.is_truthy() {
+                    Ok(lhs)
+                } else {
+                    let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
+                    Ok(rhs)
+                }
+            }
+            BinaryShortCircuitOperator::Or => {
+                if lhs.is_truthy() {
+                    Ok(lhs)
+                } else {
+                    let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
+                    Ok(rhs)
+                }
+            }
         }
     }
 }
