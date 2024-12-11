@@ -238,6 +238,7 @@ impl TreeWalkInterpreter {
         body: &Statement,
     ) -> Result<ProgramState, RuntimeError> {
         // Run the initializer
+        // NOTE(pavyamsiri): I don't really understanding how for loops are scoped.
         environment.enter_scope();
         match initializer {
             Some(Initializer::VarDecl { name, initial }) => {
