@@ -22,7 +22,7 @@ pub struct BasicFormatter;
 impl BasicFormatter {
     fn format_verbose(&self, value: &LoxValue) -> String {
         match value {
-            LoxValue::Number(v) => format!("{v})"),
+            LoxValue::Number(v) => format!("Number({v})"),
             LoxValue::String(v) => format!("String(\"{v}\")"),
             LoxValue::Nil => format!("Nil"),
             LoxValue::Bool(v) => format!("Bool({v})"),
