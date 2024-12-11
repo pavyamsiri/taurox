@@ -78,7 +78,7 @@ fn taurox_main() -> Result<ExitCode> {
                 Ok(_) => {}
                 Err(e) => {
                     eprintln!("{e}");
-                    return Ok(ExitCode::from(65));
+                    return Ok(ExitCode::from(70));
                 }
             }
         }
