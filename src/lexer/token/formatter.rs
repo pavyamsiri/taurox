@@ -2,8 +2,11 @@ use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
 
 use super::{Token, TokenKind};
 
+/// Interface for creating new token formatters.
 pub trait TokenFormatter {
+    /// Formats a token into a string.
     fn format(&self, token: &Token) -> String;
+    /// Formats a lexer error into a string.
     fn format_lexical_error(&self, error: &LexicalError) -> String;
 }
 

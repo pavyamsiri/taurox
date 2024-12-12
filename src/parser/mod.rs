@@ -3,8 +3,8 @@ pub mod formatter;
 pub mod statement;
 
 use crate::{
+    lexer::token::{Token, TokenKind},
     lexer::{Lexer, LexicalError},
-    token::{Token, TokenKind},
 };
 use expression::{
     BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,

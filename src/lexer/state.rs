@@ -1,7 +1,6 @@
-use crate::token::{Span, SpanIndex, Token, TokenKind, KEYWORD_HASHMAP};
-
 use super::cursor::SourceChar;
 use super::error::{LexicalError, LexicalErrorKind};
+use super::token::{Span, SpanIndex, Token, TokenKind, KEYWORD_HASHMAP};
 
 #[derive(Debug)]
 pub enum LexerStateTransition {

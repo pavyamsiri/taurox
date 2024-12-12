@@ -105,9 +105,11 @@ fn taurox_main() -> Result<ExitCode> {
 }
 
 fn tokenize(src: &str, format: &TokenFormat) -> bool {
+    use taurox::lexer::token::formatter::{
+        BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter,
+    };
+    use taurox::lexer::token::TokenKind;
     use taurox::lexer::Lexer;
-    use taurox::token::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
-    use taurox::token::TokenKind;
 
     let mut scanner = Lexer::new(src);
     let formatter: Box<dyn TokenFormatter> = match format {

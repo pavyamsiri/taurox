@@ -1,4 +1,4 @@
-use crate::token::Span;
+use super::token::Span;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]

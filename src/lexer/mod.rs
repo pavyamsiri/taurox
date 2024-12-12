@@ -1,12 +1,13 @@
 mod cursor;
 mod error;
 mod state;
+pub mod token;
 
-use crate::token::{Span, SpanIndex, Token};
 use cursor::SourceChar;
 pub use error::{LexicalError, LexicalErrorKind};
 use state::{LexerState, LexerStateTransition};
 use std::str::Chars;
+use token::{Span, SpanIndex, Token};
 
 #[derive(Debug)]
 enum LookAhead {

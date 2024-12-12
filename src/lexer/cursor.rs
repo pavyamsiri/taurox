@@ -1,4 +1,4 @@
-use crate::token::SpanIndex;
+use super::token::SpanIndex;
 
 #[derive(Debug, Clone, Copy)]
 pub struct SourceChar {
