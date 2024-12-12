@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum UnaryOperator {
     Bang,
     Minus,
@@ -44,7 +44,7 @@ impl BinaryOperator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryShortCircuitOperator {
     And,
     Or,
@@ -61,7 +61,7 @@ impl BinaryShortCircuitOperator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryAssignmentOperator {
     Assign,
 }

@@ -108,6 +108,12 @@ impl<'src> Parser<'src> {
     }
 }
 
+enum PrattParseOutcome {
+    NoOperator,
+    Break,
+    NewLHS(ExpressionNodeRef),
+}
+
 // Pratt parser for expressions
 impl<'src> Parser<'src> {
     pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
@@ -272,101 +278,175 @@ impl<'src> Parser<'src> {
         let mut lhs = self.expect_left_expression(tree)?;
 
         loop {
-            if let Some(operator) = self.peek_postfix_operator()? {
-                let lbp = operator.get_binding_power();
-                if lbp < min_bp {
+            match self.parse_postfix_expression_pratt(tree, lhs, min_bp)? {
+                PrattParseOutcome::NoOperator => {}
+                PrattParseOutcome::Break => {
                     break;
                 }
-
-                // Special case
-                match operator {
-                    PostfixOperator::Call => {
-                        let _ = self.expect(TokenKind::LeftParenthesis)?;
-                        // Parse arguments/expressions
-                        let mut arguments = Vec::new();
-
-                        // Hit the end of the argument list right away
-                        if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-                            lhs = tree.push(ExpressionNode::Call {
-                                callee: lhs,
-                                arguments: Vec::new(),
-                            })
-                        }
-                        // Collect arguments
-                        else {
-                            // NOTE: Only support up to 255 arguments
-                            for _ in 0..255 {
-                                let argument = self.parse_expression_pratt(0, tree)?;
-                                arguments.push(argument);
-
-                                // Hit the end of the argument list
-                                if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-                                    break;
-                                }
-
-                                let _ = self.expect(TokenKind::Comma)?;
-                            }
-                            lhs = tree.push(ExpressionNode::Call {
-                                callee: lhs,
-                                arguments,
-                            })
-                        }
-                    }
+                PrattParseOutcome::NewLHS(new_lhs) => {
+                    lhs = new_lhs;
+                    continue;
                 }
             }
 
-            if let Some(operator) = self.peek_infix_assignment_operator()? {
-                let place = {
-                    let lhs_node = tree
-                        .get_node(&lhs)
-                        .expect("The node ref is valid because it came from pushing to the tree.");
-                    lhs_node.get_l_value().ok_or(ParserError {
-                        kind: ParserErrorKind::InvalidLValue(tree.get_kind(&lhs).expect(
-                            "The node ref is valid because it came from pushing to the tree.",
-                        )),
-                        line: tree.get_line(&lhs).expect(
-                            "The node ref is valid because it came from pushing to the tree.",
-                        ),
-                    })?
-                };
-
-                let (lbp, rbp) = operator.get_binding_power();
-                if lbp < min_bp {
+            match self.parse_infix_assignment_expression_pratt(tree, lhs, min_bp)? {
+                PrattParseOutcome::NoOperator => {}
+                PrattParseOutcome::Break => {
                     break;
                 }
-                let _ = self.next_token()?;
-
-                let rhs = self.parse_expression_pratt(rbp, tree)?;
-                lhs = tree.push(ExpressionNode::BinaryAssignment { lhs: place, rhs });
-                continue;
+                PrattParseOutcome::NewLHS(new_lhs) => {
+                    lhs = new_lhs;
+                    continue;
+                }
             }
 
-            if let Some(operator) = self.peek_infix_short_circuit_operator()? {
-                let (lbp, rbp) = operator.get_binding_power();
-                if lbp < min_bp {
+            match self.parse_infix_short_circuit_expression_pratt(tree, lhs, min_bp)? {
+                PrattParseOutcome::NoOperator => {}
+                PrattParseOutcome::Break => {
                     break;
                 }
-                let _ = self.next_token()?;
-
-                let rhs = self.parse_expression_pratt(rbp, tree)?;
-                lhs = tree.push(ExpressionNode::BinaryShortCircuit { operator, lhs, rhs });
-                continue;
+                PrattParseOutcome::NewLHS(new_lhs) => {
+                    lhs = new_lhs;
+                    continue;
+                }
             }
 
-            if let Some(operator) = self.peek_infix_operator()? {
-                let (lbp, rbp) = operator.get_binding_power();
-                if lbp < min_bp {
+            match self.parse_infix_expression_pratt(tree, lhs, min_bp)? {
+                PrattParseOutcome::NoOperator => {}
+                PrattParseOutcome::Break => {
                     break;
                 }
-                let _ = self.next_token()?;
-
-                let rhs = self.parse_expression_pratt(rbp, tree)?;
-                lhs = tree.push(ExpressionNode::Binary { operator, lhs, rhs });
-                continue;
+                PrattParseOutcome::NewLHS(new_lhs) => {
+                    lhs = new_lhs;
+                    continue;
+                }
             }
             break;
         }
         Ok(lhs)
+    }
+
+    fn parse_infix_assignment_expression_pratt(
+        &mut self,
+        tree: &mut IncompleteExpression,
+        lhs: ExpressionNodeRef,
+        min_bp: u8,
+    ) -> Result<PrattParseOutcome, ParserError> {
+        const MSG: &'static str = "Caller must make sure `lhs` is a valid expression node ref.";
+        if let Some(operator) = self.peek_infix_assignment_operator()? {
+            let place = tree
+                .get_l_value(&lhs)
+                .ok_or(ParserError {
+                    kind: ParserErrorKind::InvalidLValue(tree.get_kind(&lhs).expect(MSG)),
+                    line: tree.get_line(&lhs).expect(MSG),
+                })?
+                .to_compact_string();
+
+            let (lbp, rbp) = operator.get_binding_power();
+            if lbp < min_bp {
+                return Ok(PrattParseOutcome::Break);
+            }
+            let _ = self.next_token()?;
+
+            let rhs = self.parse_expression_pratt(rbp, tree)?;
+            return Ok(PrattParseOutcome::NewLHS(
+                tree.push(ExpressionNode::BinaryAssignment { lhs: place, rhs }),
+            ));
+        }
+        Ok(PrattParseOutcome::NoOperator)
+    }
+
+    fn parse_infix_short_circuit_expression_pratt(
+        &mut self,
+        tree: &mut IncompleteExpression,
+        lhs: ExpressionNodeRef,
+        min_bp: u8,
+    ) -> Result<PrattParseOutcome, ParserError> {
+        if let Some(operator) = self.peek_infix_short_circuit_operator()? {
+            let (lbp, rbp) = operator.get_binding_power();
+            if lbp < min_bp {
+                return Ok(PrattParseOutcome::Break);
+            }
+            let _ = self.next_token()?;
+
+            let rhs = self.parse_expression_pratt(rbp, tree)?;
+            return Ok(PrattParseOutcome::NewLHS(
+                tree.push(ExpressionNode::BinaryShortCircuit { operator, lhs, rhs }),
+            ));
+        }
+        Ok(PrattParseOutcome::NoOperator)
+    }
+
+    fn parse_infix_expression_pratt(
+        &mut self,
+        tree: &mut IncompleteExpression,
+        lhs: ExpressionNodeRef,
+        min_bp: u8,
+    ) -> Result<PrattParseOutcome, ParserError> {
+        if let Some(operator) = self.peek_infix_operator()? {
+            let (lbp, rbp) = operator.get_binding_power();
+            if lbp < min_bp {
+                return Ok(PrattParseOutcome::Break);
+            }
+            let _ = self.next_token()?;
+
+            let rhs = self.parse_expression_pratt(rbp, tree)?;
+            return Ok(PrattParseOutcome::NewLHS(
+                tree.push(ExpressionNode::Binary { operator, lhs, rhs }),
+            ));
+        }
+        Ok(PrattParseOutcome::NoOperator)
+    }
+
+    fn parse_postfix_expression_pratt(
+        &mut self,
+        tree: &mut IncompleteExpression,
+        lhs: ExpressionNodeRef,
+        min_bp: u8,
+    ) -> Result<PrattParseOutcome, ParserError> {
+        if let Some(operator) = self.peek_postfix_operator()? {
+            let lbp = operator.get_binding_power();
+            if lbp < min_bp {
+                return Ok(PrattParseOutcome::Break);
+            }
+
+            // Special case
+            match operator {
+                PostfixOperator::Call => {
+                    let _ = self.expect(TokenKind::LeftParenthesis)?;
+                    // Parse arguments/expressions
+                    let mut arguments = Vec::new();
+
+                    // Hit the end of the argument list right away
+                    if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                        return Ok(PrattParseOutcome::NewLHS(tree.push(ExpressionNode::Call {
+                            callee: lhs,
+                            arguments: Vec::new(),
+                        })));
+                    }
+                    // Collect arguments
+                    else {
+                        // NOTE: Only support up to 255 arguments
+                        for _ in 0..255 {
+                            let argument = self.parse_expression_pratt(0, tree)?;
+                            arguments.push(argument);
+
+                            // Hit the end of the argument list
+                            if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                                break;
+                            }
+
+                            let _ = self.expect(TokenKind::Comma)?;
+                        }
+                        return Ok(PrattParseOutcome::NewLHS(tree.push(ExpressionNode::Call {
+                            callee: lhs,
+                            arguments,
+                        })));
+                    }
+                }
+            }
+        }
+        Ok(PrattParseOutcome::NoOperator)
     }
 }
 

@@ -20,7 +20,7 @@ pub struct ExpressionAtom {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ExpressionNodeRef(pub u32);
+pub struct ExpressionNodeRef(u32);
 #[derive(Debug, Clone)]
 pub enum ExpressionNode {
     Atom(ExpressionAtom),
@@ -52,12 +52,12 @@ pub enum ExpressionNode {
 }
 
 impl ExpressionNode {
-    pub fn get_l_value(&self) -> Option<CompactString> {
+    pub fn get_l_value(&self) -> Option<&str> {
         match self {
             ExpressionNode::Atom(ExpressionAtom {
                 kind: ExpressionAtomKind::Identifier(name),
                 ..
-            }) => Some(name.clone()),
+            }) => Some(name),
             _ => None,
         }
     }
@@ -82,6 +82,10 @@ impl IncompleteExpression {
     pub fn push(&mut self, node: ExpressionNode) -> ExpressionNodeRef {
         self.nodes.push(node);
         ExpressionNodeRef(self.nodes.len() as u32 - 1)
+    }
+
+    pub fn get_l_value(&self, index: &ExpressionNodeRef) -> Option<&str> {
+        self.get_node(index).and_then(|n| n.get_l_value())
     }
 
     pub fn get_node(&self, index: &ExpressionNodeRef) -> Option<&ExpressionNode> {
