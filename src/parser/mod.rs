@@ -314,13 +314,16 @@ impl<'src> Parser<'src> {
                         // Parse arguments/expressions
                         let mut arguments = Vec::new();
 
-                        // Hit the end of the argument list
+                        // Hit the end of the argument list right away
                         if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
                             lhs = tree.push(ExpressionTreeNode::Call {
                                 callee: lhs,
                                 arguments: Vec::new(),
                             })
-                        } else {
+                        }
+                        // Collect arguments
+                        else {
+                            // NOTE: Only support up to 255 arguments
                             for _ in 0..255 {
                                 let argument = self.parse_expression_pratt(0, tree)?;
                                 arguments.push(argument);
