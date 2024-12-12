@@ -417,178 +417,14 @@ impl<'src> Parser<'src> {
 
     pub fn parse_statement(&mut self) -> Result<Option<Statement>, ParserError> {
         let first = self.peek()?;
+        let line = first.line;
         let statement = match first.kind {
-            TokenKind::KeywordPrint => {
-                let _ = self
-                    .expect(TokenKind::KeywordPrint)
-                    .expect("Just checked it.");
-                let rhs = self.parse_expression()?;
-                let statement = Statement::NonDeclaration(NonDeclaration::Print(rhs));
-                let _ = self.expect(TokenKind::Semicolon)?;
-                statement
-            }
-            TokenKind::KeywordVar => {
-                let _ = self
-                    .expect(TokenKind::KeywordVar)
-                    .expect("Just checked it.");
-                let place = self.expect_ident()?;
-
-                let mut initial = None;
-
-                // Assignment
-                if let Some(_) = self.eat_if(TokenKind::Equal)? {
-                    let rhs = self.parse_expression()?;
-                    initial = Some(rhs);
-                }
-
-                let statement = Statement::Declaration(Declaration::Variable {
-                    name: place.clone(),
-                    initial,
-                });
-                let _ = self.expect(TokenKind::Semicolon)?;
-                statement
-            }
-            TokenKind::LeftBrace => {
-                let _ = self.expect(TokenKind::LeftBrace).expect("Just checked it.");
-                let mut statements = Vec::new();
-
-                // Check if we are empty
-                if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
-                    Statement::NonDeclaration(NonDeclaration::Block(statements))
-                } else {
-                    loop {
-                        let statement = self.parse_statement()?.ok_or(ParserError {
-                            kind: ParserErrorKind::UnexpectedEof,
-                            line: first.line,
-                        })?;
-                        statements.push(statement);
-                        if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
-                            break;
-                        }
-                    }
-                    Statement::NonDeclaration(NonDeclaration::Block(statements))
-                }
-            }
-
-            TokenKind::KeywordIf => {
-                let _ = self.expect(TokenKind::KeywordIf).expect("Just checked it.");
-                let _ = self.expect(TokenKind::LeftParenthesis)?;
-                let condition = self.parse_expression()?;
-                let _ = self.expect(TokenKind::RightParenthesis)?;
-                let success = self.parse_statement()?.ok_or(ParserError {
-                    kind: ParserErrorKind::UnexpectedEof,
-                    line: first.line,
-                })?;
-
-                let failure = if let Some(_) = self.eat_if(TokenKind::KeywordElse)? {
-                    Some(self.parse_statement()?.ok_or(ParserError {
-                        kind: ParserErrorKind::UnexpectedEof,
-                        line: first.line,
-                    })?)
-                } else {
-                    None
-                };
-
-                Statement::NonDeclaration(NonDeclaration::If {
-                    condition,
-                    success: Box::new(success),
-                    failure: Box::new(failure),
-                })
-            }
-            TokenKind::KeywordWhile => {
-                let _ = self
-                    .expect(TokenKind::KeywordWhile)
-                    .expect("Just checked it.");
-                let _ = self.expect(TokenKind::LeftParenthesis)?;
-                let condition = self.parse_expression()?;
-                let _ = self.expect(TokenKind::RightParenthesis)?;
-                let body = self.parse_statement()?.ok_or(ParserError {
-                    kind: ParserErrorKind::UnexpectedEof,
-                    line: first.line,
-                })?;
-
-                Statement::NonDeclaration(NonDeclaration::While {
-                    condition,
-                    body: Box::new(body),
-                })
-            }
-            TokenKind::KeywordFor => {
-                let _ = self
-                    .expect(TokenKind::KeywordFor)
-                    .expect("Just checked it.");
-                let _ = self.expect(TokenKind::LeftParenthesis)?;
-
-                // Parse initializer
-                let initializer: Option<Initializer> = {
-                    if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
-                        None
-                    }
-                    // Initializer exists
-                    else {
-                        let statement = self.parse_statement()?.ok_or(ParserError {
-                            kind: ParserErrorKind::UnexpectedEof,
-                            line: first.line,
-                        })?;
-                        let initializer = match statement {
-                            Statement::Declaration(Declaration::Variable { name, initial }) => {
-                                Some(Initializer::VarDecl { name, initial })
-                            }
-                            Statement::NonDeclaration(NonDeclaration::Expression(expr)) => {
-                                Some(Initializer::Expression(expr))
-                            }
-                            _ => None,
-                        };
-                        initializer
-                    }
-                };
-
-                // Parse condition
-                let condition: Option<ExpressionTreeWithRoot> = {
-                    if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
-                        None
-                    }
-                    // Condition exists
-                    else {
-                        let expr = self.parse_expression()?;
-                        self.expect(TokenKind::Semicolon)?;
-                        Some(expr)
-                    }
-                };
-
-                // Parse increment
-                let increment: Option<ExpressionTreeWithRoot> = {
-                    if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-                        None
-                    }
-                    // Increment exists
-                    else {
-                        let expr = self.parse_expression()?;
-                        self.expect(TokenKind::RightParenthesis)?;
-                        Some(expr)
-                    }
-                };
-
-                // Parse body
-                let body = self.parse_statement()?.ok_or(ParserError {
-                    kind: ParserErrorKind::UnexpectedEof,
-                    line: first.line,
-                })?;
-
-                let body = match body {
-                    Statement::Declaration(declaration) => Err(ParserError {
-                        kind: ParserErrorKind::InvalidNonDeclaration(declaration),
-                        line: first.line,
-                    }),
-                    Statement::NonDeclaration(non_declaration) => Ok(non_declaration),
-                }?;
-
-                Statement::NonDeclaration(NonDeclaration::For {
-                    initializer,
-                    condition,
-                    increment,
-                    body: Box::new(body),
-                })
-            }
+            TokenKind::KeywordPrint => self.parse_print_statement()?,
+            TokenKind::KeywordVar => self.parse_variable_declaration()?,
+            TokenKind::LeftBrace => self.parse_block_statement(line)?,
+            TokenKind::KeywordIf => self.parse_if_statement(line)?,
+            TokenKind::KeywordWhile => self.parse_while_statement(line)?,
+            TokenKind::KeywordFor => self.parse_for_statement(line)?,
             TokenKind::Eof => {
                 return Ok(None);
             }
@@ -599,5 +435,173 @@ impl<'src> Parser<'src> {
             }
         };
         Ok(Some(statement))
+    }
+
+    fn parse_print_statement(&mut self) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordPrint)?;
+        let rhs = self.parse_expression()?;
+        let statement = Statement::NonDeclaration(NonDeclaration::Print(rhs));
+        let _ = self.expect(TokenKind::Semicolon)?;
+        Ok(statement)
+    }
+
+    fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordVar)?;
+        let place = self.expect_ident()?;
+
+        let mut initial = None;
+
+        // Assignment
+        if let Some(_) = self.eat_if(TokenKind::Equal)? {
+            let rhs = self.parse_expression()?;
+            initial = Some(rhs);
+        }
+
+        let statement = Statement::Declaration(Declaration::Variable {
+            name: place.clone(),
+            initial,
+        });
+        let _ = self.expect(TokenKind::Semicolon)?;
+        Ok(statement)
+    }
+
+    fn parse_block_statement(&mut self, line: u32) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::LeftBrace)?;
+        let mut statements = Vec::new();
+
+        // Check if we are empty
+        if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
+            Ok(Statement::NonDeclaration(NonDeclaration::Block(statements)))
+        } else {
+            loop {
+                let statement = self.parse_statement()?.ok_or(ParserError {
+                    kind: ParserErrorKind::UnexpectedEof,
+                    line,
+                })?;
+                statements.push(statement);
+                if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
+                    break;
+                }
+            }
+            Ok(Statement::NonDeclaration(NonDeclaration::Block(statements)))
+        }
+    }
+
+    fn parse_if_statement(&mut self, line: u32) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordIf)?;
+        let _ = self.expect(TokenKind::LeftParenthesis)?;
+        let condition = self.parse_expression()?;
+        let _ = self.expect(TokenKind::RightParenthesis)?;
+        let success = self.parse_statement()?.ok_or(ParserError {
+            kind: ParserErrorKind::UnexpectedEof,
+            line,
+        })?;
+
+        let failure = if let Some(_) = self.eat_if(TokenKind::KeywordElse)? {
+            Some(self.parse_statement()?.ok_or(ParserError {
+                kind: ParserErrorKind::UnexpectedEof,
+                line,
+            })?)
+        } else {
+            None
+        };
+
+        Ok(Statement::NonDeclaration(NonDeclaration::If {
+            condition,
+            success: Box::new(success),
+            failure: Box::new(failure),
+        }))
+    }
+
+    fn parse_while_statement(&mut self, line: u32) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordWhile)?;
+        let _ = self.expect(TokenKind::LeftParenthesis)?;
+        let condition = self.parse_expression()?;
+        let _ = self.expect(TokenKind::RightParenthesis)?;
+        let body = self.parse_statement()?.ok_or(ParserError {
+            kind: ParserErrorKind::UnexpectedEof,
+            line,
+        })?;
+
+        Ok(Statement::NonDeclaration(NonDeclaration::While {
+            condition,
+            body: Box::new(body),
+        }))
+    }
+
+    fn parse_for_statement(&mut self, line: u32) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordFor)?;
+        let _ = self.expect(TokenKind::LeftParenthesis)?;
+
+        // Parse initializer
+        let initializer: Option<Initializer> = {
+            if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
+                None
+            }
+            // Initializer exists
+            else {
+                let statement = self.parse_statement()?.ok_or(ParserError {
+                    kind: ParserErrorKind::UnexpectedEof,
+                    line,
+                })?;
+                let initializer = match statement {
+                    Statement::Declaration(Declaration::Variable { name, initial }) => {
+                        Some(Initializer::VarDecl { name, initial })
+                    }
+                    Statement::NonDeclaration(NonDeclaration::Expression(expr)) => {
+                        Some(Initializer::Expression(expr))
+                    }
+                    _ => None,
+                };
+                initializer
+            }
+        };
+
+        // Parse condition
+        let condition: Option<ExpressionTreeWithRoot> = {
+            if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
+                None
+            }
+            // Condition exists
+            else {
+                let expr = self.parse_expression()?;
+                self.expect(TokenKind::Semicolon)?;
+                Some(expr)
+            }
+        };
+
+        // Parse increment
+        let increment: Option<ExpressionTreeWithRoot> = {
+            if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                None
+            }
+            // Increment exists
+            else {
+                let expr = self.parse_expression()?;
+                self.expect(TokenKind::RightParenthesis)?;
+                Some(expr)
+            }
+        };
+
+        // Parse body
+        let body = self.parse_statement()?.ok_or(ParserError {
+            kind: ParserErrorKind::UnexpectedEof,
+            line,
+        })?;
+
+        let body = match body {
+            Statement::Declaration(declaration) => Err(ParserError {
+                kind: ParserErrorKind::InvalidNonDeclaration(declaration),
+                line,
+            }),
+            Statement::NonDeclaration(non_declaration) => Ok(non_declaration),
+        }?;
+
+        Ok(Statement::NonDeclaration(NonDeclaration::For {
+            initializer,
+            condition,
+            increment,
+            body: Box::new(body),
+        }))
     }
 }
