@@ -12,7 +12,7 @@ use crate::parser::{
     statement::{Declaration, Initializer, NonDeclaration, Statement},
     Program,
 };
-use compact_str::CompactString;
+use compact_str::ToCompactString;
 
 pub struct TreeWalkInterpreter<S> {
     program: Program,
@@ -73,9 +73,12 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
                 name,
                 parameters,
                 body,
-            }) => {
-                self.interpret_function_declaration(environment, name, &parameters, body.as_ref())?
-            }
+            }) => self.interpret_function_declaration(
+                environment,
+                name,
+                &parameters.iter().map(|s| s.as_ref()).collect::<Vec<&str>>(),
+                body.as_ref(),
+            )?,
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment)?
             }
@@ -155,14 +158,22 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut Environment,
         name: &str,
-        parameters: &[CompactString],
+        parameters: &[&str],
         body: &[Statement],
     ) -> Result<ProgramState, RuntimeError> {
-        let _ = environment;
-        let _ = name;
-        let _ = parameters;
-        let _ = body;
-        todo!();
+        environment.declare(
+            name,
+            LoxValue::Function {
+                name: name.into(),
+                parameters: parameters
+                    .to_vec()
+                    .iter()
+                    .map(|&s| s.to_compact_string())
+                    .collect(),
+                body: body.to_vec(),
+            },
+        );
+        Ok(ProgramState::Run)
     }
 
     fn interpret_print_statement(
@@ -319,71 +330,7 @@ impl TreeWalkStatementInterpreter {
                 self.evaluate_infix_short_circuit(*operator, *lhs, *rhs, expr, environment)?
             }
             ExpressionNode::Call { callee, arguments } => {
-                let callee = self.evaluate_expression_node(expr, *callee, environment)?;
-                match callee {
-                    LoxValue::NativeFunction(fun) => {
-                        // Set up scope
-                        environment.enter_scope();
-
-                        // Check that the argument list is the same length as the parameter list.
-                        if arguments.len() != fun.get_parameters().len() {
-                            return Err(RuntimeError {
-                                kind: RuntimeErrorKind::InvalidArgumentCount {
-                                    actual: arguments.len(),
-                                    expected: fun.get_parameters().len(),
-                                },
-                                line,
-                            });
-                        }
-
-                        // Define the arguments in the function scope
-                        for (name, argument) in fun.get_parameters().iter().zip(arguments.iter()) {
-                            let argument =
-                                self.evaluate_expression_node(expr, *argument, environment)?;
-                            environment.declare(name, argument);
-                        }
-
-                        let result = fun.call(environment)?;
-
-                        environment.exit_scope();
-                        result
-                    }
-                    LoxValue::Function {
-                        name: _,
-                        parameters,
-                        body: _,
-                    } => {
-                        // Set up scope
-                        environment.enter_scope();
-
-                        // Check that the argument list is the same length as the parameter list.
-                        if arguments.len() != parameters.len() {
-                            return Err(RuntimeError {
-                                kind: RuntimeErrorKind::InvalidArgumentCount {
-                                    actual: arguments.len(),
-                                    expected: parameters.len(),
-                                },
-                                line,
-                            });
-                        }
-
-                        // Define the arguments in the function scope
-                        for (name, argument) in parameters.iter().zip(arguments.iter()) {
-                            let argument =
-                                self.evaluate_expression_node(expr, *argument, environment)?;
-                            environment.declare(name, argument);
-                        }
-
-                        // TODO(pavyamsiri): Refactor to be able to interpret statements here.
-                        todo!();
-                    }
-                    v => {
-                        return Err(RuntimeError {
-                            kind: RuntimeErrorKind::InvalidCallee(v),
-                            line,
-                        });
-                    }
-                }
+                self.evaluate_call(*callee, arguments, expr, environment, line)?
             }
         };
         Ok(result)
@@ -469,5 +416,81 @@ impl TreeWalkStatementInterpreter {
                 }
             }
         }
+    }
+
+    fn evaluate_call(
+        &self,
+        callee: ExpressionNodeRef,
+        arguments: &[ExpressionNodeRef],
+        expr: &Expression,
+        environment: &mut Environment,
+        line: u32,
+    ) -> Result<LoxValue, RuntimeError> {
+        let callee = self.evaluate_expression_node(expr, callee, environment)?;
+        let result = match callee {
+            LoxValue::NativeFunction(fun) => {
+                // Set up scope
+                environment.enter_scope();
+
+                // Check that the argument list is the same length as the parameter list.
+                if arguments.len() != fun.get_parameters().len() {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::InvalidArgumentCount {
+                            actual: arguments.len(),
+                            expected: fun.get_parameters().len(),
+                        },
+                        line,
+                    });
+                }
+
+                // Define the arguments in the function scope
+                for (name, argument) in fun.get_parameters().iter().zip(arguments.iter()) {
+                    let argument = self.evaluate_expression_node(expr, *argument, environment)?;
+                    environment.declare(name, argument);
+                }
+
+                let result = fun.call(environment)?;
+
+                environment.exit_scope();
+                result
+            }
+            LoxValue::Function {
+                name: _,
+                parameters,
+                body,
+            } => {
+                // Set up scope
+                environment.enter_scope();
+
+                // Check that the argument list is the same length as the parameter list.
+                if arguments.len() != parameters.len() {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::InvalidArgumentCount {
+                            actual: arguments.len(),
+                            expected: parameters.len(),
+                        },
+                        line,
+                    });
+                }
+
+                // Define the arguments in the function scope
+                for (name, argument) in parameters.iter().zip(arguments.iter()) {
+                    let argument = self.evaluate_expression_node(expr, *argument, environment)?;
+                    environment.declare(name, argument);
+                }
+
+                for statement in body {
+                    let _ = self.interpret_statement(&statement, environment)?;
+                }
+                LoxValue::Nil
+            }
+            v => {
+                return Err(RuntimeError {
+                    kind: RuntimeErrorKind::InvalidCallee(v),
+                    line,
+                });
+            }
+        };
+        Ok(result)
     }
 }
