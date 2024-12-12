@@ -5,7 +5,7 @@ use compact_str::{CompactString, CompactStringExt};
 use crate::parser::statement::Statement;
 
 use super::{
-    environment::Environment,
+    environment::{Environment, Locals},
     error::{RuntimeError, RuntimeErrorKind},
 };
 
@@ -26,6 +26,7 @@ pub enum LoxValue {
         name: CompactString,
         parameters: Vec<CompactString>,
         body: Vec<Statement>,
+        closure: Locals,
     },
 }
 
