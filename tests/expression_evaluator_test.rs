@@ -5,7 +5,7 @@ use std::{
 };
 use taurox::{
     interpreter::{
-        environment::Environment,
+        environment::SharedEnvironment,
         formatter::{BasicFormatter, ValueFormatter},
         StatementInterpreter, TreeWalkStatementInterpreter,
     },
@@ -20,7 +20,7 @@ fn check(input: &str, expected: &str, test_name: &str) {
     let result = parser.parse_expression();
     let expression_formatter = SExpressionFormatter;
     let value_formatter = BasicFormatter;
-    let mut environment = Environment::new();
+    let mut environment = SharedEnvironment::new();
     let interpreter = TreeWalkStatementInterpreter;
     let actual = match result {
         Ok(ref t) => {

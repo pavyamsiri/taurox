@@ -9,17 +9,17 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
-pub struct Environment {
-    inner: Arc<Mutex<EnvironmentImpl>>,
+pub struct SharedEnvironment {
+    inner: Arc<Mutex<Environment>>,
 }
 
 #[derive(Debug)]
-struct EnvironmentImpl {
+struct Environment {
     values: HashMap<CompactString, LoxValue>,
-    parent: Option<Environment>,
+    parent: Option<SharedEnvironment>,
 }
 
-impl Environment {
+impl SharedEnvironment {
     pub fn new() -> Self {
         let mut globals = HashMap::new();
 
@@ -34,7 +34,7 @@ impl Environment {
         }
 
         Self {
-            inner: Arc::new(Mutex::new(EnvironmentImpl {
+            inner: Arc::new(Mutex::new(Environment {
                 values: globals,
                 parent: None,
             })),
@@ -43,7 +43,7 @@ impl Environment {
 
     pub fn new_scope(&self) -> Self {
         Self {
-            inner: Arc::new(Mutex::new(EnvironmentImpl {
+            inner: Arc::new(Mutex::new(Environment {
                 values: HashMap::new(),
                 parent: Some(self.clone()),
             })),
@@ -66,7 +66,7 @@ impl Environment {
     }
 }
 
-impl EnvironmentImpl {
+impl Environment {
     pub fn access(&self, name: &str) -> Option<LoxValue> {
         if let Some(value) = self.values.get(name) {
             Some(value.clone())

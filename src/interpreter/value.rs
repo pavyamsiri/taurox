@@ -5,14 +5,14 @@ use compact_str::{CompactString, CompactStringExt};
 use crate::parser::statement::Statement;
 
 use super::{
-    environment::Environment,
+    environment::SharedEnvironment,
     error::{RuntimeError, RuntimeErrorKind},
 };
 
 pub trait NativeFunction: std::fmt::Debug + Send + Sync {
     fn get_name(&self) -> &'static str;
     fn get_parameters(&self) -> &'static [&'static str];
-    fn call(&self, environment: &mut Environment) -> Result<LoxValue, RuntimeError>;
+    fn call(&self, environment: &mut SharedEnvironment) -> Result<LoxValue, RuntimeError>;
 }
 
 #[derive(Debug, Clone)]
@@ -26,7 +26,7 @@ pub enum LoxValue {
         name: CompactString,
         parameters: Vec<CompactString>,
         body: Vec<Statement>,
-        closure: Environment,
+        closure: SharedEnvironment,
     },
 }
 

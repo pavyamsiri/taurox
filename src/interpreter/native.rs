@@ -2,7 +2,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::error::RuntimeError;
 use super::{
-    environment::Environment,
+    environment::SharedEnvironment,
     value::{LoxValue, NativeFunction},
 };
 
@@ -14,7 +14,7 @@ impl NativeFunction for NativeClock {
         "clock"
     }
 
-    fn call(&self, environment: &mut Environment) -> Result<LoxValue, RuntimeError> {
+    fn call(&self, environment: &mut SharedEnvironment) -> Result<LoxValue, RuntimeError> {
         let _ = environment;
         let now = SystemTime::now();
         let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");

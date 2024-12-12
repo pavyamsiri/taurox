@@ -1,5 +1,5 @@
 use super::{
-    environment::Environment,
+    environment::SharedEnvironment,
     error::{RuntimeError, RuntimeErrorKind},
     value::LoxValue,
     Interpreter, ProgramState, StatementInterpreter,
@@ -16,7 +16,7 @@ use compact_str::ToCompactString;
 
 pub struct TreeWalkInterpreter<S> {
     program: Program,
-    environment: Environment,
+    environment: SharedEnvironment,
     counter: usize,
     interpreter: S,
 }
@@ -46,7 +46,7 @@ where
     pub fn new(program: Program) -> Self {
         Self {
             program,
-            environment: Environment::new(),
+            environment: SharedEnvironment::new(),
             counter: 0,
             interpreter: S::create(),
         }
@@ -63,7 +63,7 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
     fn interpret_statement(
         &self,
         statement: &Statement,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<ProgramState, RuntimeError> {
         let state = match statement {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
@@ -89,7 +89,7 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
     fn evaluate(
         &self,
         expr: &Expression,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<LoxValue, RuntimeError> {
         self.evaluate_expression_node(expr, expr.get_root_ref(), environment)
     }
@@ -100,7 +100,7 @@ impl TreeWalkStatementInterpreter {
     fn interpret_non_declaration(
         &self,
         statement: &NonDeclaration,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<ProgramState, RuntimeError> {
         let state = match statement {
             NonDeclaration::Expression(expr) => {
@@ -144,7 +144,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_variable_declaration(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         name: &str,
         initial: Option<&Expression>,
     ) -> Result<ProgramState, RuntimeError> {
@@ -159,7 +159,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_function_declaration(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         name: &str,
         parameters: &[&str],
         body: &[Statement],
@@ -182,7 +182,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_print_statement(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         expr: &Expression,
     ) -> Result<ProgramState, RuntimeError> {
         let result = self.evaluate(expr, environment)?;
@@ -192,7 +192,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_expression_statement(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         expr: &Expression,
     ) -> Result<ProgramState, RuntimeError> {
         let _ = self.evaluate(expr, environment)?;
@@ -201,7 +201,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_if_statement(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         condition: &Expression,
         success: &Statement,
         failure: Option<&Statement>,
@@ -219,7 +219,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_while_statement(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         condition: &Expression,
         body: &Statement,
     ) -> Result<ProgramState, RuntimeError> {
@@ -237,7 +237,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_return_statement(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         value: Option<&Expression>,
     ) -> Result<ProgramState, RuntimeError> {
         let value = if let Some(expr) = value {
@@ -251,7 +251,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_block_statement(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         statements: &Vec<Statement>,
     ) -> Result<ProgramState, RuntimeError> {
         let mut environment = environment.new_scope();
@@ -270,7 +270,7 @@ impl TreeWalkStatementInterpreter {
 
     fn interpret_for_statement(
         &self,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         initializer: Option<&Initializer>,
         condition: Option<&Expression>,
         increment: Option<&Expression>,
@@ -316,7 +316,7 @@ impl TreeWalkStatementInterpreter {
         &self,
         expr: &Expression,
         node: ExpressionNodeRef,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<LoxValue, RuntimeError> {
         let current_node = expr
             .get_node(node)
@@ -366,7 +366,7 @@ impl TreeWalkStatementInterpreter {
     fn evaluate_atom(
         &self,
         atom: &ExpressionAtom,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<LoxValue, RuntimeErrorKind> {
         let result = match &atom.kind {
             ExpressionAtomKind::Number(v) => LoxValue::Number(*v),
@@ -420,7 +420,7 @@ impl TreeWalkStatementInterpreter {
         lhs: ExpressionNodeRef,
         rhs: ExpressionNodeRef,
         expr: &Expression,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<LoxValue, RuntimeError> {
         type Operator = InfixShortCircuitOperator;
         let lhs = { self.evaluate_expression_node(expr, lhs, environment)? };
@@ -450,7 +450,7 @@ impl TreeWalkStatementInterpreter {
         callee: ExpressionNodeRef,
         arguments: &[ExpressionNodeRef],
         expr: &Expression,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
         line: u32,
     ) -> Result<LoxValue, RuntimeError> {
         let callee = self.evaluate_expression_node(expr, callee, environment)?;

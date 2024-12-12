@@ -6,7 +6,7 @@ mod tree;
 mod value;
 
 use crate::parser::{expression::Expression, statement::Statement};
-use environment::Environment;
+use environment::SharedEnvironment;
 use error::RuntimeError;
 pub use tree::{TreeWalkInterpreter, TreeWalkStatementInterpreter};
 use value::LoxValue;
@@ -26,13 +26,13 @@ pub trait StatementInterpreter {
     fn interpret_statement(
         &self,
         statement: &Statement,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<ProgramState, RuntimeError>;
 
     fn evaluate(
         &self,
         expr: &Expression,
-        environment: &mut Environment,
+        environment: &mut SharedEnvironment,
     ) -> Result<LoxValue, RuntimeError>;
 
     fn create() -> Self;
