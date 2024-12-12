@@ -174,7 +174,7 @@ impl TreeWalkStatementInterpreter {
                     .map(|&s| s.to_compact_string())
                     .collect(),
                 body: body.to_vec(),
-                closure: environment.copy_locals(),
+                closure: environment.new_scope(),
             },
         );
         Ok(ProgramState::Run)
@@ -254,10 +254,10 @@ impl TreeWalkStatementInterpreter {
         environment: &mut Environment,
         statements: &Vec<Statement>,
     ) -> Result<ProgramState, RuntimeError> {
+        let mut environment = environment.new_scope();
         let mut state = ProgramState::Run;
-        environment.enter_scope();
         for statement in statements {
-            match self.interpret_statement(statement, environment)? {
+            match self.interpret_statement(statement, &mut environment)? {
                 ProgramState::Run => {}
                 s => {
                     state = s;
@@ -265,7 +265,6 @@ impl TreeWalkStatementInterpreter {
                 }
             }
         }
-        environment.exit_scope();
         Ok(state)
     }
 
@@ -278,21 +277,20 @@ impl TreeWalkStatementInterpreter {
         body: &NonDeclaration,
     ) -> Result<ProgramState, RuntimeError> {
         // Run the initializer
-        // NOTE(pavyamsiri): I don't really understanding how for loops are scoped.
-        environment.enter_scope();
+        let mut environment = environment.new_scope();
         match initializer {
             Some(Initializer::VarDecl { name, initial }) => {
-                self.interpret_variable_declaration(environment, name, initial.as_ref())?;
+                self.interpret_variable_declaration(&mut environment, name, initial.as_ref())?;
             }
             Some(Initializer::Expression(expr)) => {
-                self.evaluate(expr, environment)?;
+                self.evaluate(expr, &mut environment)?;
             }
             _ => {}
         };
 
         loop {
             let flag = match condition {
-                Some(condition) => self.evaluate(condition, environment)?.is_truthy(),
+                Some(condition) => self.evaluate(condition, &mut environment)?.is_truthy(),
                 None => true,
             };
 
@@ -300,15 +298,14 @@ impl TreeWalkStatementInterpreter {
                 break;
             }
 
-            self.interpret_non_declaration(body, environment)?;
+            self.interpret_non_declaration(body, &mut environment)?;
             match increment {
                 Some(increment) => {
-                    self.evaluate(increment, environment)?;
+                    self.evaluate(increment, &mut environment)?;
                 }
                 None => {}
             }
         }
-        environment.exit_scope();
         Ok(ProgramState::Run)
     }
 }
@@ -460,7 +457,7 @@ impl TreeWalkStatementInterpreter {
         let result = match callee {
             LoxValue::NativeFunction(fun) => {
                 // Set up scope
-                environment.enter_scope();
+                let mut environment = environment.new_scope();
 
                 // Check that the argument list is the same length as the parameter list.
                 if arguments.len() != fun.get_parameters().len() {
@@ -475,13 +472,13 @@ impl TreeWalkStatementInterpreter {
 
                 // Define the arguments in the function scope
                 for (name, argument) in fun.get_parameters().iter().zip(arguments.iter()) {
-                    let argument = self.evaluate_expression_node(expr, *argument, environment)?;
+                    let argument =
+                        self.evaluate_expression_node(expr, *argument, &mut environment)?;
                     environment.declare(name, argument);
                 }
 
-                let result = fun.call(environment)?;
+                let result = fun.call(&mut environment)?;
 
-                environment.exit_scope();
                 result
             }
             LoxValue::Function {
@@ -492,8 +489,7 @@ impl TreeWalkStatementInterpreter {
             } => {
                 let _ = name;
                 // Set up scope
-                let mut environment = environment.new_enclosed(closure);
-                environment.enter_scope();
+                let mut environment = closure.new_scope();
 
                 // Check that the argument list is the same length as the parameter list.
                 if arguments.len() != parameters.len() {
@@ -527,7 +523,6 @@ impl TreeWalkStatementInterpreter {
                     }
                 }
                 // Exit scope
-                environment.exit_scope();
                 result
             }
             v => {
