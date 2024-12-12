@@ -517,10 +517,10 @@ impl<'src> Parser<'src> {
         const MSG: &'static str = "Caller must make sure `lhs` is a valid expression node ref.";
         if let Some(operator) = self.peek_infix_assignment_operator()? {
             let place = tree
-                .get_l_value(&lhs)
+                .get_l_value(lhs)
                 .ok_or(ParserError {
-                    kind: ParserErrorKind::InvalidLValue(tree.get_kind(&lhs).expect(MSG)),
-                    line: tree.get_line(&lhs).expect(MSG),
+                    kind: ParserErrorKind::InvalidLValue(tree.get_kind(lhs).expect(MSG)),
+                    line: tree.get_line(lhs).expect(MSG),
                 })?
                 .to_compact_string();
 

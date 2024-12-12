@@ -145,14 +145,17 @@ fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
 }
 
 fn evaluate(src: &str) -> Result<()> {
-    use taurox::interpreter::{environment::Environment, expression::ExpressionEvaluator};
+    use taurox::interpreter::environment::Environment;
     use taurox::parser::Parser;
+
+    use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
 
     let mut parser = Parser::new(src);
     let expression = parser.parse_expression()?;
 
     let mut environment = Environment::new();
-    let result = ExpressionEvaluator::evaluate_expression(&expression, &mut environment)?;
+    let interpreter = TreeWalkStatementInterpreter;
+    let result = interpreter.evaluate(&expression, &mut environment)?;
 
     eprintln!("{}", result);
 

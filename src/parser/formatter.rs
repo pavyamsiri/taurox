@@ -37,7 +37,7 @@ impl SExpressionFormatter {
 
     fn format_node(tree: &Expression, node: &ExpressionNodeRef) -> String {
         let current_node = &tree
-            .get_node(node)
+            .get_node(*node)
             .expect("Caller should make sure the ref is valid.");
 
         match current_node {

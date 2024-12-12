@@ -1,15 +1,15 @@
 pub mod environment;
 pub mod error;
-pub mod expression;
 pub mod formatter;
 mod native;
 mod tree;
 mod value;
 
-use crate::parser::statement::Statement;
+use crate::parser::{expression::Expression, statement::Statement};
 use environment::Environment;
 use error::RuntimeError;
 pub use tree::{TreeWalkInterpreter, TreeWalkStatementInterpreter};
+use value::LoxValue;
 
 #[derive(Debug)]
 pub enum ProgramState {
@@ -27,6 +27,12 @@ pub trait StatementInterpreter {
         statement: &Statement,
         environment: &mut Environment,
     ) -> Result<ProgramState, RuntimeError>;
+
+    fn evaluate(
+        &self,
+        expr: &Expression,
+        environment: &mut Environment,
+    ) -> Result<LoxValue, RuntimeError>;
 
     fn create() -> Self;
 }

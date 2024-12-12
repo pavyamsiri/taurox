@@ -84,28 +84,28 @@ impl IncompleteExpression {
         ExpressionNodeRef(self.nodes.len() as u32 - 1)
     }
 
-    pub fn get_l_value(&self, index: &ExpressionNodeRef) -> Option<&str> {
+    pub fn get_l_value(&self, index: ExpressionNodeRef) -> Option<&str> {
         self.get_node(index).and_then(|n| n.get_l_value())
     }
 
-    pub fn get_node(&self, index: &ExpressionNodeRef) -> Option<&ExpressionNode> {
+    pub fn get_node(&self, index: ExpressionNodeRef) -> Option<&ExpressionNode> {
         self.nodes.get(index.0 as usize)
     }
 
-    pub fn get_line(&self, node: &ExpressionNodeRef) -> Option<u32> {
+    pub fn get_line(&self, node: ExpressionNodeRef) -> Option<u32> {
         let node = self.nodes.get(node.0 as usize)?;
         match node {
             ExpressionNode::Atom(ExpressionAtom { line, .. }) => Some(*line),
-            ExpressionNode::Prefix { rhs, .. } => self.get_line(rhs),
-            ExpressionNode::Infix { lhs, .. } => self.get_line(lhs),
-            ExpressionNode::InfixAssignment { rhs, .. } => self.get_line(rhs),
-            ExpressionNode::InfixShortCircuit { lhs, .. } => self.get_line(lhs),
-            ExpressionNode::Group { inner } => self.get_line(inner),
-            ExpressionNode::Call { callee, .. } => self.get_line(callee),
+            ExpressionNode::Prefix { rhs, .. } => self.get_line(*rhs),
+            ExpressionNode::Infix { lhs, .. } => self.get_line(*lhs),
+            ExpressionNode::InfixAssignment { rhs, .. } => self.get_line(*rhs),
+            ExpressionNode::InfixShortCircuit { lhs, .. } => self.get_line(*lhs),
+            ExpressionNode::Group { inner } => self.get_line(*inner),
+            ExpressionNode::Call { callee, .. } => self.get_line(*callee),
         }
     }
 
-    pub fn get_kind(&self, node: &ExpressionNodeRef) -> Option<TokenKind> {
+    pub fn get_kind(&self, node: ExpressionNodeRef) -> Option<TokenKind> {
         let node = self.nodes.get(node.0 as usize)?;
         match node {
             ExpressionNode::Atom(ExpressionAtom { kind, .. }) => match kind {
@@ -116,12 +116,12 @@ impl IncompleteExpression {
                 ExpressionAtomKind::Identifier(_) => Some(TokenKind::Ident),
                 ExpressionAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
             },
-            ExpressionNode::Prefix { rhs, .. } => self.get_kind(rhs),
-            ExpressionNode::Infix { lhs, .. } => self.get_kind(lhs),
-            ExpressionNode::InfixAssignment { rhs, .. } => self.get_kind(rhs),
-            ExpressionNode::InfixShortCircuit { lhs, .. } => self.get_kind(lhs),
-            ExpressionNode::Group { inner } => self.get_kind(inner),
-            ExpressionNode::Call { callee, .. } => self.get_kind(callee),
+            ExpressionNode::Prefix { rhs, .. } => self.get_kind(*rhs),
+            ExpressionNode::Infix { lhs, .. } => self.get_kind(*lhs),
+            ExpressionNode::InfixAssignment { rhs, .. } => self.get_kind(*rhs),
+            ExpressionNode::InfixShortCircuit { lhs, .. } => self.get_kind(*lhs),
+            ExpressionNode::Group { inner } => self.get_kind(*inner),
+            ExpressionNode::Call { callee, .. } => self.get_kind(*callee),
         }
     }
 }
@@ -140,19 +140,19 @@ impl Expression {
     }
 
     pub fn get_root(&self) -> &ExpressionNode {
-        self.get_node(&self.get_root_ref())
+        self.get_node(self.get_root_ref())
             .expect("The root exists within the tree.")
     }
 
-    pub fn get_node(&self, node: &ExpressionNodeRef) -> Option<&ExpressionNode> {
+    pub fn get_node(&self, node: ExpressionNodeRef) -> Option<&ExpressionNode> {
         self.inner.get_node(node)
     }
 
-    pub fn get_line(&self, node: &ExpressionNodeRef) -> Option<u32> {
+    pub fn get_line(&self, node: ExpressionNodeRef) -> Option<u32> {
         self.inner.get_line(node)
     }
 
-    pub fn get_kind(&self, node: &ExpressionNodeRef) -> Option<TokenKind> {
+    pub fn get_kind(&self, node: ExpressionNodeRef) -> Option<TokenKind> {
         self.inner.get_kind(node)
     }
 }

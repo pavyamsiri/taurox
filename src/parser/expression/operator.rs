@@ -13,7 +13,7 @@ impl PrefixOperator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum InfixOperator {
     Multiply,
     Divide,
@@ -75,7 +75,7 @@ impl InfixAssignmentOperator {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum PostfixOperator {
     Call,
 }
