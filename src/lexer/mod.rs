@@ -1,39 +1,12 @@
+mod cursor;
+mod error;
 mod state;
 
 use crate::token::{Span, SpanIndex, Token};
+use cursor::SourceChar;
+pub use error::{LexicalError, LexicalErrorKind};
 use state::{LexerState, LexerStateTransition};
 use std::str::Chars;
-use thiserror::Error;
-
-#[derive(Debug, Error, Clone)]
-pub enum LexicalErrorKind {
-    #[error("Unrecognized character {0}")]
-    Unrecognized(char),
-    #[error("Unterminated string literal")]
-    UnclosedString,
-}
-
-#[derive(Debug, Error, Clone)]
-#[error("[line {line}] {kind}")]
-pub struct LexicalError {
-    #[source]
-    pub kind: LexicalErrorKind,
-    pub span: Span,
-    pub line: u32,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct SourceChar {
-    value: char,
-    offset: SpanIndex,
-    line: u32,
-}
-
-impl SourceChar {
-    pub fn next_offset(&self) -> SpanIndex {
-        self.offset + self.value.len_utf8()
-    }
-}
 
 #[derive(Debug)]
 enum LookAhead {
