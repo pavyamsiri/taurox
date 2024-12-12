@@ -60,6 +60,7 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
         Self {}
     }
 
+    #[must_use]
     fn interpret_statement(
         &self,
         statement: &Statement,
@@ -205,14 +206,15 @@ impl TreeWalkStatementInterpreter {
         success: &Statement,
         failure: Option<&Statement>,
     ) -> Result<ProgramState, RuntimeError> {
+        let mut state = ProgramState::Run;
         if self.evaluate(condition, environment)?.is_truthy() {
-            self.interpret_statement(success, environment)?;
+            state = self.interpret_statement(success, environment)?;
         } else {
             if let Some(failure) = failure {
-                self.interpret_statement(failure, environment)?;
+                state = self.interpret_statement(failure, environment)?;
             }
         }
-        Ok(ProgramState::Run)
+        Ok(state)
     }
 
     fn interpret_while_statement(
@@ -255,7 +257,13 @@ impl TreeWalkStatementInterpreter {
         let mut state = ProgramState::Run;
         environment.enter_scope();
         for statement in statements {
-            state = self.interpret_statement(statement, environment)?;
+            match self.interpret_statement(statement, environment)? {
+                ProgramState::Run => {}
+                s => {
+                    state = s;
+                    break;
+                }
+            }
         }
         environment.exit_scope();
         Ok(state)
@@ -514,6 +522,8 @@ impl TreeWalkStatementInterpreter {
                         }
                     }
                 }
+                // Exit scope
+                environment.exit_scope();
                 result
             }
             v => {
