@@ -165,6 +165,9 @@ impl ExpressionFormatter for SExpressionFormatter {
             ParserErrorKind::InvalidNonDeclaration(ref declaration) => {
                 format!("({line}) Invalid non-declaration: {declaration:?}")
             }
+            ParserErrorKind::NonBlock(ref statement) => {
+                format!("({line}) Invalid block: {statement:?}")
+            }
         }
     }
 }

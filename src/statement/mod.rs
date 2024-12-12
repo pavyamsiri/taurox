@@ -2,7 +2,7 @@ use compact_str::CompactString;
 
 use crate::expression::ExpressionTreeWithRoot;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Declaration(Declaration),
     NonDeclaration(NonDeclaration),
@@ -14,9 +14,14 @@ pub enum Declaration {
         name: CompactString,
         initial: Option<ExpressionTreeWithRoot>,
     },
+    Function {
+        name: CompactString,
+        parameters: Vec<CompactString>,
+        body: Vec<Statement>,
+    },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Initializer {
     VarDecl {
         name: CompactString,
@@ -25,7 +30,7 @@ pub enum Initializer {
     Expression(ExpressionTreeWithRoot),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NonDeclaration {
     Expression(ExpressionTreeWithRoot),
     Print(ExpressionTreeWithRoot),

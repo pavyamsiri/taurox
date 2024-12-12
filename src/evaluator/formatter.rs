@@ -27,6 +27,7 @@ impl BasicFormatter {
             LoxValue::Nil => format!("Nil"),
             LoxValue::Bool(v) => format!("Bool({v})"),
             LoxValue::NativeFunction(fun) => format!("NativeFunction({})", fun.get_name()),
+            LoxValue::Function { name, .. } => format!("Function({name})"),
         }
     }
 }
@@ -57,6 +58,9 @@ impl ValueFormatter for BasicFormatter {
             }
             RuntimeErrorKind::InvalidCallee(ref callee) => {
                 format!("({line}) Invalid Callee: {}", self.format_verbose(callee))
+            }
+            RuntimeErrorKind::InvalidArgumentCount { actual, expected } => {
+                format!("({line}) Invalid Argument Count: {actual} of {expected}")
             }
         }
     }

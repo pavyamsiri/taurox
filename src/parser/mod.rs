@@ -21,6 +21,8 @@ pub enum ParserErrorKind {
     },
     #[error("Expected an operator but got token {0:?}.")]
     NonOperator(TokenKind),
+    #[error("Expected a block but got {0:?}.")]
+    NonBlock(Statement),
     #[error("Expected an left hand side to expression but got token {0:?}.")]
     NonExpression(TokenKind),
     #[error("Expected a non-EOF token.")]
@@ -425,6 +427,7 @@ impl<'src> Parser<'src> {
             TokenKind::KeywordIf => self.parse_if_statement(line)?,
             TokenKind::KeywordWhile => self.parse_while_statement(line)?,
             TokenKind::KeywordFor => self.parse_for_statement(line)?,
+            TokenKind::KeywordFun => self.parse_function_declaration(line)?,
             TokenKind::Eof => {
                 return Ok(None);
             }
@@ -463,6 +466,52 @@ impl<'src> Parser<'src> {
         });
         let _ = self.expect(TokenKind::Semicolon)?;
         Ok(statement)
+    }
+
+    fn parse_function_declaration(&mut self, line: u32) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordFun)?;
+        let name = self.expect_ident()?;
+        let _ = self.expect(TokenKind::LeftParenthesis)?;
+
+        // No parameters
+        let parameters = if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+            Vec::new()
+        } else {
+            let mut parameters = Vec::new();
+            // NOTE(pavyamsiri): Only allow up to 255 parameters
+            for _ in 0..255 {
+                let parameter = self.expect_ident()?;
+                parameters.push(parameter);
+
+                if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                    break;
+                }
+                let _ = self.expect(TokenKind::Comma)?;
+            }
+            parameters
+        };
+
+        let body = {
+            let body_statement = self.parse_statement()?.ok_or(ParserError {
+                kind: ParserErrorKind::UnexpectedEof,
+                line,
+            })?;
+            match body_statement {
+                Statement::NonDeclaration(NonDeclaration::Block(body)) => body,
+                s => {
+                    return Err(ParserError {
+                        kind: ParserErrorKind::NonBlock(s),
+                        line,
+                    })
+                }
+            }
+        };
+
+        Ok(Statement::Declaration(Declaration::Function {
+            name,
+            parameters,
+            body,
+        }))
     }
 
     fn parse_block_statement(&mut self, line: u32) -> Result<Statement, ParserError> {

@@ -9,6 +9,7 @@ use crate::{
         UnaryOperator,
     },
     interpreter::Environment,
+    statement::Statement,
 };
 use compact_str::{CompactString, CompactStringExt};
 use thiserror::Error;
@@ -25,6 +26,8 @@ pub enum RuntimeErrorKind {
     InvalidAccess(CompactString),
     #[error("Invalid Callee: {0}")]
     InvalidCallee(LoxValue),
+    #[error("Invalid Argument Count: {actual} of {expected}")]
+    InvalidArgumentCount { actual: usize, expected: usize },
 }
 
 #[derive(Debug, Error, Clone)]
@@ -37,7 +40,8 @@ pub struct RuntimeError {
 
 pub trait NativeFunction: std::fmt::Debug + Send + Sync {
     fn get_name(&self) -> &'static str;
-    fn call(&self, arguments: &[LoxValue]) -> Result<LoxValue, RuntimeError>;
+    fn get_parameters(&self) -> &'static [&'static str];
+    fn call(&self, environment: &mut Environment) -> Result<LoxValue, RuntimeError>;
 }
 
 #[derive(Debug, Clone)]
@@ -47,17 +51,31 @@ pub enum LoxValue {
     Nil,
     Bool(bool),
     NativeFunction(Arc<dyn NativeFunction>),
+    Function {
+        name: CompactString,
+        parameters: Vec<CompactString>,
+        body: Vec<Statement>,
+    },
 }
 
 impl std::fmt::Display for LoxValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LoxValue::Number(v) => write!(f, "{v}"),
-            LoxValue::String(v) => write!(f, "{v}"),
-            LoxValue::Nil => write!(f, "nil"),
-            LoxValue::Bool(v) => write!(f, "{v}"),
-            LoxValue::NativeFunction(fun) => {
+            Self::Number(v) => write!(f, "{v}"),
+            Self::String(v) => write!(f, "{v}"),
+            Self::Nil => write!(f, "nil"),
+            Self::Bool(v) => write!(f, "{v}"),
+            Self::NativeFunction(fun) => {
                 write!(f, "<native fn `{}`>", fun.get_name())
+            }
+            Self::Function {
+                name, parameters, ..
+            } => {
+                write!(f, "<fn `{}`(", name)?;
+                for parameter in parameters.iter() {
+                    write!(f, " {parameter}")?;
+                }
+                write!(f, ")")
             }
         }
     }
@@ -228,22 +246,70 @@ impl ExpressionEvaluator {
             }
             ExpressionTreeNode::Call { callee, arguments } => {
                 let callee = Self::evaluate_expression_node(tree, callee, environment)?;
-                let fun = match callee {
-                    LoxValue::NativeFunction(fun) => fun,
+                match callee {
+                    LoxValue::NativeFunction(fun) => {
+                        // Set up scope
+                        environment.enter_scope();
+
+                        // Check that the argument list is the same length as the parameter list.
+                        if arguments.len() != fun.get_parameters().len() {
+                            return Err(RuntimeError {
+                                kind: RuntimeErrorKind::InvalidArgumentCount {
+                                    actual: arguments.len(),
+                                    expected: fun.get_parameters().len(),
+                                },
+                                line,
+                            });
+                        }
+
+                        // Define the arguments in the function scope
+                        for (name, argument) in fun.get_parameters().iter().zip(arguments.iter()) {
+                            let argument =
+                                Self::evaluate_expression_node(tree, argument, environment)?;
+                            environment.declare(name, argument);
+                        }
+
+                        let result = fun.call(environment)?;
+
+                        environment.exit_scope();
+                        result
+                    }
+                    LoxValue::Function {
+                        name: _,
+                        parameters,
+                        body: _,
+                    } => {
+                        // Set up scope
+                        environment.enter_scope();
+
+                        // Check that the argument list is the same length as the parameter list.
+                        if arguments.len() != parameters.len() {
+                            return Err(RuntimeError {
+                                kind: RuntimeErrorKind::InvalidArgumentCount {
+                                    actual: arguments.len(),
+                                    expected: parameters.len(),
+                                },
+                                line,
+                            });
+                        }
+
+                        // Define the arguments in the function scope
+                        for (name, argument) in parameters.iter().zip(arguments.iter()) {
+                            let argument =
+                                Self::evaluate_expression_node(tree, argument, environment)?;
+                            environment.declare(name, argument);
+                        }
+
+                        // TODO(pavyamsiri): Refactor to be able to interpret statements here.
+                        todo!();
+                    }
                     v => {
                         return Err(RuntimeError {
                             kind: RuntimeErrorKind::InvalidCallee(v),
                             line,
-                        })
+                        });
                     }
-                };
-
-                let arguments: Vec<_> = arguments
-                    .iter()
-                    .map(|a| Self::evaluate_expression_node(tree, a, environment))
-                    .collect::<Result<Vec<_>, RuntimeError>>()?;
-
-                fun.call(&arguments)?
+                }
             }
         };
         Ok(result)

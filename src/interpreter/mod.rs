@@ -133,6 +133,13 @@ impl TreeWalkInterpreter {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
                 Self::interpret_variable_declaration(environment, name, initial.as_ref())?
             }
+            Statement::Declaration(Declaration::Function {
+                name,
+                parameters,
+                body,
+            }) => {
+                Self::interpret_function_declaration(environment, name, &parameters, body.as_ref())?
+            }
             Statement::NonDeclaration(statement) => {
                 Self::handle_non_declaration(statement, environment)?
             }
@@ -192,6 +199,16 @@ impl TreeWalkInterpreter {
             LoxValue::Nil
         };
         environment.declare(name, initial);
+        Ok(ProgramState::Run)
+    }
+
+    fn interpret_function_declaration(
+        environment: &mut Environment,
+        name: &str,
+        parameters: &[CompactString],
+        body: &[Statement],
+    ) -> Result<ProgramState, RuntimeError> {
+        todo!();
         Ok(ProgramState::Run)
     }
 
