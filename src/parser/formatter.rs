@@ -1,9 +1,8 @@
 use crate::parser::{ParserError, ParserErrorKind};
 
-use super::{
-    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom,
-    ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
-    UnaryOperator,
+use super::expression::{
+    BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom, ExpressionTreeAtomKind,
+    ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
 };
 
 pub trait ExpressionFormatter {
@@ -56,10 +55,9 @@ impl SExpressionFormatter {
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
-            ExpressionTreeNode::BinaryAssignment { operator, lhs, rhs } => {
+            ExpressionTreeNode::BinaryAssignment { lhs, rhs } => {
                 format!(
-                    "({} {lhs} {})",
-                    SExpressionFormatter::format_binary_assignment_operator(operator),
+                    "(= {lhs} {})",
                     SExpressionFormatter::format_node(tree, &rhs)
                 )
             }
@@ -113,13 +111,6 @@ impl SExpressionFormatter {
             BinaryOperator::GreaterThanEqual => ">=",
             BinaryOperator::EqualEqual => "==",
             BinaryOperator::BangEqual => "!=",
-        }
-        .into()
-    }
-
-    fn format_binary_assignment_operator(operator: &BinaryAssignmentOperator) -> String {
-        match operator {
-            BinaryAssignmentOperator::Assign => "=",
         }
         .into()
     }

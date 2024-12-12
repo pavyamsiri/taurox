@@ -337,11 +337,7 @@ impl<'src> Parser<'src> {
                 let _ = self.next_token()?;
 
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                lhs = tree.push(ExpressionTreeNode::BinaryAssignment {
-                    operator,
-                    lhs: place,
-                    rhs,
-                });
+                lhs = tree.push(ExpressionTreeNode::BinaryAssignment { lhs: place, rhs });
                 continue;
             }
 

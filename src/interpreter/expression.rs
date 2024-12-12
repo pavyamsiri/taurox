@@ -1,7 +1,6 @@
 use crate::parser::expression::{
-    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom,
-    ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
-    UnaryOperator,
+    BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom, ExpressionTreeAtomKind,
+    ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
 };
 
 use super::{
@@ -58,11 +57,7 @@ impl ExpressionEvaluator {
                 Self::evaluate_binary(operator, &lhs, &rhs)
                     .map_err(|kind| RuntimeError { kind, line })?
             }
-            ExpressionTreeNode::BinaryAssignment {
-                operator: BinaryAssignmentOperator::Assign,
-                lhs,
-                rhs,
-            } => {
+            ExpressionTreeNode::BinaryAssignment { lhs, rhs } => {
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 let _ = environment
                     .assign(lhs, rhs.clone())
