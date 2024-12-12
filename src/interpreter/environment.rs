@@ -11,6 +11,25 @@ pub struct Environment {
     scopes: Vec<HashMap<CompactString, LoxValue>>,
 }
 
+impl std::fmt::Display for Environment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Globals:")?;
+        for (key, value) in &self.globals {
+            writeln!(f, "  {}: {}", key, value)?;
+        }
+
+        writeln!(f, "Scopes:")?;
+        for (i, scope) in self.scopes.iter().enumerate() {
+            writeln!(f, "  Scope {}:", i)?;
+            for (key, value) in scope {
+                writeln!(f, "    {}: {}", key, value)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl Environment {
     pub fn new() -> Self {
         let mut globals = HashMap::new();

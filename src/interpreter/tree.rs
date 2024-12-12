@@ -60,7 +60,6 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
         Self {}
     }
 
-    #[must_use]
     fn interpret_statement(
         &self,
         statement: &Statement,
