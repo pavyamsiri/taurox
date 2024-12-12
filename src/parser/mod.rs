@@ -8,9 +8,9 @@ use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
 use error::ParserErrorKind;
 use expression::{
-    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, Expression,
-    ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef, IncompleteExpression,
-    PostfixOperator, UnaryOperator,
+    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+    IncompleteExpression, InfixAssignmentOperator, InfixOperator, InfixShortCircuitOperator,
+    PostfixOperator, PrefixOperator,
 };
 use statement::{Declaration, Initializer, NonDeclaration, Statement};
 
@@ -124,20 +124,20 @@ impl<'src> Parser<'src> {
             .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
-    fn peek_infix_operator(&mut self) -> Result<Option<BinaryOperator>, ParserError> {
+    fn peek_infix_operator(&mut self) -> Result<Option<InfixOperator>, ParserError> {
         let token = self.peek()?;
 
         match token.kind {
-            TokenKind::Plus => Ok(Some(BinaryOperator::Add)),
-            TokenKind::Minus => Ok(Some(BinaryOperator::Subtract)),
-            TokenKind::Star => Ok(Some(BinaryOperator::Multiply)),
-            TokenKind::Slash => Ok(Some(BinaryOperator::Divide)),
-            TokenKind::LessThan => Ok(Some(BinaryOperator::LessThan)),
-            TokenKind::LessThanEqual => Ok(Some(BinaryOperator::LessThanEqual)),
-            TokenKind::GreaterThan => Ok(Some(BinaryOperator::GreaterThan)),
-            TokenKind::GreaterThanEqual => Ok(Some(BinaryOperator::GreaterThanEqual)),
-            TokenKind::EqualEqual => Ok(Some(BinaryOperator::EqualEqual)),
-            TokenKind::BangEqual => Ok(Some(BinaryOperator::BangEqual)),
+            TokenKind::Plus => Ok(Some(InfixOperator::Add)),
+            TokenKind::Minus => Ok(Some(InfixOperator::Subtract)),
+            TokenKind::Star => Ok(Some(InfixOperator::Multiply)),
+            TokenKind::Slash => Ok(Some(InfixOperator::Divide)),
+            TokenKind::LessThan => Ok(Some(InfixOperator::LessThan)),
+            TokenKind::LessThanEqual => Ok(Some(InfixOperator::LessThanEqual)),
+            TokenKind::GreaterThan => Ok(Some(InfixOperator::GreaterThan)),
+            TokenKind::GreaterThanEqual => Ok(Some(InfixOperator::GreaterThanEqual)),
+            TokenKind::EqualEqual => Ok(Some(InfixOperator::EqualEqual)),
+            TokenKind::BangEqual => Ok(Some(InfixOperator::BangEqual)),
             _ => Ok(None),
         }
     }
@@ -152,23 +152,23 @@ impl<'src> Parser<'src> {
     }
     fn peek_infix_assignment_operator(
         &mut self,
-    ) -> Result<Option<BinaryAssignmentOperator>, ParserError> {
+    ) -> Result<Option<InfixAssignmentOperator>, ParserError> {
         let token = self.peek()?;
 
         match token.kind {
-            TokenKind::Equal => Ok(Some(BinaryAssignmentOperator::Assign)),
+            TokenKind::Equal => Ok(Some(InfixAssignmentOperator::Assign)),
             _ => Ok(None),
         }
     }
 
     fn peek_infix_short_circuit_operator(
         &mut self,
-    ) -> Result<Option<BinaryShortCircuitOperator>, ParserError> {
+    ) -> Result<Option<InfixShortCircuitOperator>, ParserError> {
         let token = self.peek()?;
 
         match token.kind {
-            TokenKind::KeywordAnd => Ok(Some(BinaryShortCircuitOperator::And)),
-            TokenKind::KeywordOr => Ok(Some(BinaryShortCircuitOperator::Or)),
+            TokenKind::KeywordAnd => Ok(Some(InfixShortCircuitOperator::And)),
+            TokenKind::KeywordOr => Ok(Some(InfixShortCircuitOperator::Or)),
             _ => Ok(None),
         }
     }
@@ -241,18 +241,18 @@ impl<'src> Parser<'src> {
                 });
                 tree.push(node)
             }
-            // Unary operators
+            // Prefix operators
             TokenKind::Minus => {
-                let operator = UnaryOperator::Minus;
+                let operator = PrefixOperator::Minus;
                 let rbp = operator.get_binding_power();
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                tree.push(ExpressionNode::Unary { operator, rhs })
+                tree.push(ExpressionNode::Prefix { operator, rhs })
             }
             TokenKind::Bang => {
-                let operator = UnaryOperator::Bang;
+                let operator = PrefixOperator::Bang;
                 let rbp = operator.get_binding_power();
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                tree.push(ExpressionNode::Unary { operator, rhs })
+                tree.push(ExpressionNode::Prefix { operator, rhs })
             }
             // Bracketed expression
             TokenKind::LeftParenthesis => {
@@ -350,7 +350,7 @@ impl<'src> Parser<'src> {
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
             return Ok(PrattParseOutcome::NewLHS(
-                tree.push(ExpressionNode::BinaryAssignment { lhs: place, rhs }),
+                tree.push(ExpressionNode::InfixAssignment { lhs: place, rhs }),
             ));
         }
         Ok(PrattParseOutcome::NoOperator)
@@ -371,7 +371,7 @@ impl<'src> Parser<'src> {
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
             return Ok(PrattParseOutcome::NewLHS(
-                tree.push(ExpressionNode::BinaryShortCircuit { operator, lhs, rhs }),
+                tree.push(ExpressionNode::InfixShortCircuit { operator, lhs, rhs }),
             ));
         }
         Ok(PrattParseOutcome::NoOperator)
@@ -392,7 +392,7 @@ impl<'src> Parser<'src> {
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
             return Ok(PrattParseOutcome::NewLHS(
-                tree.push(ExpressionNode::Binary { operator, lhs, rhs }),
+                tree.push(ExpressionNode::Infix { operator, lhs, rhs }),
             ));
         }
         Ok(PrattParseOutcome::NoOperator)

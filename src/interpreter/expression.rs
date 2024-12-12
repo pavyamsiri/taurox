@@ -1,6 +1,6 @@
 use crate::parser::expression::{
-    BinaryOperator, BinaryShortCircuitOperator, Expression, ExpressionAtom, ExpressionAtomKind,
-    ExpressionNode, ExpressionNodeRef, UnaryOperator,
+    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+    InfixOperator, InfixShortCircuitOperator, PrefixOperator,
 };
 
 use super::{
@@ -44,20 +44,20 @@ impl ExpressionEvaluator {
         let result = match current_node {
             ExpressionNode::Atom(atom) => Self::evaluate_expression_atom(atom, environment)
                 .map_err(|kind| RuntimeError { kind, line })?,
-            ExpressionNode::Unary { operator, rhs } => {
+            ExpressionNode::Prefix { operator, rhs } => {
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 Self::evaluate_unary(operator, &rhs).map_err(|kind| RuntimeError { kind, line })?
             }
             ExpressionNode::Group { inner } => {
                 Self::evaluate_expression_node(tree, inner, environment)?
             }
-            ExpressionNode::Binary { operator, lhs, rhs } => {
+            ExpressionNode::Infix { operator, lhs, rhs } => {
                 let lhs = Self::evaluate_expression_node(tree, lhs, environment)?;
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 Self::evaluate_binary(operator, &lhs, &rhs)
                     .map_err(|kind| RuntimeError { kind, line })?
             }
-            ExpressionNode::BinaryAssignment { lhs, rhs } => {
+            ExpressionNode::InfixAssignment { lhs, rhs } => {
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 let _ = environment
                     .assign(lhs, rhs.clone())
@@ -67,7 +67,7 @@ impl ExpressionEvaluator {
                     })?;
                 rhs
             }
-            ExpressionNode::BinaryShortCircuit { operator, lhs, rhs } => {
+            ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
                 Self::evaluate_binary_short_circuit(operator, lhs, rhs, tree, environment)?
             }
             ExpressionNode::Call { callee, arguments } => {
@@ -149,36 +149,36 @@ impl ExpressionEvaluator {
     }
 
     fn evaluate_unary(
-        operator: &UnaryOperator,
+        operator: &PrefixOperator,
         rhs: &LoxValue,
     ) -> Result<LoxValue, RuntimeErrorKind> {
         match operator {
-            UnaryOperator::Bang => Ok(LoxValue::Bool(rhs.logical_not())),
-            UnaryOperator::Minus => rhs.numeric_negate(),
+            PrefixOperator::Bang => Ok(LoxValue::Bool(rhs.logical_not())),
+            PrefixOperator::Minus => rhs.numeric_negate(),
         }
     }
 
     fn evaluate_binary(
-        operator: &BinaryOperator,
+        operator: &InfixOperator,
         lhs: &LoxValue,
         rhs: &LoxValue,
     ) -> Result<LoxValue, RuntimeErrorKind> {
         match operator {
-            BinaryOperator::Add => lhs.add(rhs),
-            BinaryOperator::Subtract => lhs.subtract(rhs),
-            BinaryOperator::Multiply => lhs.multiply(rhs),
-            BinaryOperator::Divide => lhs.divide(rhs),
-            BinaryOperator::LessThan => lhs.less_than(rhs),
-            BinaryOperator::LessThanEqual => lhs.less_than_or_equal(rhs),
-            BinaryOperator::GreaterThan => lhs.greater_than(rhs),
-            BinaryOperator::GreaterThanEqual => lhs.greater_than_or_equal(rhs),
-            BinaryOperator::EqualEqual => Ok(LoxValue::Bool(lhs.is_equal(rhs))),
-            BinaryOperator::BangEqual => Ok(LoxValue::Bool(lhs.is_not_equal(rhs))),
+            InfixOperator::Add => lhs.add(rhs),
+            InfixOperator::Subtract => lhs.subtract(rhs),
+            InfixOperator::Multiply => lhs.multiply(rhs),
+            InfixOperator::Divide => lhs.divide(rhs),
+            InfixOperator::LessThan => lhs.less_than(rhs),
+            InfixOperator::LessThanEqual => lhs.less_than_or_equal(rhs),
+            InfixOperator::GreaterThan => lhs.greater_than(rhs),
+            InfixOperator::GreaterThanEqual => lhs.greater_than_or_equal(rhs),
+            InfixOperator::EqualEqual => Ok(LoxValue::Bool(lhs.is_equal(rhs))),
+            InfixOperator::BangEqual => Ok(LoxValue::Bool(lhs.is_not_equal(rhs))),
         }
     }
 
     fn evaluate_binary_short_circuit(
-        operator: &BinaryShortCircuitOperator,
+        operator: &InfixShortCircuitOperator,
         lhs: &ExpressionNodeRef,
         rhs: &ExpressionNodeRef,
         tree: &Expression,
@@ -187,7 +187,7 @@ impl ExpressionEvaluator {
         let lhs = { Self::evaluate_expression_node(tree, lhs, environment)? };
 
         match operator {
-            BinaryShortCircuitOperator::And => {
+            InfixShortCircuitOperator::And => {
                 if !lhs.is_truthy() {
                     Ok(lhs)
                 } else {
@@ -195,7 +195,7 @@ impl ExpressionEvaluator {
                     Ok(rhs)
                 }
             }
-            BinaryShortCircuitOperator::Or => {
+            InfixShortCircuitOperator::Or => {
                 if lhs.is_truthy() {
                     Ok(lhs)
                 } else {

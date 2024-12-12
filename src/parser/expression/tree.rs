@@ -2,7 +2,7 @@ use compact_str::CompactString;
 
 use crate::lexer::TokenKind;
 
-use super::{BinaryOperator, BinaryShortCircuitOperator, UnaryOperator};
+use super::{InfixOperator, InfixShortCircuitOperator, PrefixOperator};
 
 #[derive(Debug, Clone)]
 pub enum ExpressionAtomKind {
@@ -27,21 +27,21 @@ pub enum ExpressionNode {
     Group {
         inner: ExpressionNodeRef,
     },
-    Unary {
-        operator: UnaryOperator,
+    Prefix {
+        operator: PrefixOperator,
         rhs: ExpressionNodeRef,
     },
-    Binary {
-        operator: BinaryOperator,
+    Infix {
+        operator: InfixOperator,
         lhs: ExpressionNodeRef,
         rhs: ExpressionNodeRef,
     },
-    BinaryAssignment {
+    InfixAssignment {
         lhs: CompactString,
         rhs: ExpressionNodeRef,
     },
-    BinaryShortCircuit {
-        operator: BinaryShortCircuitOperator,
+    InfixShortCircuit {
+        operator: InfixShortCircuitOperator,
         lhs: ExpressionNodeRef,
         rhs: ExpressionNodeRef,
     },
@@ -96,10 +96,10 @@ impl IncompleteExpression {
         let node = self.nodes.get(node.0 as usize)?;
         match node {
             ExpressionNode::Atom(ExpressionAtom { line, .. }) => Some(*line),
-            ExpressionNode::Unary { rhs, .. } => self.get_line(rhs),
-            ExpressionNode::Binary { lhs, .. } => self.get_line(lhs),
-            ExpressionNode::BinaryAssignment { rhs, .. } => self.get_line(rhs),
-            ExpressionNode::BinaryShortCircuit { lhs, .. } => self.get_line(lhs),
+            ExpressionNode::Prefix { rhs, .. } => self.get_line(rhs),
+            ExpressionNode::Infix { lhs, .. } => self.get_line(lhs),
+            ExpressionNode::InfixAssignment { rhs, .. } => self.get_line(rhs),
+            ExpressionNode::InfixShortCircuit { lhs, .. } => self.get_line(lhs),
             ExpressionNode::Group { inner } => self.get_line(inner),
             ExpressionNode::Call { callee, .. } => self.get_line(callee),
         }
@@ -116,10 +116,10 @@ impl IncompleteExpression {
                 ExpressionAtomKind::Identifier(_) => Some(TokenKind::Ident),
                 ExpressionAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
             },
-            ExpressionNode::Unary { rhs, .. } => self.get_kind(rhs),
-            ExpressionNode::Binary { lhs, .. } => self.get_kind(lhs),
-            ExpressionNode::BinaryAssignment { rhs, .. } => self.get_kind(rhs),
-            ExpressionNode::BinaryShortCircuit { lhs, .. } => self.get_kind(lhs),
+            ExpressionNode::Prefix { rhs, .. } => self.get_kind(rhs),
+            ExpressionNode::Infix { lhs, .. } => self.get_kind(lhs),
+            ExpressionNode::InfixAssignment { rhs, .. } => self.get_kind(rhs),
+            ExpressionNode::InfixShortCircuit { lhs, .. } => self.get_kind(lhs),
             ExpressionNode::Group { inner } => self.get_kind(inner),
             ExpressionNode::Call { callee, .. } => self.get_kind(callee),
         }

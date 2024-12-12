@@ -1,8 +1,8 @@
 use crate::parser::{ParserError, ParserErrorKind};
 
 use super::expression::{
-    BinaryOperator, BinaryShortCircuitOperator, Expression, ExpressionAtom, ExpressionAtomKind,
-    ExpressionNode, ExpressionNodeRef, UnaryOperator,
+    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+    InfixOperator, InfixShortCircuitOperator, PrefixOperator,
 };
 
 pub trait ExpressionFormatter {
@@ -42,14 +42,14 @@ impl SExpressionFormatter {
 
         match current_node {
             ExpressionNode::Atom(atom) => Self::format_atom(atom),
-            ExpressionNode::Unary { operator, rhs } => {
+            ExpressionNode::Prefix { operator, rhs } => {
                 format!(
                     "({} {})",
                     SExpressionFormatter::format_unary_operator(operator),
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
-            ExpressionNode::Binary { operator, lhs, rhs } => {
+            ExpressionNode::Infix { operator, lhs, rhs } => {
                 format!(
                     "({} {} {})",
                     SExpressionFormatter::format_binary_operator(operator),
@@ -57,13 +57,13 @@ impl SExpressionFormatter {
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
-            ExpressionNode::BinaryAssignment { lhs, rhs } => {
+            ExpressionNode::InfixAssignment { lhs, rhs } => {
                 format!(
                     "(= {lhs} {})",
                     SExpressionFormatter::format_node(tree, &rhs)
                 )
             }
-            ExpressionNode::BinaryShortCircuit { operator, lhs, rhs } => {
+            ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
                 format!(
                     "({} {} {})",
                     SExpressionFormatter::format_binary_short_circuit_operator(operator),
@@ -94,33 +94,33 @@ impl SExpressionFormatter {
         }
     }
 
-    fn format_unary_operator(operator: &UnaryOperator) -> String {
+    fn format_unary_operator(operator: &PrefixOperator) -> String {
         match operator {
-            UnaryOperator::Bang => "!",
-            UnaryOperator::Minus => "-",
+            PrefixOperator::Bang => "!",
+            PrefixOperator::Minus => "-",
         }
         .into()
     }
-    fn format_binary_operator(operator: &BinaryOperator) -> String {
+    fn format_binary_operator(operator: &InfixOperator) -> String {
         match operator {
-            BinaryOperator::Add => "+",
-            BinaryOperator::Subtract => "-",
-            BinaryOperator::Multiply => "*",
-            BinaryOperator::Divide => "/",
-            BinaryOperator::LessThan => "<",
-            BinaryOperator::LessThanEqual => "<=",
-            BinaryOperator::GreaterThan => ">",
-            BinaryOperator::GreaterThanEqual => ">=",
-            BinaryOperator::EqualEqual => "==",
-            BinaryOperator::BangEqual => "!=",
+            InfixOperator::Add => "+",
+            InfixOperator::Subtract => "-",
+            InfixOperator::Multiply => "*",
+            InfixOperator::Divide => "/",
+            InfixOperator::LessThan => "<",
+            InfixOperator::LessThanEqual => "<=",
+            InfixOperator::GreaterThan => ">",
+            InfixOperator::GreaterThanEqual => ">=",
+            InfixOperator::EqualEqual => "==",
+            InfixOperator::BangEqual => "!=",
         }
         .into()
     }
 
-    fn format_binary_short_circuit_operator(operator: &BinaryShortCircuitOperator) -> String {
+    fn format_binary_short_circuit_operator(operator: &InfixShortCircuitOperator) -> String {
         match operator {
-            BinaryShortCircuitOperator::And => "and",
-            BinaryShortCircuitOperator::Or => "or",
+            InfixShortCircuitOperator::And => "and",
+            InfixShortCircuitOperator::Or => "or",
         }
         .into()
     }

@@ -1,20 +1,20 @@
 #[derive(Debug, Clone, Copy)]
-pub enum UnaryOperator {
+pub enum PrefixOperator {
     Bang,
     Minus,
 }
 
-impl UnaryOperator {
+impl PrefixOperator {
     pub fn get_binding_power(&self) -> u8 {
         match self {
             // 2. Unary operators
-            UnaryOperator::Bang | UnaryOperator::Minus => 15,
+            PrefixOperator::Bang | PrefixOperator::Minus => 15,
         }
     }
 }
 
 #[derive(Debug, Clone)]
-pub enum BinaryOperator {
+pub enum InfixOperator {
     Multiply,
     Divide,
     Add,
@@ -27,7 +27,7 @@ pub enum BinaryOperator {
     BangEqual,
 }
 
-impl BinaryOperator {
+impl InfixOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
             // 3. Multiplicative operators
@@ -45,12 +45,12 @@ impl BinaryOperator {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum BinaryShortCircuitOperator {
+pub enum InfixShortCircuitOperator {
     And,
     Or,
 }
 
-impl BinaryShortCircuitOperator {
+impl InfixShortCircuitOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
             // 7. Logical AND operator
@@ -62,11 +62,11 @@ impl BinaryShortCircuitOperator {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum BinaryAssignmentOperator {
+pub enum InfixAssignmentOperator {
     Assign,
 }
 
-impl BinaryAssignmentOperator {
+impl InfixAssignmentOperator {
     pub fn get_binding_power(&self) -> (u8, u8) {
         match self {
             // 9. Assignment operator

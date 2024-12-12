@@ -2,8 +2,8 @@ mod operator;
 mod tree;
 
 pub use operator::{
-    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, PostfixOperator,
-    UnaryOperator,
+    InfixAssignmentOperator, InfixOperator, InfixShortCircuitOperator, PostfixOperator,
+    PrefixOperator,
 };
 pub use tree::{
     Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
