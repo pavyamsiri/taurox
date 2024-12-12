@@ -36,7 +36,9 @@ impl SExpressionFormatter {
     }
 
     fn format_node(tree: &Expression, node: &ExpressionNodeRef) -> String {
-        let current_node = &tree.nodes[node.0 as usize];
+        let current_node = &tree
+            .get_node(node)
+            .expect("Caller should make sure the ref is valid.");
 
         match current_node {
             ExpressionNode::Atom(atom) => Self::format_atom(atom),
@@ -126,7 +128,7 @@ impl SExpressionFormatter {
 
 impl ExpressionFormatter for SExpressionFormatter {
     fn format(&self, tree: &Expression) -> String {
-        SExpressionFormatter::format_node(tree, &tree.root)
+        SExpressionFormatter::format_node(tree, &tree.get_root_ref())
     }
 
     fn format_error(&self, error: &ParserError) -> String {

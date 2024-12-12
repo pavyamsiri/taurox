@@ -70,8 +70,8 @@ pub struct IncompleteExpression {
 
 #[derive(Debug, Clone)]
 pub struct Expression {
-    pub nodes: Vec<ExpressionNode>,
-    pub root: ExpressionNodeRef,
+    inner: IncompleteExpression,
+    root: ExpressionNodeRef,
 }
 
 impl IncompleteExpression {
@@ -127,10 +127,7 @@ impl Expression {
         if !(0..tree.nodes.len()).contains(&(root.0 as usize)) {
             None
         } else {
-            Some(Self {
-                nodes: tree.nodes,
-                root,
-            })
+            Some(Self { inner: tree, root })
         }
     }
 
@@ -144,39 +141,14 @@ impl Expression {
     }
 
     pub fn get_node(&self, node: &ExpressionNodeRef) -> Option<&ExpressionNode> {
-        self.nodes.get(node.0 as usize)
+        self.inner.get_node(node)
     }
 
     pub fn get_line(&self, node: &ExpressionNodeRef) -> Option<u32> {
-        let node = self.nodes.get(node.0 as usize)?;
-        match node {
-            ExpressionNode::Atom(ExpressionAtom { line, .. }) => Some(*line),
-            ExpressionNode::Unary { rhs, .. } => self.get_line(rhs),
-            ExpressionNode::Binary { lhs, .. } => self.get_line(lhs),
-            ExpressionNode::BinaryAssignment { rhs, .. } => self.get_line(rhs),
-            ExpressionNode::BinaryShortCircuit { lhs, .. } => self.get_line(lhs),
-            ExpressionNode::Group { inner } => self.get_line(inner),
-            ExpressionNode::Call { callee, .. } => self.get_line(callee),
-        }
+        self.inner.get_line(node)
     }
 
     pub fn get_kind(&self, node: &ExpressionNodeRef) -> Option<TokenKind> {
-        let node = self.nodes.get(node.0 as usize)?;
-        match node {
-            ExpressionNode::Atom(ExpressionAtom { kind, .. }) => match kind {
-                ExpressionAtomKind::Number(_) => Some(TokenKind::NumericLiteral),
-                ExpressionAtomKind::Bool(true) => Some(TokenKind::KeywordTrue),
-                ExpressionAtomKind::Bool(false) => Some(TokenKind::KeywordFalse),
-                ExpressionAtomKind::Nil => Some(TokenKind::KeywordNil),
-                ExpressionAtomKind::Identifier(_) => Some(TokenKind::Ident),
-                ExpressionAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
-            },
-            ExpressionNode::Unary { rhs, .. } => self.get_kind(rhs),
-            ExpressionNode::Binary { lhs, .. } => self.get_kind(lhs),
-            ExpressionNode::BinaryAssignment { rhs, .. } => self.get_kind(rhs),
-            ExpressionNode::BinaryShortCircuit { lhs, .. } => self.get_kind(lhs),
-            ExpressionNode::Group { inner } => self.get_kind(inner),
-            ExpressionNode::Call { callee, .. } => self.get_kind(callee),
-        }
+        self.inner.get_kind(node)
     }
 }
