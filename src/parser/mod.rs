@@ -12,7 +12,7 @@ use expression::{
     IncompleteExpression, InfixAssignmentOperator, InfixOperator, InfixShortCircuitOperator,
     PostfixOperator, PrefixOperator,
 };
-use statement::{Declaration, Initializer, NonDeclaration, Statement};
+use statement::{Declaration, Function, Initializer, NonDeclaration, Statement};
 
 #[derive(Debug)]
 pub struct Program {
@@ -136,11 +136,11 @@ impl<'src> Parser<'src> {
             }
         };
 
-        Ok(Statement::Declaration(Declaration::Function {
+        Ok(Statement::Declaration(Declaration::Function(Function {
             name,
             parameters,
             body,
-        }))
+        })))
     }
 
     fn parse_block_statement(&mut self, line: u32) -> Result<Statement, ParserError> {

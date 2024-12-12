@@ -9,10 +9,9 @@ use crate::parser::{
         Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
-    statement::{Declaration, Initializer, NonDeclaration, Statement},
+    statement::{Declaration, Function, Initializer, NonDeclaration, Statement},
     Program,
 };
-use compact_str::ToCompactString;
 
 pub struct TreeWalkInterpreter<S> {
     program: Program,
@@ -69,16 +68,9 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
                 self.interpret_variable_declaration(environment, name, initial.as_ref())?
             }
-            Statement::Declaration(Declaration::Function {
-                name,
-                parameters,
-                body,
-            }) => self.interpret_function_declaration(
-                environment,
-                name,
-                &parameters.iter().map(|s| s.as_ref()).collect::<Vec<&str>>(),
-                body.as_ref(),
-            )?,
+            Statement::Declaration(Declaration::Function(fun)) => {
+                self.interpret_function_declaration(environment, fun)?
+            }
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment)?
             }
@@ -160,20 +152,14 @@ impl TreeWalkStatementInterpreter {
     fn interpret_function_declaration(
         &self,
         environment: &mut SharedEnvironment,
-        name: &str,
-        parameters: &[&str],
-        body: &[Statement],
+        fun: &Function,
     ) -> Result<ProgramState, RuntimeError> {
         environment.declare(
-            name,
+            &fun.name,
             LoxValue::Function {
-                name: name.into(),
-                parameters: parameters
-                    .to_vec()
-                    .iter()
-                    .map(|&s| s.to_compact_string())
-                    .collect(),
-                body: body.to_vec(),
+                name: fun.name.clone(),
+                parameters: fun.parameters.clone(),
+                body: fun.body.clone(),
                 closure: environment.new_scope(),
             },
         );

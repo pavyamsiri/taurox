@@ -14,20 +14,7 @@ pub enum Declaration {
         name: CompactString,
         initial: Option<Expression>,
     },
-    Function {
-        name: CompactString,
-        parameters: Vec<CompactString>,
-        body: Vec<Statement>,
-    },
-}
-
-#[derive(Debug, Clone)]
-pub enum Initializer {
-    VarDecl {
-        name: CompactString,
-        initial: Option<Expression>,
-    },
-    Expression(Expression),
+    Function(Function),
 }
 
 #[derive(Debug, Clone)]
@@ -53,4 +40,20 @@ pub enum NonDeclaration {
     Return {
         value: Option<Expression>,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct Function {
+    pub name: CompactString,
+    pub parameters: Vec<CompactString>,
+    pub body: Vec<Statement>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Initializer {
+    VarDecl {
+        name: CompactString,
+        initial: Option<Expression>,
+    },
+    Expression(Expression),
 }
