@@ -168,7 +168,7 @@ impl TreeWalkStatementInterpreter {
                 name: fun.name.clone(),
                 parameters: fun.parameters.clone(),
                 body: fun.body.clone(),
-                closure: environment.new_scope(),
+                closure: environment.new_enclosed(),
             },
         );
         Ok(ProgramState::Run)
@@ -248,7 +248,7 @@ impl TreeWalkStatementInterpreter {
         environment: &mut SharedEnvironment,
         statements: &Vec<Statement>,
     ) -> Result<ProgramState, RuntimeError> {
-        let mut environment = environment.new_scope();
+        let mut environment = environment.new_enclosed();
         let mut state = ProgramState::Run;
         for statement in statements {
             match self.interpret_statement(statement, &mut environment)? {
@@ -271,7 +271,7 @@ impl TreeWalkStatementInterpreter {
         body: &NonDeclaration,
     ) -> Result<ProgramState, RuntimeError> {
         // Run the initializer
-        let mut environment = environment.new_scope();
+        let mut environment = environment.new_enclosed();
         match initializer {
             Some(Initializer::VarDecl { name, initial }) => {
                 self.interpret_variable_declaration(&mut environment, name, initial.as_ref())?;
@@ -451,7 +451,7 @@ impl TreeWalkStatementInterpreter {
         let result = match callee {
             LoxValue::NativeFunction(fun) => {
                 // Set up scope
-                let mut environment = environment.new_scope();
+                let mut environment = environment.new_enclosed();
 
                 // Check that the argument list is the same length as the parameter list.
                 if arguments.len() != fun.get_parameters().len() {
@@ -483,7 +483,7 @@ impl TreeWalkStatementInterpreter {
             } => {
                 let _ = name;
                 // Set up scope
-                let mut inner_scope = closure.new_scope();
+                let mut inner_scope = closure.new_enclosed();
 
                 // Check that the argument list is the same length as the parameter list.
                 if arguments.len() != parameters.len() {

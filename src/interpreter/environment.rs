@@ -41,7 +41,7 @@ impl SharedEnvironment {
         }
     }
 
-    pub fn new_scope(&self) -> Self {
+    pub fn new_enclosed(&self) -> Self {
         Self {
             inner: Arc::new(Mutex::new(Environment {
                 values: HashMap::new(),
