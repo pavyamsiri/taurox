@@ -489,7 +489,7 @@ impl TreeWalkStatementInterpreter {
             } => {
                 let _ = name;
                 // Set up scope
-                let mut environment = closure.new_scope();
+                let mut inner_scope = closure.new_scope();
 
                 // Check that the argument list is the same length as the parameter list.
                 if arguments.len() != parameters.len() {
@@ -504,14 +504,13 @@ impl TreeWalkStatementInterpreter {
 
                 // Define the arguments in the function scope
                 for (name, argument) in parameters.iter().zip(arguments.iter()) {
-                    let argument =
-                        self.evaluate_expression_node(expr, *argument, &mut environment)?;
-                    environment.declare(name, argument);
+                    let argument = self.evaluate_expression_node(expr, *argument, environment)?;
+                    inner_scope.declare(name, argument);
                 }
 
                 let mut result = LoxValue::Nil;
                 for statement in body {
-                    match self.interpret_statement(&statement, &mut environment)? {
+                    match self.interpret_statement(&statement, &mut inner_scope)? {
                         ProgramState::Run => {}
                         ProgramState::Return(v) => {
                             result = v;
