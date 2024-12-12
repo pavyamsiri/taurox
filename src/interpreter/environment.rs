@@ -15,7 +15,7 @@ pub struct SharedEnvironment {
 
 #[derive(Debug, Clone)]
 struct Environment {
-    values: HashMap<CompactString, LoxValue>,
+    values: HashMap<CompactString, Option<LoxValue>>,
     parent: Option<SharedEnvironment>,
 }
 
@@ -29,7 +29,7 @@ impl SharedEnvironment {
 
             globals.insert(
                 clock.get_name().to_compact_string(),
-                LoxValue::NativeFunction(Arc::new(clock)),
+                Some(LoxValue::NativeFunction(Arc::new(clock))),
             );
         }
 
@@ -60,16 +60,21 @@ impl SharedEnvironment {
         inner.assign(name, value)
     }
 
-    pub fn declare(&mut self, name: &str, value: LoxValue) {
+    pub fn define(&mut self, name: &str, value: LoxValue) {
         let mut inner = self.inner.lock().unwrap();
-        inner.declare(name, value)
+        inner.define(name, value);
+    }
+
+    pub fn declare(&mut self, name: &str) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.declare(name);
     }
 }
 
 impl Environment {
     pub fn access(&self, name: &str) -> Option<LoxValue> {
         if let Some(value) = self.values.get(name) {
-            Some(value.clone())
+            value.clone()
         } else if let Some(parent) = self.parent.clone() {
             parent.access(name)
         } else {
@@ -79,7 +84,7 @@ impl Environment {
 
     pub fn assign(&mut self, name: &str, value: LoxValue) -> Result<(), ()> {
         if self.values.contains_key(name) {
-            self.values.insert(name.to_compact_string(), value);
+            self.values.insert(name.to_compact_string(), Some(value));
             Ok(())
         } else if let Some(mut parent) = self.parent.clone() {
             parent.assign(name, value)
@@ -88,8 +93,12 @@ impl Environment {
         }
     }
 
-    pub fn declare(&mut self, name: &str, value: LoxValue) {
-        self.values.insert(name.to_compact_string(), value);
+    pub fn define(&mut self, name: &str, value: LoxValue) {
+        self.values.insert(name.to_compact_string(), Some(value));
+    }
+
+    pub fn declare(&mut self, name: &str) {
+        self.values.insert(name.to_compact_string(), None);
     }
 }
 
@@ -116,20 +125,34 @@ impl std::fmt::Display for SharedEnvironment {
                 // Global scope
                 writeln!(f, "Global Scope:")?;
                 for (name, value) in &env.values {
-                    writeln!(f, "  {}: {}", name, value)?;
+                    if let Some(value) = value {
+                        writeln!(f, "  {}: {}", name, value)?;
+                    } else {
+                        writeln!(f, "  {}: undefined", name)?;
+                    }
                 }
             } else {
                 // Local scopes
                 writeln!(f, "{:indent$}Local Scope:", "", indent = depth * 2 + 1)?;
                 for (name, value) in &env.values {
-                    writeln!(
-                        f,
-                        "{:indent$}  {}: {}",
-                        "",
-                        name,
-                        value,
-                        indent = depth * 2 + 1
-                    )?;
+                    if let Some(value) = value {
+                        writeln!(
+                            f,
+                            "{:indent$}  {}: {}",
+                            "",
+                            name,
+                            value,
+                            indent = depth * 2 + 1
+                        )?;
+                    } else {
+                        writeln!(
+                            f,
+                            "{:indent$}  {}: undefined",
+                            "",
+                            name,
+                            indent = depth * 2 + 1
+                        )?;
+                    }
                 }
             }
         }

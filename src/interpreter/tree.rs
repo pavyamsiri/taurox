@@ -64,6 +64,7 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
         statement: &Statement,
         environment: &mut SharedEnvironment,
     ) -> Result<ProgramState, RuntimeError> {
+        eprintln!("Env:\n{environment}");
         let state = match statement {
             Statement::Declaration(Declaration::Variable { name, initial }) => {
                 self.interpret_variable_declaration(environment, name, initial.as_ref())?
@@ -146,12 +147,13 @@ impl TreeWalkStatementInterpreter {
         name: &str,
         initial: Option<&Expression>,
     ) -> Result<ProgramState, RuntimeError> {
+        environment.declare(name);
         let initial = if let Some(expr) = initial {
             self.evaluate(expr, environment)?
         } else {
             LoxValue::Nil
         };
-        environment.declare(name, initial);
+        environment.define(name, initial);
         Ok(ProgramState::Run)
     }
 
@@ -160,7 +162,7 @@ impl TreeWalkStatementInterpreter {
         environment: &mut SharedEnvironment,
         fun: &Function,
     ) -> Result<ProgramState, RuntimeError> {
-        environment.declare(
+        environment.define(
             &fun.name,
             LoxValue::Function {
                 name: fun.name.clone(),
@@ -466,7 +468,7 @@ impl TreeWalkStatementInterpreter {
                 for (name, argument) in fun.get_parameters().iter().zip(arguments.iter()) {
                     let argument =
                         self.evaluate_expression_node(expr, *argument, &mut environment)?;
-                    environment.declare(name, argument);
+                    environment.define(name, argument);
                 }
 
                 let result = fun.call(&mut environment)?;
@@ -497,7 +499,7 @@ impl TreeWalkStatementInterpreter {
                 // Define the arguments in the function scope
                 for (name, argument) in parameters.iter().zip(arguments.iter()) {
                     let argument = self.evaluate_expression_node(expr, *argument, environment)?;
-                    inner_scope.declare(name, argument);
+                    inner_scope.define(name, argument);
                 }
 
                 let mut result = LoxValue::Nil;
