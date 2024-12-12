@@ -71,6 +71,12 @@ impl StatementInterpreter for TreeWalkStatementInterpreter {
             Statement::Declaration(Declaration::Function(fun)) => {
                 self.interpret_function_declaration(environment, fun)?
             }
+            Statement::Declaration(Declaration::Class {
+                name: _,
+                methods: _,
+            }) => {
+                todo!();
+            }
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment)?
             }

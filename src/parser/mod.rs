@@ -68,15 +68,10 @@ impl<'src> Parser<'src> {
         };
         Ok(Some(statement))
     }
+}
 
-    fn parse_print_statement(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordPrint)?;
-        let rhs = self.parse_expression()?;
-        let statement = Statement::NonDeclaration(NonDeclaration::Print(rhs));
-        let _ = self.expect(TokenKind::Semicolon)?;
-        Ok(statement)
-    }
-
+// Declarations
+impl<'src> Parser<'src> {
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
         let _ = self.expect(TokenKind::KeywordVar)?;
         let place = self.expect_ident()?;
@@ -142,7 +137,17 @@ impl<'src> Parser<'src> {
             body,
         })))
     }
+}
 
+// Non declaration statements
+impl<'src> Parser<'src> {
+    fn parse_print_statement(&mut self) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordPrint)?;
+        let rhs = self.parse_expression()?;
+        let statement = Statement::NonDeclaration(NonDeclaration::Print(rhs));
+        let _ = self.expect(TokenKind::Semicolon)?;
+        Ok(statement)
+    }
     fn parse_block_statement(&mut self, line: u32) -> Result<Statement, ParserError> {
         let _ = self.expect(TokenKind::LeftBrace)?;
         let mut statements = Vec::new();
@@ -283,6 +288,7 @@ impl<'src> Parser<'src> {
         }))
     }
 }
+
 enum PrattParseOutcome {
     NoOperator,
     Break,

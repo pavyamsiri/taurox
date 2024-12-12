@@ -15,6 +15,10 @@ pub enum Declaration {
         initial: Option<Expression>,
     },
     Function(Function),
+    Class {
+        name: CompactString,
+        methods: Vec<Function>,
+    },
 }
 
 #[derive(Debug, Clone)]
