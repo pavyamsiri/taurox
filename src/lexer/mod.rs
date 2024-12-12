@@ -2,13 +2,14 @@ mod cursor;
 mod error;
 pub mod formatter;
 mod state;
-pub mod token;
+mod token;
 
 use cursor::SourceChar;
 pub use error::{LexicalError, LexicalErrorKind};
 use state::{LexerState, LexerStateTransition};
 use std::str::Chars;
-use token::{Span, SpanIndex, Token};
+use token::{Span, SpanIndex};
+pub use token::{Token, TokenKind};
 
 #[derive(Debug)]
 enum LookAhead {

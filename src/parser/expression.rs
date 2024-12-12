@@ -1,4 +1,4 @@
-use crate::lexer::token::TokenKind;
+use crate::lexer::TokenKind;
 use compact_str::CompactString;
 
 #[derive(Debug, Clone)]

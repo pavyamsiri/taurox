@@ -8,7 +8,7 @@ use taurox::{
     lexer::Lexer,
     lexer::{
         formatter::{BasicFormatter, ToFormatter, TokenFormatter},
-        token::TokenKind,
+        TokenKind,
     },
 };
 

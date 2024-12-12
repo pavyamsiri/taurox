@@ -2,10 +2,7 @@ pub mod expression;
 pub mod formatter;
 pub mod statement;
 
-use crate::{
-    lexer::token::{Token, TokenKind},
-    lexer::{Lexer, LexicalError},
-};
+use crate::lexer::{Lexer, LexicalError, Token, TokenKind};
 use expression::{
     BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,
     ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef,
