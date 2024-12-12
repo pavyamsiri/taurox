@@ -1,6 +1,6 @@
 use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
 
-use super::{Token, TokenKind};
+use super::token::{Token, TokenKind};
 
 /// Interface for creating new token formatters.
 pub trait TokenFormatter {

@@ -1,5 +1,6 @@
 mod cursor;
 mod error;
+pub mod formatter;
 mod state;
 pub mod token;
 

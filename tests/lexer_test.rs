@@ -6,9 +6,9 @@ use std::{
 
 use taurox::{
     lexer::Lexer,
-    token::{
+    lexer::{
         formatter::{BasicFormatter, ToFormatter, TokenFormatter},
-        TokenKind,
+        token::TokenKind,
     },
 };
 

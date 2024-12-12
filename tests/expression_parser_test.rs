@@ -4,9 +4,9 @@ use std::{
     path::Path,
 };
 
-use taurox::{
-    expression::formatter::{ExpressionFormatter, SExpressionFormatter},
-    parser::Parser,
+use taurox::parser::{
+    formatter::{ExpressionFormatter, SExpressionFormatter},
+    Parser,
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {

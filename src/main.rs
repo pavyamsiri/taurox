@@ -105,9 +105,7 @@ fn taurox_main() -> Result<ExitCode> {
 }
 
 fn tokenize(src: &str, format: &TokenFormat) -> bool {
-    use taurox::lexer::token::formatter::{
-        BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter,
-    };
+    use taurox::lexer::formatter::{BasicFormatter, DebugFormatter, ToFormatter, TokenFormatter};
     use taurox::lexer::token::TokenKind;
     use taurox::lexer::Lexer;
 

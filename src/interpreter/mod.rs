@@ -1,6 +1,7 @@
 pub mod environment;
 pub mod error;
 pub mod expression;
+pub mod formatter;
 mod native;
 mod value;
 

@@ -3,15 +3,16 @@ use std::{
     fs::{read_dir, read_to_string},
     path::Path,
 };
-
 use taurox::{
-    evaluator::{
+    interpreter::{
+        environment::Environment,
+        expression::ExpressionEvaluator,
         formatter::{BasicFormatter, ValueFormatter},
-        ExpressionEvaluator,
     },
-    expression::formatter::{ExpressionFormatter, SExpressionFormatter},
-    interpreter::Environment,
-    parser::Parser,
+    parser::{
+        formatter::{ExpressionFormatter, SExpressionFormatter},
+        Parser,
+    },
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {

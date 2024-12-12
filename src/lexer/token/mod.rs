@@ -1,4 +1,3 @@
-pub mod formatter;
 mod span;
 
 pub use span::{SpanIndex, SpanLength};

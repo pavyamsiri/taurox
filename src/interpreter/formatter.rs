@@ -1,4 +1,7 @@
-use super::{LoxValue, RuntimeError, RuntimeErrorKind};
+use super::{
+    error::{RuntimeError, RuntimeErrorKind},
+    value::LoxValue,
+};
 
 pub trait ValueFormatter {
     fn format(&self, value: &LoxValue) -> String;
