@@ -1,3 +1,7 @@
+mod expression;
+mod formatter;
+mod statement;
+
 use crate::{
     expression::{
         BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,

@@ -1,8 +1,8 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{
-    evaluator::{LoxValue, NativeFunction, RuntimeError},
-    interpreter::Environment,
+use super::{
+    environment::Environment,
+    value::{LoxValue, NativeFunction, RuntimeError},
 };
 
 #[derive(Debug)]
