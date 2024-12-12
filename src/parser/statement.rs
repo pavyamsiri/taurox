@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 
-use crate::expression::ExpressionTreeWithRoot;
+use super::expression::ExpressionTreeWithRoot;
 
 #[derive(Debug, Clone)]
 pub enum Statement {

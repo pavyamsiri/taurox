@@ -23,6 +23,6 @@ pub enum RuntimeErrorKind {
 #[error("({line}) {kind}")]
 pub struct RuntimeError {
     #[source]
-    kind: RuntimeErrorKind,
-    line: u32,
+    pub(crate) kind: RuntimeErrorKind,
+    pub(crate) line: u32,
 }

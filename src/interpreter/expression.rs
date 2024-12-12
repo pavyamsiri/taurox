@@ -1,18 +1,14 @@
-pub mod formatter;
-
-use std::sync::Arc;
-
-use crate::{
-    expression::{
-        BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom,
-        ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
-        UnaryOperator,
-    },
-    interpreter::Environment,
-    statement::Statement,
+use crate::parser::expression::{
+    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom,
+    ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot,
+    UnaryOperator,
 };
-use compact_str::{CompactString, CompactStringExt};
-use thiserror::Error;
+
+use super::{
+    environment::Environment,
+    error::{RuntimeError, RuntimeErrorKind},
+    value::LoxValue,
+};
 
 pub struct ExpressionEvaluator;
 

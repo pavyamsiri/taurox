@@ -1,4 +1,13 @@
-use compact_str::CompactString;
+use std::sync::Arc;
+
+use compact_str::{CompactString, CompactStringExt};
+
+use crate::parser::statement::Statement;
+
+use super::{
+    environment::Environment,
+    error::{RuntimeError, RuntimeErrorKind},
+};
 
 pub trait NativeFunction: std::fmt::Debug + Send + Sync {
     fn get_name(&self) -> &'static str;

@@ -1,17 +1,17 @@
-mod expression;
-mod formatter;
-mod statement;
+pub mod expression;
+pub mod formatter;
+pub mod statement;
 
 use crate::{
-    expression::{
-        BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,
-        ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef,
-        ExpressionTreeWithRoot, PostfixOperator, UnaryOperator,
-    },
     lexer::{Lexer, LexicalError},
-    statement::{Declaration, Initializer, NonDeclaration, Statement},
     token::{Token, TokenKind},
 };
+use expression::{
+    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,
+    ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef,
+    ExpressionTreeWithRoot, PostfixOperator, UnaryOperator,
+};
+use statement::{Declaration, Initializer, NonDeclaration, Statement};
 
 use compact_str::{CompactString, ToCompactString};
 use thiserror::Error;

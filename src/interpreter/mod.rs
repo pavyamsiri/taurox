@@ -1,18 +1,18 @@
-mod environment;
-mod error;
-mod expression;
+pub mod environment;
+pub mod error;
+pub mod expression;
 mod native;
 mod value;
 
 use crate::{
-    evaluator::ExpressionEvaluator,
-    expression::ExpressionTreeWithRoot,
+    parser::expression::ExpressionTreeWithRoot,
+    parser::statement::{Declaration, Initializer, NonDeclaration, Statement},
     parser::Program,
-    statement::{Declaration, Initializer, NonDeclaration, Statement},
 };
 use compact_str::CompactString;
 use environment::Environment;
 use error::RuntimeError;
+use expression::ExpressionEvaluator;
 use value::LoxValue;
 
 #[derive(Debug)]

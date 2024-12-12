@@ -1,8 +1,9 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::error::RuntimeError;
 use super::{
     environment::Environment,
-    value::{LoxValue, NativeFunction, RuntimeError},
+    value::{LoxValue, NativeFunction},
 };
 
 #[derive(Debug)]

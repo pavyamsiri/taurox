@@ -1,5 +1,3 @@
-pub mod formatter;
-
 use crate::token::TokenKind;
 use compact_str::CompactString;
 
@@ -110,7 +108,7 @@ impl PostfixOperator {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct ExpressionTreeNodeRef(u32);
+pub struct ExpressionTreeNodeRef(pub u32);
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeNode {
     Atom(ExpressionTreeAtom),
@@ -161,8 +159,8 @@ pub struct ExpressionTree {
 
 #[derive(Debug, Clone)]
 pub struct ExpressionTreeWithRoot {
-    nodes: Vec<ExpressionTreeNode>,
-    root: ExpressionTreeNodeRef,
+    pub nodes: Vec<ExpressionTreeNode>,
+    pub root: ExpressionTreeNodeRef,
 }
 
 impl ExpressionTree {

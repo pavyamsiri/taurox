@@ -2,7 +2,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
 use std::path::PathBuf;
 use std::{fs::read_to_string, process::ExitCode};
-use taurox::evaluator::RuntimeError;
+use taurox::interpreter::error::RuntimeError;
 use taurox::parser::ParserError;
 
 #[derive(Debug, Parser)]
@@ -132,9 +132,7 @@ fn tokenize(src: &str, format: &TokenFormat) -> bool {
 }
 
 fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
-    use taurox::expression::formatter::{
-        DebugFormatter, ExpressionFormatter, SExpressionFormatter,
-    };
+    use taurox::parser::formatter::{DebugFormatter, ExpressionFormatter, SExpressionFormatter};
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src);
@@ -148,8 +146,7 @@ fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
 }
 
 fn evaluate(src: &str) -> Result<()> {
-    use taurox::evaluator::ExpressionEvaluator;
-    use taurox::interpreter::Environment;
+    use taurox::interpreter::{environment::Environment, expression::ExpressionEvaluator};
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src);
