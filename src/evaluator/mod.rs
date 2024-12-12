@@ -177,7 +177,6 @@ impl ExpressionEvaluator {
                 .access(name)
                 .ok_or(RuntimeErrorKind::InvalidAccess(name.clone()))?
                 .clone(),
-            ExpressionTreeAtomKind::NativeFunction(fun) => LoxValue::NativeFunction(fun.clone()),
         };
         Ok(result)
     }

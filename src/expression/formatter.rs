@@ -33,7 +33,6 @@ impl SExpressionFormatter {
             ExpressionTreeAtomKind::Nil => "nil".into(),
             ExpressionTreeAtomKind::Identifier(ref name) => format!("{name}"),
             ExpressionTreeAtomKind::StringLiteral(ref v) => format!("{v}"),
-            ExpressionTreeAtomKind::NativeFunction(ref fun) => format!("{}", fun.get_name()),
         }
     }
 

@@ -1,8 +1,7 @@
 pub mod formatter;
 
-use crate::{evaluator::NativeFunction, token::TokenKind};
+use crate::token::TokenKind;
 use compact_str::CompactString;
-use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum ExpressionTreeAtomKind {
@@ -11,7 +10,6 @@ pub enum ExpressionTreeAtomKind {
     Nil,
     Identifier(CompactString),
     StringLiteral(CompactString),
-    NativeFunction(Arc<dyn NativeFunction>),
 }
 
 #[derive(Debug, Clone)]
@@ -204,7 +202,6 @@ impl ExpressionTree {
                 ExpressionTreeAtomKind::Nil => Some(TokenKind::KeywordNil),
                 ExpressionTreeAtomKind::Identifier(_) => Some(TokenKind::Ident),
                 ExpressionTreeAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
-                ExpressionTreeAtomKind::NativeFunction(_) => Some(TokenKind::Ident),
             },
             ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),
@@ -264,7 +261,6 @@ impl ExpressionTreeWithRoot {
                 ExpressionTreeAtomKind::Nil => Some(TokenKind::KeywordNil),
                 ExpressionTreeAtomKind::Identifier(_) => Some(TokenKind::Ident),
                 ExpressionTreeAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
-                ExpressionTreeAtomKind::NativeFunction(_) => Some(TokenKind::Ident),
             },
             ExpressionTreeNode::Unary { rhs, .. } => self.get_kind(rhs),
             ExpressionTreeNode::Binary { lhs, .. } => self.get_kind(lhs),
