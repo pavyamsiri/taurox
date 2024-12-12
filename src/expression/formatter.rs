@@ -78,6 +78,20 @@ impl SExpressionFormatter {
                     SExpressionFormatter::format_node(tree, &inner)
                 )
             }
+            ExpressionTreeNode::Call { callee, arguments } => {
+                let mut buffer =
+                    format!("(call {}", SExpressionFormatter::format_node(tree, callee));
+
+                for argument in arguments.iter() {
+                    buffer.push_str(&format!(
+                        " {}",
+                        SExpressionFormatter::format_node(tree, argument)
+                    ));
+                }
+                buffer.push(')');
+
+                buffer
+            }
         }
     }
 

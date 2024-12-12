@@ -2,7 +2,7 @@ use crate::{
     expression::{
         BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,
         ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef,
-        ExpressionTreeWithRoot, UnaryOperator,
+        ExpressionTreeWithRoot, PostfixOperator, UnaryOperator,
     },
     lexer::{Lexer, LexicalError},
     statement::{Declaration, Initializer, NonDeclaration, Statement},
@@ -147,7 +147,7 @@ impl<'src> Parser<'src> {
             .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
-    fn peek_binary_operator(&mut self) -> Result<Option<BinaryOperator>, ParserError> {
+    fn peek_infix_operator(&mut self) -> Result<Option<BinaryOperator>, ParserError> {
         let token = self.peek()?;
 
         match token.kind {
@@ -165,7 +165,15 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn peek_binary_assignment_operator(
+    fn peek_postfix_operator(&mut self) -> Result<Option<PostfixOperator>, ParserError> {
+        let token = self.peek()?;
+
+        match token.kind {
+            TokenKind::LeftParenthesis => Ok(Some(PostfixOperator::Call)),
+            _ => Ok(None),
+        }
+    }
+    fn peek_infix_assignment_operator(
         &mut self,
     ) -> Result<Option<BinaryAssignmentOperator>, ParserError> {
         let token = self.peek()?;
@@ -176,7 +184,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn peek_binary_short_circuit_operator(
+    fn peek_infix_short_circuit_operator(
         &mut self,
     ) -> Result<Option<BinaryShortCircuitOperator>, ParserError> {
         let token = self.peek()?;
@@ -293,7 +301,47 @@ impl<'src> Parser<'src> {
         let mut lhs = self.expect_left_expression(tree)?;
 
         loop {
-            if let Some(operator) = self.peek_binary_assignment_operator()? {
+            if let Some(operator) = self.peek_postfix_operator()? {
+                let lbp = operator.get_binding_power();
+                if lbp < min_bp {
+                    break;
+                }
+
+                // Special case
+                match operator {
+                    PostfixOperator::Call => {
+                        let _ = self.expect(TokenKind::LeftParenthesis)?;
+                        // Parse arguments/expressions
+                        let mut arguments = Vec::new();
+
+                        // Hit the end of the argument list
+                        if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                            lhs = tree.push(ExpressionTreeNode::Call {
+                                callee: lhs,
+                                arguments: Vec::new(),
+                            })
+                        } else {
+                            for _ in 0..255 {
+                                let argument = self.parse_expression_pratt(0, tree)?;
+                                arguments.push(argument);
+
+                                // Hit the end of the argument list
+                                if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                                    break;
+                                }
+
+                                let _ = self.expect(TokenKind::Comma)?;
+                            }
+                            lhs = tree.push(ExpressionTreeNode::Call {
+                                callee: lhs,
+                                arguments,
+                            })
+                        }
+                    }
+                }
+            }
+
+            if let Some(operator) = self.peek_infix_assignment_operator()? {
                 let place = {
                     let lhs_node = tree
                         .get_node(&lhs)
@@ -323,7 +371,7 @@ impl<'src> Parser<'src> {
                 continue;
             }
 
-            if let Some(operator) = self.peek_binary_short_circuit_operator()? {
+            if let Some(operator) = self.peek_infix_short_circuit_operator()? {
                 let (lbp, rbp) = operator.get_binding_power();
                 if lbp < min_bp {
                     break;
@@ -335,7 +383,7 @@ impl<'src> Parser<'src> {
                 continue;
             }
 
-            if let Some(operator) = self.peek_binary_operator()? {
+            if let Some(operator) = self.peek_infix_operator()? {
                 let (lbp, rbp) = operator.get_binding_power();
                 if lbp < min_bp {
                     break;

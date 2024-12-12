@@ -55,6 +55,9 @@ impl ValueFormatter for BasicFormatter {
             RuntimeErrorKind::InvalidAccess(ref name) => {
                 format!("({line}) Invalid Access: {name}",)
             }
+            RuntimeErrorKind::InvalidCallee(ref callee) => {
+                format!("({line}) Invalid Callee: {}", self.format_verbose(callee))
+            }
         }
     }
 }

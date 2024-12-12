@@ -23,6 +23,8 @@ pub enum RuntimeErrorKind {
     NonAddable(LoxValue, LoxValue),
     #[error("Invalid Access: {0}")]
     InvalidAccess(CompactString),
+    #[error("Invalid Callee: {0}")]
+    InvalidCallee(LoxValue),
 }
 
 #[derive(Debug, Error, Clone)]
@@ -224,6 +226,25 @@ impl ExpressionEvaluator {
             }
             ExpressionTreeNode::BinaryShortCircuit { operator, lhs, rhs } => {
                 Self::evaluate_binary_short_circuit(operator, lhs, rhs, tree, environment)?
+            }
+            ExpressionTreeNode::Call { callee, arguments } => {
+                let callee = Self::evaluate_expression_node(tree, callee, environment)?;
+                let fun = match callee {
+                    LoxValue::NativeFunction(fun) => fun,
+                    v => {
+                        return Err(RuntimeError {
+                            kind: RuntimeErrorKind::InvalidCallee(v),
+                            line,
+                        })
+                    }
+                };
+
+                let arguments: Vec<_> = arguments
+                    .iter()
+                    .map(|a| Self::evaluate_expression_node(tree, a, environment))
+                    .collect::<Result<Vec<_>, RuntimeError>>()?;
+
+                fun.call(&arguments)?
             }
         };
         Ok(result)

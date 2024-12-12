@@ -14,9 +14,6 @@ impl NativeFunction for NativeClock {
         let _ = arguments;
         let now = SystemTime::now();
         let duration_since_epoch = now.duration_since(UNIX_EPOCH).expect("Time went backwards");
-        Ok(LoxValue::Number(
-            duration_since_epoch.as_secs() as f64
-                + duration_since_epoch.subsec_nanos() as f64 * 1e-9,
-        ))
+        Ok(LoxValue::Number(duration_since_epoch.as_secs() as f64))
     }
 }
