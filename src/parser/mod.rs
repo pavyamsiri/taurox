@@ -51,6 +51,7 @@ impl<'src> Parser<'src> {
         let statement = match first.kind {
             TokenKind::KeywordFun => self.parse_function_declaration(line)?,
             TokenKind::KeywordVar => self.parse_variable_declaration()?,
+            TokenKind::KeywordClass => self.parse_class_declaration(line)?,
             TokenKind::KeywordPrint => self.parse_print_statement()?,
             TokenKind::LeftBrace => self.parse_block_statement(line)?,
             TokenKind::KeywordIf => self.parse_if_statement(line)?,
@@ -92,8 +93,41 @@ impl<'src> Parser<'src> {
         Ok(statement)
     }
 
+    fn parse_class_declaration(&mut self, line: u32) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordClass)?;
+        let place = self.expect_ident()?;
+        let _ = self.expect(TokenKind::LeftBrace)?;
+
+        let methods = if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
+            Vec::new()
+        } else {
+            let mut methods = Vec::new();
+            // Only allow 255 methods
+            for _ in 0..255 {
+                let function = self.parse_function(line)?;
+                methods.push(function);
+
+                if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
+                    break;
+                }
+            }
+            methods
+        };
+
+        Ok(Statement::Declaration(Declaration::Class {
+            name: place,
+            methods,
+        }))
+    }
+
     fn parse_function_declaration(&mut self, line: u32) -> Result<Statement, ParserError> {
         let _ = self.expect(TokenKind::KeywordFun)?;
+        let function = self.parse_function(line)?;
+
+        Ok(Statement::Declaration(Declaration::Function(function)))
+    }
+
+    fn parse_function(&mut self, line: u32) -> Result<Function, ParserError> {
         let name = self.expect_ident()?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
@@ -130,12 +164,11 @@ impl<'src> Parser<'src> {
                 }
             }
         };
-
-        Ok(Statement::Declaration(Declaration::Function(Function {
+        Ok(Function {
             name,
             parameters,
             body,
-        })))
+        })
     }
 }
 
