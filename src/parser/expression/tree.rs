@@ -135,6 +135,10 @@ impl Expression {
         }
     }
 
+    pub fn get_name(&self) -> Option<&str> {
+        self.inner.get_l_value(self.get_root_ref())
+    }
+
     pub fn get_root_ref(&self) -> ExpressionNodeRef {
         self.root
     }
@@ -146,6 +150,12 @@ impl Expression {
 
     pub fn get_node(&self, node: ExpressionNodeRef) -> Option<&ExpressionNode> {
         self.inner.get_node(node)
+    }
+
+    pub fn get_line_of_root(&self) -> u32 {
+        self.inner
+            .get_line(self.get_root_ref())
+            .expect("The root exists within the tree.")
     }
 
     pub fn get_line(&self, node: ExpressionNodeRef) -> Option<u32> {

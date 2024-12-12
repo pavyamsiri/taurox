@@ -2,6 +2,8 @@ pub mod environment;
 pub mod error;
 pub mod formatter;
 mod native;
+mod resolver;
+mod scope;
 mod tree;
 mod value;
 
