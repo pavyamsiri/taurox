@@ -135,6 +135,9 @@ impl TreeWalkStatementInterpreter {
                 increment.as_ref(),
                 body,
             )?,
+            NonDeclaration::Return { value } => {
+                self.interpret_return_statement(environment, value.as_ref())?
+            }
         };
         Ok(state)
     }
@@ -219,10 +222,29 @@ impl TreeWalkStatementInterpreter {
         body: &Statement,
     ) -> Result<ProgramState, RuntimeError> {
         while self.evaluate(condition, environment)?.is_truthy() {
-            self.interpret_statement(body, environment)?;
+            match self.interpret_statement(body, environment)? {
+                ProgramState::Run => {}
+                s => {
+                    return Ok(s);
+                }
+            }
         }
 
         Ok(ProgramState::Run)
+    }
+
+    fn interpret_return_statement(
+        &self,
+        environment: &mut Environment,
+        value: Option<&Expression>,
+    ) -> Result<ProgramState, RuntimeError> {
+        let value = if let Some(expr) = value {
+            self.evaluate(expr, environment)?
+        } else {
+            LoxValue::Nil
+        };
+
+        Ok(ProgramState::Return(value))
     }
 
     fn interpret_block_statement(
@@ -479,10 +501,20 @@ impl TreeWalkStatementInterpreter {
                     environment.declare(name, argument);
                 }
 
+                let mut result = LoxValue::Nil;
                 for statement in body {
-                    let _ = self.interpret_statement(&statement, environment)?;
+                    match self.interpret_statement(&statement, environment)? {
+                        ProgramState::Run => {}
+                        ProgramState::Return(v) => {
+                            result = v;
+                            break;
+                        }
+                        ProgramState::Terminate => {
+                            panic!("Terminating during function?");
+                        }
+                    }
                 }
-                LoxValue::Nil
+                result
             }
             v => {
                 return Err(RuntimeError {

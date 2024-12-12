@@ -50,4 +50,7 @@ pub enum NonDeclaration {
         increment: Option<Expression>,
         body: Box<NonDeclaration>,
     },
+    Return {
+        value: Option<Expression>,
+    },
 }

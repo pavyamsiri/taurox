@@ -14,6 +14,7 @@ use value::LoxValue;
 #[derive(Debug)]
 pub enum ProgramState {
     Run,
+    Return(LoxValue),
     Terminate,
 }
 

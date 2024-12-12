@@ -56,6 +56,7 @@ impl<'src> Parser<'src> {
             TokenKind::KeywordIf => self.parse_if_statement(line)?,
             TokenKind::KeywordWhile => self.parse_while_statement(line)?,
             TokenKind::KeywordFor => self.parse_for_statement(line)?,
+            TokenKind::KeywordReturn => self.parse_return_statement()?,
             TokenKind::Eof => {
                 return Ok(None);
             }
@@ -708,5 +709,19 @@ impl<'src> Parser<'src> {
             let _ = self.next_token().expect("Just peeked.");
             Ok(Some(next_token))
         }
+    }
+
+    fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
+        let _ = self.expect(TokenKind::KeywordReturn)?;
+
+        let value = if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
+            None
+        } else {
+            let value = Some(self.parse_expression()?);
+            let _ = self.expect(TokenKind::Semicolon)?;
+            value
+        };
+
+        Ok(Statement::NonDeclaration(NonDeclaration::Return { value }))
     }
 }

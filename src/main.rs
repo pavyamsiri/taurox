@@ -181,7 +181,7 @@ fn run(src: &str) -> std::result::Result<(), ProgramError> {
             .map_err(|e| ProgramError::RuntimeError(e))?;
         match state {
             ProgramState::Run => {}
-            ProgramState::Terminate => break,
+            ProgramState::Terminate | ProgramState::Return(_) => break,
         }
     }
 
