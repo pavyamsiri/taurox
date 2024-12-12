@@ -166,12 +166,12 @@ enum ProgramError {
 
 fn run(src: &str) -> std::result::Result<(), ProgramError> {
     use taurox::interpreter::ProgramState;
-    use taurox::interpreter::{Interpreter, TreeWalkInterpreter};
+    use taurox::interpreter::{Interpreter, TreeWalkInterpreter, TreeWalkStatementInterpreter};
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src);
     let program = parser.parse().map_err(|e| ProgramError::CompileError(e))?;
-    let mut interpreter = TreeWalkInterpreter::new(program);
+    let mut interpreter = TreeWalkInterpreter::<TreeWalkStatementInterpreter>::new(program);
     loop {
         let state = interpreter
             .step()
