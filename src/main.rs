@@ -117,7 +117,7 @@ fn tokenize(src: &str, format: &TokenFormat) -> bool {
     loop {
         match scanner.next_token() {
             Ok(token) => {
-                eprintln!("{}", formatter.format(&token));
+                println!("{}", formatter.format(&token));
                 if matches!(token.kind, TokenKind::Eof) {
                     return succeeded;
                 }
@@ -140,7 +140,7 @@ fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
         ExpressionFormat::SExpr => Box::new(SExpressionFormatter {}),
     };
     let expression = parser.parse_expression()?;
-    eprintln!("{}", formatter.format(&expression));
+    println!("{}", formatter.format(&expression));
     Ok(())
 }
 
@@ -157,7 +157,7 @@ fn evaluate(src: &str) -> Result<()> {
     let interpreter = TreeWalkStatementInterpreter;
     let result = interpreter.evaluate(&expression, &mut environment)?;
 
-    eprintln!("{}", result);
+    println!("{}", result);
 
     Ok(())
 }
