@@ -1,6 +1,6 @@
 use crate::parser::expression::{
-    BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom, ExpressionTreeAtomKind,
-    ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+    BinaryOperator, BinaryShortCircuitOperator, Expression, ExpressionAtom, ExpressionAtomKind,
+    ExpressionNode, ExpressionNodeRef, UnaryOperator,
 };
 
 use super::{
@@ -13,15 +13,15 @@ pub struct ExpressionEvaluator;
 
 impl ExpressionEvaluator {
     fn evaluate_expression_atom(
-        atom: &ExpressionTreeAtom,
+        atom: &ExpressionAtom,
         environment: &mut Environment,
     ) -> Result<LoxValue, RuntimeErrorKind> {
         let result = match &atom.kind {
-            ExpressionTreeAtomKind::Number(v) => LoxValue::Number(*v),
-            ExpressionTreeAtomKind::Bool(v) => LoxValue::Bool(*v),
-            ExpressionTreeAtomKind::Nil => LoxValue::Nil,
-            ExpressionTreeAtomKind::StringLiteral(ref v) => LoxValue::String(v.clone()),
-            ExpressionTreeAtomKind::Identifier(ref name) => environment
+            ExpressionAtomKind::Number(v) => LoxValue::Number(*v),
+            ExpressionAtomKind::Bool(v) => LoxValue::Bool(*v),
+            ExpressionAtomKind::Nil => LoxValue::Nil,
+            ExpressionAtomKind::StringLiteral(ref v) => LoxValue::String(v.clone()),
+            ExpressionAtomKind::Identifier(ref name) => environment
                 .access(name)
                 .ok_or(RuntimeErrorKind::InvalidAccess(name.clone()))?
                 .clone(),
@@ -30,8 +30,8 @@ impl ExpressionEvaluator {
     }
 
     fn evaluate_expression_node(
-        tree: &ExpressionTreeWithRoot,
-        node: &ExpressionTreeNodeRef,
+        tree: &Expression,
+        node: &ExpressionNodeRef,
         environment: &mut Environment,
     ) -> Result<LoxValue, RuntimeError> {
         let current_node = tree
@@ -42,22 +42,22 @@ impl ExpressionEvaluator {
             .expect("Node ref came from the tree so it must exist.");
 
         let result = match current_node {
-            ExpressionTreeNode::Atom(atom) => Self::evaluate_expression_atom(atom, environment)
+            ExpressionNode::Atom(atom) => Self::evaluate_expression_atom(atom, environment)
                 .map_err(|kind| RuntimeError { kind, line })?,
-            ExpressionTreeNode::Unary { operator, rhs } => {
+            ExpressionNode::Unary { operator, rhs } => {
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 Self::evaluate_unary(operator, &rhs).map_err(|kind| RuntimeError { kind, line })?
             }
-            ExpressionTreeNode::Group { inner } => {
+            ExpressionNode::Group { inner } => {
                 Self::evaluate_expression_node(tree, inner, environment)?
             }
-            ExpressionTreeNode::Binary { operator, lhs, rhs } => {
+            ExpressionNode::Binary { operator, lhs, rhs } => {
                 let lhs = Self::evaluate_expression_node(tree, lhs, environment)?;
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 Self::evaluate_binary(operator, &lhs, &rhs)
                     .map_err(|kind| RuntimeError { kind, line })?
             }
-            ExpressionTreeNode::BinaryAssignment { lhs, rhs } => {
+            ExpressionNode::BinaryAssignment { lhs, rhs } => {
                 let rhs = Self::evaluate_expression_node(tree, rhs, environment)?;
                 let _ = environment
                     .assign(lhs, rhs.clone())
@@ -67,10 +67,10 @@ impl ExpressionEvaluator {
                     })?;
                 rhs
             }
-            ExpressionTreeNode::BinaryShortCircuit { operator, lhs, rhs } => {
+            ExpressionNode::BinaryShortCircuit { operator, lhs, rhs } => {
                 Self::evaluate_binary_short_circuit(operator, lhs, rhs, tree, environment)?
             }
-            ExpressionTreeNode::Call { callee, arguments } => {
+            ExpressionNode::Call { callee, arguments } => {
                 let callee = Self::evaluate_expression_node(tree, callee, environment)?;
                 match callee {
                     LoxValue::NativeFunction(fun) => {
@@ -142,7 +142,7 @@ impl ExpressionEvaluator {
     }
 
     pub fn evaluate_expression(
-        tree: &ExpressionTreeWithRoot,
+        tree: &Expression,
         environment: &mut Environment,
     ) -> Result<LoxValue, RuntimeError> {
         Self::evaluate_expression_node(tree, &tree.get_root_ref(), environment)
@@ -179,9 +179,9 @@ impl ExpressionEvaluator {
 
     fn evaluate_binary_short_circuit(
         operator: &BinaryShortCircuitOperator,
-        lhs: &ExpressionTreeNodeRef,
-        rhs: &ExpressionTreeNodeRef,
-        tree: &ExpressionTreeWithRoot,
+        lhs: &ExpressionNodeRef,
+        rhs: &ExpressionNodeRef,
+        tree: &Expression,
         environment: &mut Environment,
     ) -> Result<LoxValue, RuntimeError> {
         let lhs = { Self::evaluate_expression_node(tree, lhs, environment)? };

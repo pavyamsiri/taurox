@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 
-use super::expression::ExpressionTreeWithRoot;
+use super::expression::Expression;
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -12,7 +12,7 @@ pub enum Statement {
 pub enum Declaration {
     Variable {
         name: CompactString,
-        initial: Option<ExpressionTreeWithRoot>,
+        initial: Option<Expression>,
     },
     Function {
         name: CompactString,
@@ -25,29 +25,29 @@ pub enum Declaration {
 pub enum Initializer {
     VarDecl {
         name: CompactString,
-        initial: Option<ExpressionTreeWithRoot>,
+        initial: Option<Expression>,
     },
-    Expression(ExpressionTreeWithRoot),
+    Expression(Expression),
 }
 
 #[derive(Debug, Clone)]
 pub enum NonDeclaration {
-    Expression(ExpressionTreeWithRoot),
-    Print(ExpressionTreeWithRoot),
+    Expression(Expression),
+    Print(Expression),
     Block(Vec<Statement>),
     If {
-        condition: ExpressionTreeWithRoot,
+        condition: Expression,
         success: Box<Statement>,
         failure: Box<Option<Statement>>,
     },
     While {
-        condition: ExpressionTreeWithRoot,
+        condition: Expression,
         body: Box<Statement>,
     },
     For {
         initializer: Option<Initializer>,
-        condition: Option<ExpressionTreeWithRoot>,
-        increment: Option<ExpressionTreeWithRoot>,
+        condition: Option<Expression>,
+        increment: Option<Expression>,
         body: Box<NonDeclaration>,
     },
 }

@@ -6,7 +6,7 @@ mod native;
 mod value;
 
 use crate::{
-    parser::expression::ExpressionTreeWithRoot,
+    parser::expression::Expression,
     parser::statement::{Declaration, Initializer, NonDeclaration, Statement},
     parser::Program,
 };
@@ -109,7 +109,7 @@ impl TreeWalkInterpreter {
     fn interpret_variable_declaration(
         environment: &mut Environment,
         name: &str,
-        initial: Option<&ExpressionTreeWithRoot>,
+        initial: Option<&Expression>,
     ) -> Result<ProgramState, RuntimeError> {
         let initial = if let Some(expr) = initial {
             ExpressionEvaluator::evaluate_expression(expr, environment)?
@@ -135,7 +135,7 @@ impl TreeWalkInterpreter {
 
     fn interpret_print_statement(
         environment: &mut Environment,
-        expr: &ExpressionTreeWithRoot,
+        expr: &Expression,
     ) -> Result<ProgramState, RuntimeError> {
         let result = ExpressionEvaluator::evaluate_expression(expr, environment)?;
         println!("{result}");
@@ -144,7 +144,7 @@ impl TreeWalkInterpreter {
 
     fn interpret_expression_statement(
         environment: &mut Environment,
-        expr: &ExpressionTreeWithRoot,
+        expr: &Expression,
     ) -> Result<ProgramState, RuntimeError> {
         let _ = ExpressionEvaluator::evaluate_expression(expr, environment)?;
         Ok(ProgramState::Run)
@@ -152,7 +152,7 @@ impl TreeWalkInterpreter {
 
     fn interpret_if_statement(
         environment: &mut Environment,
-        condition: &ExpressionTreeWithRoot,
+        condition: &Expression,
         success: &Statement,
         failure: Option<&Statement>,
     ) -> Result<ProgramState, RuntimeError> {
@@ -168,7 +168,7 @@ impl TreeWalkInterpreter {
 
     fn interpret_while_statement(
         environment: &mut Environment,
-        condition: &ExpressionTreeWithRoot,
+        condition: &Expression,
         body: &Statement,
     ) -> Result<ProgramState, RuntimeError> {
         while ExpressionEvaluator::evaluate_expression(condition, environment)?.is_truthy() {
@@ -194,8 +194,8 @@ impl TreeWalkInterpreter {
     fn interpret_for_statement(
         environment: &mut Environment,
         initializer: Option<&Initializer>,
-        condition: Option<&ExpressionTreeWithRoot>,
-        increment: Option<&ExpressionTreeWithRoot>,
+        condition: Option<&Expression>,
+        increment: Option<&Expression>,
         body: &NonDeclaration,
     ) -> Result<ProgramState, RuntimeError> {
         // Run the initializer

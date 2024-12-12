@@ -8,9 +8,9 @@ use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
 use error::ParserErrorKind;
 use expression::{
-    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, ExpressionTree,
-    ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode, ExpressionTreeNodeRef,
-    ExpressionTreeWithRoot, PostfixOperator, UnaryOperator,
+    BinaryAssignmentOperator, BinaryOperator, BinaryShortCircuitOperator, Expression,
+    ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef, IncompleteExpression,
+    PostfixOperator, UnaryOperator,
 };
 use statement::{Declaration, Initializer, NonDeclaration, Statement};
 
@@ -110,11 +110,11 @@ impl<'src> Parser<'src> {
 
 // Pratt parser for expressions
 impl<'src> Parser<'src> {
-    pub fn parse_expression(&mut self) -> Result<ExpressionTreeWithRoot, ParserError> {
-        let mut tree = ExpressionTree::new();
+    pub fn parse_expression(&mut self) -> Result<Expression, ParserError> {
+        let mut tree = IncompleteExpression::new();
         let res = self.parse_expression_pratt(0, &mut tree)?;
 
-        Ok(ExpressionTreeWithRoot::new(tree, res)
+        Ok(Expression::new(tree, res)
             .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
@@ -169,8 +169,8 @@ impl<'src> Parser<'src> {
 
     fn expect_left_expression(
         &mut self,
-        tree: &mut ExpressionTree,
-    ) -> Result<ExpressionTreeNodeRef, ParserError> {
+        tree: &mut IncompleteExpression,
+    ) -> Result<ExpressionNodeRef, ParserError> {
         let token = self.next_token()?;
 
         if matches!(token.kind, TokenKind::Eof) {
@@ -187,8 +187,8 @@ impl<'src> Parser<'src> {
 
         let node = match token.kind {
             TokenKind::NumericLiteral => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                    kind: ExpressionTreeAtomKind::Number(
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::Number(
                         lexeme
                             .parse()
                             .expect("Numeric literal tokens are valid `f64`"),
@@ -198,8 +198,8 @@ impl<'src> Parser<'src> {
                 tree.push(node)
             }
             TokenKind::Ident => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                    kind: ExpressionTreeAtomKind::Identifier(lexeme.into()),
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::Identifier(lexeme.into()),
                     line: token.line,
                 });
                 tree.push(node)
@@ -208,29 +208,29 @@ impl<'src> Parser<'src> {
                 let value = lexeme
                     .get(1..lexeme.len() - 1)
                     .expect("String literal tokens are at least length 2.");
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                    kind: ExpressionTreeAtomKind::StringLiteral(value.into()),
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::StringLiteral(value.into()),
                     line: token.line,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordNil => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                    kind: ExpressionTreeAtomKind::Nil,
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::Nil,
                     line: token.line,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordTrue => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                    kind: ExpressionTreeAtomKind::Bool(true),
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::Bool(true),
                     line: token.line,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordFalse => {
-                let node = ExpressionTreeNode::Atom(ExpressionTreeAtom {
-                    kind: ExpressionTreeAtomKind::Bool(false),
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::Bool(false),
                     line: token.line,
                 });
                 tree.push(node)
@@ -240,19 +240,19 @@ impl<'src> Parser<'src> {
                 let operator = UnaryOperator::Minus;
                 let rbp = operator.get_binding_power();
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                tree.push(ExpressionTreeNode::Unary { operator, rhs })
+                tree.push(ExpressionNode::Unary { operator, rhs })
             }
             TokenKind::Bang => {
                 let operator = UnaryOperator::Bang;
                 let rbp = operator.get_binding_power();
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                tree.push(ExpressionTreeNode::Unary { operator, rhs })
+                tree.push(ExpressionNode::Unary { operator, rhs })
             }
             // Bracketed expression
             TokenKind::LeftParenthesis => {
                 let inner = self.parse_expression_pratt(0, tree)?;
                 self.expect(TokenKind::RightParenthesis)?;
-                tree.push(ExpressionTreeNode::Group { inner })
+                tree.push(ExpressionNode::Group { inner })
             }
             kind => {
                 return Err(ParserError {
@@ -267,8 +267,8 @@ impl<'src> Parser<'src> {
     fn parse_expression_pratt(
         &mut self,
         min_bp: u8,
-        tree: &mut ExpressionTree,
-    ) -> Result<ExpressionTreeNodeRef, ParserError> {
+        tree: &mut IncompleteExpression,
+    ) -> Result<ExpressionNodeRef, ParserError> {
         let mut lhs = self.expect_left_expression(tree)?;
 
         loop {
@@ -287,7 +287,7 @@ impl<'src> Parser<'src> {
 
                         // Hit the end of the argument list right away
                         if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-                            lhs = tree.push(ExpressionTreeNode::Call {
+                            lhs = tree.push(ExpressionNode::Call {
                                 callee: lhs,
                                 arguments: Vec::new(),
                             })
@@ -306,7 +306,7 @@ impl<'src> Parser<'src> {
 
                                 let _ = self.expect(TokenKind::Comma)?;
                             }
-                            lhs = tree.push(ExpressionTreeNode::Call {
+                            lhs = tree.push(ExpressionNode::Call {
                                 callee: lhs,
                                 arguments,
                             })
@@ -337,7 +337,7 @@ impl<'src> Parser<'src> {
                 let _ = self.next_token()?;
 
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                lhs = tree.push(ExpressionTreeNode::BinaryAssignment { lhs: place, rhs });
+                lhs = tree.push(ExpressionNode::BinaryAssignment { lhs: place, rhs });
                 continue;
             }
 
@@ -349,7 +349,7 @@ impl<'src> Parser<'src> {
                 let _ = self.next_token()?;
 
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                lhs = tree.push(ExpressionTreeNode::BinaryShortCircuit { operator, lhs, rhs });
+                lhs = tree.push(ExpressionNode::BinaryShortCircuit { operator, lhs, rhs });
                 continue;
             }
 
@@ -361,7 +361,7 @@ impl<'src> Parser<'src> {
                 let _ = self.next_token()?;
 
                 let rhs = self.parse_expression_pratt(rbp, tree)?;
-                lhs = tree.push(ExpressionTreeNode::Binary { operator, lhs, rhs });
+                lhs = tree.push(ExpressionNode::Binary { operator, lhs, rhs });
                 continue;
             }
             break;
@@ -572,7 +572,7 @@ impl<'src> Parser<'src> {
         };
 
         // Parse condition
-        let condition: Option<ExpressionTreeWithRoot> = {
+        let condition: Option<Expression> = {
             if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
                 None
             }
@@ -585,7 +585,7 @@ impl<'src> Parser<'src> {
         };
 
         // Parse increment
-        let increment: Option<ExpressionTreeWithRoot> = {
+        let increment: Option<Expression> = {
             if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
                 None
             }

@@ -1,19 +1,19 @@
 use crate::parser::{ParserError, ParserErrorKind};
 
 use super::expression::{
-    BinaryOperator, BinaryShortCircuitOperator, ExpressionTreeAtom, ExpressionTreeAtomKind,
-    ExpressionTreeNode, ExpressionTreeNodeRef, ExpressionTreeWithRoot, UnaryOperator,
+    BinaryOperator, BinaryShortCircuitOperator, Expression, ExpressionAtom, ExpressionAtomKind,
+    ExpressionNode, ExpressionNodeRef, UnaryOperator,
 };
 
 pub trait ExpressionFormatter {
-    fn format(&self, tree: &ExpressionTreeWithRoot) -> String;
+    fn format(&self, tree: &Expression) -> String;
     fn format_error(&self, error: &ParserError) -> String;
 }
 
 pub struct DebugFormatter;
 
 impl ExpressionFormatter for DebugFormatter {
-    fn format(&self, tree: &ExpressionTreeWithRoot) -> String {
+    fn format(&self, tree: &Expression) -> String {
         format!("{tree:?}")
     }
 
@@ -25,29 +25,29 @@ impl ExpressionFormatter for DebugFormatter {
 pub struct SExpressionFormatter;
 
 impl SExpressionFormatter {
-    fn format_atom(atom: &ExpressionTreeAtom) -> String {
+    fn format_atom(atom: &ExpressionAtom) -> String {
         match atom.kind {
-            ExpressionTreeAtomKind::Number(v) => format!("{v:?}"),
-            ExpressionTreeAtomKind::Bool(v) => format!("{v}"),
-            ExpressionTreeAtomKind::Nil => "nil".into(),
-            ExpressionTreeAtomKind::Identifier(ref name) => format!("{name}"),
-            ExpressionTreeAtomKind::StringLiteral(ref v) => format!("{v}"),
+            ExpressionAtomKind::Number(v) => format!("{v:?}"),
+            ExpressionAtomKind::Bool(v) => format!("{v}"),
+            ExpressionAtomKind::Nil => "nil".into(),
+            ExpressionAtomKind::Identifier(ref name) => format!("{name}"),
+            ExpressionAtomKind::StringLiteral(ref v) => format!("{v}"),
         }
     }
 
-    fn format_node(tree: &ExpressionTreeWithRoot, node: &ExpressionTreeNodeRef) -> String {
+    fn format_node(tree: &Expression, node: &ExpressionNodeRef) -> String {
         let current_node = &tree.nodes[node.0 as usize];
 
         match current_node {
-            ExpressionTreeNode::Atom(atom) => Self::format_atom(atom),
-            ExpressionTreeNode::Unary { operator, rhs } => {
+            ExpressionNode::Atom(atom) => Self::format_atom(atom),
+            ExpressionNode::Unary { operator, rhs } => {
                 format!(
                     "({} {})",
                     SExpressionFormatter::format_unary_operator(operator),
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
-            ExpressionTreeNode::Binary { operator, lhs, rhs } => {
+            ExpressionNode::Binary { operator, lhs, rhs } => {
                 format!(
                     "({} {} {})",
                     SExpressionFormatter::format_binary_operator(operator),
@@ -55,13 +55,13 @@ impl SExpressionFormatter {
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
-            ExpressionTreeNode::BinaryAssignment { lhs, rhs } => {
+            ExpressionNode::BinaryAssignment { lhs, rhs } => {
                 format!(
                     "(= {lhs} {})",
                     SExpressionFormatter::format_node(tree, &rhs)
                 )
             }
-            ExpressionTreeNode::BinaryShortCircuit { operator, lhs, rhs } => {
+            ExpressionNode::BinaryShortCircuit { operator, lhs, rhs } => {
                 format!(
                     "({} {} {})",
                     SExpressionFormatter::format_binary_short_circuit_operator(operator),
@@ -69,13 +69,13 @@ impl SExpressionFormatter {
                     SExpressionFormatter::format_node(tree, &rhs),
                 )
             }
-            ExpressionTreeNode::Group { inner } => {
+            ExpressionNode::Group { inner } => {
                 format!(
                     "(group {})",
                     SExpressionFormatter::format_node(tree, &inner)
                 )
             }
-            ExpressionTreeNode::Call { callee, arguments } => {
+            ExpressionNode::Call { callee, arguments } => {
                 let mut buffer =
                     format!("(call {}", SExpressionFormatter::format_node(tree, callee));
 
@@ -125,7 +125,7 @@ impl SExpressionFormatter {
 }
 
 impl ExpressionFormatter for SExpressionFormatter {
-    fn format(&self, tree: &ExpressionTreeWithRoot) -> String {
+    fn format(&self, tree: &Expression) -> String {
         SExpressionFormatter::format_node(tree, &tree.root)
     }
 

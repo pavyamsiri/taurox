@@ -6,6 +6,6 @@ pub use operator::{
     UnaryOperator,
 };
 pub use tree::{
-    ExpressionTree, ExpressionTreeAtom, ExpressionTreeAtomKind, ExpressionTreeNode,
-    ExpressionTreeNodeRef, ExpressionTreeWithRoot,
+    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+    IncompleteExpression,
 };
