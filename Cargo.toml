@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ariadne = "0.5.0"
 clap = { version = "4.5.23", features = ["derive"] }
 color-eyre = "0.6.3"
 compact_str = "0.8.0"
-owo-colors = "4.1.0"
 proptest = "1.6.0"
 thiserror = "2.0.4"

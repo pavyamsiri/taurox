@@ -1,11 +1,10 @@
+use ariadne::Fmt;
+
 use super::{
     token::{Token, TokenKind},
     LineBreaks,
 };
 use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
-use owo_colors::colors::*;
-use owo_colors::OwoColorize;
-use std::ops::Range;
 
 /// Interface for creating new token formatters.
 pub trait TokenFormatter {
@@ -289,49 +288,27 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
     fn format_lexical_error(&self, error: &LexicalError) -> String {
         let line = self.line_breaks.get_line_from_span(error.span);
         match error.kind {
-            LexicalErrorKind::Unrecognized(_) => {
-                let width = self.line_breaks.get_max_line().ilog10() as usize;
-                let ((start_span, start_line), (end_span, _)) =
-                    self.line_breaks.get_line_range_from_span(error.span);
+            LexicalErrorKind::Unrecognized(c) => {
+                use ariadne::{Color, Label, Report, ReportKind, Source};
 
-                let prelude_range = start_line.saturating_sub(4)..start_line.saturating_sub(1);
-
-                let spans = self.line_breaks.get_ranges(Range {
-                    start: prelude_range.start as usize,
-                    end: prelude_range.end as usize,
-                });
-
-                let mut buffer = String::new();
-
-                for (span, line_number) in spans.iter().zip(prelude_range) {
-                    let span = Range {
-                        start: span.start.to_usize(),
-                        end: span.end.to_usize(),
-                    };
-                    let line_content = &self.text[span];
-                    buffer.push_str(&format!(
-                        "{:width$} {}{}",
-                        (line_number + 1).fg::<BrightBlue>(),
-                        "|".fg::<BrightBlue>(),
-                        line_content,
-                    ));
-                }
-
-                let length = error.span.length.to_usize();
-                let start = &self.text[start_span];
-                let e = &self.text[error.span.range()];
-                let end = &self.text[end_span];
-                buffer.push_str(&format!(
-                    "{:width$} {}{start}{}{end}{}{}{}{}",
-                    line.fg::<BrightBlue>(),
-                    "|".fg::<BrightBlue>(),
-                    e.fg::<BrightMagenta>(),
-                    " ".repeat(width + 2),
-                    "|".fg::<BrightBlue>(),
-                    " ".repeat(start.len()),
-                    "^".repeat(length).fg::<BrightYellow>(),
-                ));
-                buffer
+                let mut output = std::io::Cursor::new(Vec::new());
+                Report::build(ReportKind::Error, ("test.lox", error.span.range()))
+                    .with_code(3)
+                    .with_message("Unrecognized character")
+                    .with_label(
+                        Label::new(("test.lox", error.span.range()))
+                            .with_message(format!(
+                                "Unrecognized character {}",
+                                c.fg(Color::BrightRed)
+                            ))
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write(("test.lox", Source::from(self.text)), &mut output)
+                    .expect("Write into buffer should not fail.");
+                let output = String::from_utf8(output.into_inner())
+                    .expect("Ariadne produces valid utf-8 strings.");
+                output
             }
             LexicalErrorKind::UnclosedString => {
                 format!("({}) ERROR UNTERMINATED_STRING null", line)
