@@ -1,6 +1,6 @@
-VAR var null
-IDENTIFIER language null
-EQUAL = null
-STRING "lox" lox
-SEMICOLON ; null
-EOF  null
+(1) VAR var null
+(1) IDENTIFIER language null
+(1) EQUAL = null
+(1) STRING "lox" lox
+(1) SEMICOLON ; null
+(2) EOF  null

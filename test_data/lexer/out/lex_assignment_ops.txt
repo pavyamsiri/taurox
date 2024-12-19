@@ -1,14 +1,14 @@
-EQUAL = null
-LEFT_BRACE { null
-EQUAL_EQUAL == null
-EQUAL = null
-RIGHT_BRACE } null
-LEFT_PAREN ( null
-LEFT_BRACE { null
-EQUAL = null
-RIGHT_BRACE } null
-RIGHT_PAREN ) null
-LEFT_BRACE { null
-EQUAL_EQUAL == null
-RIGHT_BRACE } null
-EOF  null
+(1) EQUAL = null
+(1) LEFT_BRACE { null
+(1) EQUAL_EQUAL == null
+(1) EQUAL = null
+(1) RIGHT_BRACE } null
+(1) LEFT_PAREN ( null
+(1) LEFT_BRACE { null
+(1) EQUAL = null
+(1) RIGHT_BRACE } null
+(1) RIGHT_PAREN ) null
+(1) LEFT_BRACE { null
+(1) EQUAL_EQUAL == null
+(1) RIGHT_BRACE } null
+(2) EOF  null

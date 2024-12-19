@@ -1,4 +1,4 @@
-IDENTIFIER foo null
-IDENTIFIER bar null
-IDENTIFIER _hello null
-EOF  null
+(1) IDENTIFIER foo null
+(1) IDENTIFIER bar null
+(1) IDENTIFIER _hello null
+(2) EOF  null

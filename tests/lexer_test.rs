@@ -6,13 +6,13 @@ use std::{
 };
 
 use taurox::lexer::{
-    formatter::{BasicFormatter, ToFormatter, TokenFormatter},
+    formatter::{LineFormatter, ToFormatter, TokenFormatter},
     Lexer, Token, TokenKind,
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut scanner = Lexer::new(input);
-    let formatter: BasicFormatter = scanner.create_formatter();
+    let formatter: LineFormatter = scanner.create_formatter();
     let mut buffer = String::new();
     loop {
         match scanner.next_token() {
@@ -34,7 +34,7 @@ fn check(input: &str, expected: &str, test_name: &str) {
 
 #[test]
 fn smoke_test() {
-    check("", "EOF  null", "smoke");
+    check("", "(1) EOF  null", "smoke");
 }
 
 #[test]

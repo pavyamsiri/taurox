@@ -1,6 +1,6 @@
-COMMA , null
-DOT . null
-[line 1] Error: Unexpected character: $
-LEFT_PAREN ( null
-[line 1] Error: Unexpected character: #
-EOF  null
+(1) COMMA , null
+(1) DOT . null
+(1) ERROR UNEXPECTED_CHAR $
+(1) LEFT_PAREN ( null
+(1) ERROR UNEXPECTED_CHAR #
+(2) EOF  null

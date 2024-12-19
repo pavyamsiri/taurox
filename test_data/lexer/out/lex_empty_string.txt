@@ -1,2 +1,2 @@
-STRING "" 
-EOF  null
+(1) STRING "" 
+(2) EOF  null

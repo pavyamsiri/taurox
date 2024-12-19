@@ -1,5 +1,5 @@
-LEFT_BRACE { null
-LEFT_BRACE { null
-RIGHT_BRACE } null
-RIGHT_BRACE } null
-EOF  null
+(1) LEFT_BRACE { null
+(1) LEFT_BRACE { null
+(1) RIGHT_BRACE } null
+(1) RIGHT_BRACE } null
+(2) EOF  null

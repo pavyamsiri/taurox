@@ -214,10 +214,10 @@ impl<'src> TokenFormatter for LineFormatter<'src> {
         let line = self.get_line(error.span.start);
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
-                format!("[line {}] Error: Unexpected character: {c}", line)
+                format!("({}) ERROR UNEXPECTED_CHAR {c}", line)
             }
             LexicalErrorKind::UnclosedString => {
-                format!("[line {}] Error: Unterminated string.", line)
+                format!("({}) ERROR UNTERMINATED_STRING null", line)
             }
         }
     }

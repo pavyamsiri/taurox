@@ -1,2 +1,2 @@
-VAR var null
-EOF  null
+(1) VAR var null
+(1) EOF  null

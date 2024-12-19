@@ -1,2 +1,2 @@
-NUMBER 123 123.0
-EOF  null
+(1) NUMBER 123 123.0
+(1) EOF  null

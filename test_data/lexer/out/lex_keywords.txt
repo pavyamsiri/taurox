@@ -1,17 +1,17 @@
-AND and null
-CLASS class null
-ELSE else null
-FALSE false null
-FOR for null
-FUN fun null
-IF if null
-NIL nil null
-OR or null
-PRINT print null
-RETURN return null
-SUPER super null
-THIS this null
-TRUE true null
-VAR var null
-WHILE while null
-EOF  null
+(1) AND and null
+(2) CLASS class null
+(3) ELSE else null
+(4) FALSE false null
+(5) FOR for null
+(6) FUN fun null
+(7) IF if null
+(8) NIL nil null
+(9) OR or null
+(10) PRINT print null
+(11) RETURN return null
+(12) SUPER super null
+(13) THIS this null
+(14) TRUE true null
+(15) VAR var null
+(16) WHILE while null
+(17) EOF  null

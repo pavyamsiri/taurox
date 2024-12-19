@@ -1,4 +1,4 @@
-SLASH / null
-LEFT_PAREN ( null
-RIGHT_PAREN ) null
-EOF  null
+(1) SLASH / null
+(1) LEFT_PAREN ( null
+(1) RIGHT_PAREN ) null
+(2) EOF  null

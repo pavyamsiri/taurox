@@ -1,11 +1,11 @@
-NUMBER 42 42.0
-SEMICOLON ; null
-NUMBER 32.123 32.123
-SEMICOLON ; null
-NUMBER 1.0 1.0
-SLASH / null
-NUMBER 5 5.0
-DOT . null
-PLUS + null
-NUMBER 333 333.0
-EOF  null
+(1) NUMBER 42 42.0
+(1) SEMICOLON ; null
+(1) NUMBER 32.123 32.123
+(1) SEMICOLON ; null
+(1) NUMBER 1.0 1.0
+(1) SLASH / null
+(1) NUMBER 5 5.0
+(1) DOT . null
+(1) PLUS + null
+(1) NUMBER 333 333.0
+(2) EOF  null

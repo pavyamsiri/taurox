@@ -1,2 +1,2 @@
-STRING "foo baz" foo baz
-EOF  null
+(1) STRING "foo baz" foo baz
+(2) EOF  null

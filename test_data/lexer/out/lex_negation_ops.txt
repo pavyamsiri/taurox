@@ -1,4 +1,4 @@
-BANG ! null
-BANG_EQUAL != null
-EQUAL_EQUAL == null
-EOF  null
+(1) BANG ! null
+(1) BANG_EQUAL != null
+(1) EQUAL_EQUAL == null
+(2) EOF  null

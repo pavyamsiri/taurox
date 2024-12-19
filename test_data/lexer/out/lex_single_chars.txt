@@ -1,10 +1,10 @@
-LEFT_PAREN ( null
-LEFT_BRACE { null
-STAR * null
-DOT . null
-COMMA , null
-PLUS + null
-STAR * null
-RIGHT_BRACE } null
-RIGHT_PAREN ) null
-EOF  null
+(1) LEFT_PAREN ( null
+(1) LEFT_BRACE { null
+(1) STAR * null
+(1) DOT . null
+(1) COMMA , null
+(1) PLUS + null
+(1) STAR * null
+(1) RIGHT_BRACE } null
+(1) RIGHT_PAREN ) null
+(2) EOF  null
