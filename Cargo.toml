@@ -7,4 +7,5 @@ edition = "2021"
 clap = { version = "4.5.23", features = ["derive"] }
 color-eyre = "0.6.3"
 compact_str = "0.8.0"
+proptest = "1.6.0"
 thiserror = "2.0.4"

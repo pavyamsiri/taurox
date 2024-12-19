@@ -1,15 +1,13 @@
 use color_eyre::eyre::{Context, Result};
+use proptest::prelude::*;
 use std::{
     fs::{read_dir, read_to_string},
     path::Path,
 };
 
-use taurox::{
-    lexer::Lexer,
-    lexer::{
-        formatter::{BasicFormatter, ToFormatter, TokenFormatter},
-        TokenKind,
-    },
+use taurox::lexer::{
+    formatter::{BasicFormatter, ToFormatter, TokenFormatter},
+    Lexer, Token, TokenKind,
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
@@ -83,4 +81,105 @@ fn test_all() -> Result<()> {
     }
 
     Ok(())
+}
+
+// Property-based tests
+
+fn symbol_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("(".to_string()),
+        Just("}".to_string()),
+        Just("{".to_string()),
+        Just("}".to_string()),
+        Just(",".to_string()),
+        Just(".".to_string()),
+        Just("-".to_string()),
+        Just("+".to_string()),
+        Just(";".to_string()),
+        Just("*".to_string()),
+        Just("!".to_string()),
+        Just("!=".to_string()),
+        Just("=".to_string()),
+        Just("==".to_string()),
+        Just("<".to_string()),
+        Just("<=".to_string()),
+        Just(">".to_string()),
+        Just(">=".to_string()),
+        Just("/".to_string()),
+    ]
+}
+
+fn numeric_literal_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        any::<i64>().prop_map(|n| n.to_string()), // Integer literals
+        any::<f64>().prop_map(|n| n.to_string()), // Float literals
+    ]
+}
+
+fn string_literal_strategy() -> impl Strategy<Value = String> {
+    "[^\"]*".prop_map(|s: String| format!("\"{}\"", s))
+}
+
+fn identifier_strategy() -> impl Strategy<Value = String> {
+    "[a-zA-Z][a-zA-Z0-9_]*".prop_map(|s: String| s)
+}
+
+fn keyword_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("and".to_string()),
+        Just("class".to_string()),
+        Just("else".to_string()),
+        Just("false".to_string()),
+        Just("for".to_string()),
+        Just("fun".to_string()),
+        Just("if".to_string()),
+        Just("nil".to_string()),
+        Just("or".to_string()),
+        Just("print".to_string()),
+        Just("return".to_string()),
+        Just("super".to_string()),
+        Just("this".to_string()),
+        Just("true".to_string()),
+        Just("var".to_string()),
+        Just("while".to_string()),
+    ]
+}
+
+fn comment_strategy() -> impl Strategy<Value = String> {
+    "[^\n]*".prop_map(|s: String| format!("//{}\n", s))
+}
+
+fn token_string_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        symbol_strategy(),
+        numeric_literal_strategy(),
+        string_literal_strategy(),
+        identifier_strategy(),
+        keyword_strategy(),
+        comment_strategy(),
+    ]
+}
+
+fn token_sequence_strategy() -> impl Strategy<Value = String> {
+    const MIN_TOKEN_COUNT: usize = 1;
+    const MAX_TOKEN_COUNT: usize = 100;
+    prop::collection::vec(token_string_strategy(), MIN_TOKEN_COUNT..MAX_TOKEN_COUNT)
+        .prop_map(|tokens| tokens.join(" "))
+}
+
+proptest! {
+    #[test]
+    fn lexer_handles_valid_tokens_with_comments(input in token_sequence_strategy()) {
+        let mut scanner = Lexer::new(&input);
+        loop {
+            match scanner.next_token() {
+                Ok(Token {kind: TokenKind::Eof, ..}) => {
+                    break;
+                },
+                token => {
+                    prop_assert!(token.is_ok());
+                }
+            }
+        }
+    }
 }
