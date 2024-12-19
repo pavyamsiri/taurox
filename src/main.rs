@@ -123,7 +123,7 @@ fn tokenize(src: &str, format: &TokenFormat) -> bool {
     loop {
         match scanner.next_token() {
             Ok(token) => {
-                println!("{}", formatter.format(&token));
+                // println!("{}", formatter.format(&token));
                 if matches!(token.kind, TokenKind::Eof) {
                     return succeeded;
                 }

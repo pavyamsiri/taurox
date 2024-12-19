@@ -23,10 +23,10 @@ impl LineBreaks {
             let mut line_breaks = Vec::new();
             let mut cursor: SpanIndex = 0.into();
             for (offset, byte) in text.bytes().enumerate() {
-                let offset = offset.into();
+                let offset = (offset + 1).into();
                 if byte == b'\n' {
                     line_breaks.push(cursor..offset);
-                    cursor = offset + 1;
+                    cursor = offset;
                 }
             }
             if !text.ends_with("\n") {
@@ -91,9 +91,7 @@ impl LineBreaks {
 
         // Fix up last range to not include EOF
         let end_range = if end_range.end >= self.max_offset {
-            let new_range = end_range.start..self.max_offset;
-            eprintln!("FIX UP {end_range:?} to {new_range:?}");
-            new_range
+            end_range.start..self.max_offset
         } else {
             end_range
         };

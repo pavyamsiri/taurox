@@ -294,7 +294,7 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
                 let length = error.span.length.to_usize();
                 let start = &self.text[start_span];
                 let e = &self.text[error.span.range()];
-                let end = &self.text[end_span];
+                let end = &self.text[end_span].trim_end();
                 format!(
                     "{:width$} {}    {start}{}{end}\n{}{}{}{}",
                     line.fg::<BrightBlue>(),
