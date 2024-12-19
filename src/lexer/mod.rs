@@ -7,9 +7,11 @@ mod token;
 use cursor::SourceChar;
 pub use error::{LexicalError, LexicalErrorKind};
 use state::{LexerState, LexerStateTransition};
-use std::{ops::Range, str::Chars};
+use std::{ops::Range, rc::Rc, str::Chars};
 use token::{Span, SpanIndex};
 pub use token::{Token, TokenKind};
+
+type LineBreaks = Rc<[Range<SpanIndex>]>;
 
 #[derive(Debug)]
 enum LookAhead {
@@ -25,7 +27,7 @@ pub struct Lexer<'src> {
     state: LexerState,
     offset: SpanIndex,
     lookahead: LookAhead,
-    line_breaks: Vec<Range<SpanIndex>>,
+    line_breaks: LineBreaks,
     line: u32,
 }
 
@@ -38,12 +40,16 @@ impl<'src> Lexer<'src> {
             lookahead: LookAhead::None,
             offset: 0.into(),
             line: 1,
-            line_breaks: Self::determine_line_breaks(source),
+            line_breaks: Self::determine_line_breaks(source).into(),
         }
     }
 
     pub fn get_source(&self) -> &'src str {
         self.source
+    }
+
+    pub fn get_line_breaks(&self) -> LineBreaks {
+        self.line_breaks.clone()
     }
 
     pub fn get_lexeme(&self, span: &Span) -> Option<&'src str> {
@@ -67,7 +73,7 @@ impl<'src> Lexer<'src> {
         line_breaks
     }
 
-    pub fn get_line(&self, offset: SpanIndex) -> Option<u32> {
+    pub fn get_line(&self, offset: SpanIndex) -> u32 {
         self.line_breaks
             .binary_search_by(|r| {
                 if offset < r.start {
@@ -78,12 +84,8 @@ impl<'src> Lexer<'src> {
                     std::cmp::Ordering::Equal
                 }
             })
-            .map(|v| (v + 1) as u32)
-            .ok()
-    }
-
-    pub fn get_line_breaks(&self) -> &[Range<SpanIndex>] {
-        return &self.line_breaks;
+            .map(|v| (v + 1))
+            .unwrap_or(self.line_breaks.len() + 1) as u32
     }
 }
 
