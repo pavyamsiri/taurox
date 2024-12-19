@@ -26,7 +26,6 @@ pub struct Lexer<'src> {
     offset: SpanIndex,
     lookahead: LookAhead,
     line_breaks: Vec<Range<SpanIndex>>,
-    start_line: SpanIndex,
     line: u32,
 }
 
@@ -39,8 +38,7 @@ impl<'src> Lexer<'src> {
             lookahead: LookAhead::None,
             offset: 0.into(),
             line: 1,
-            start_line: 0.into(),
-            line_breaks: Vec::new(),
+            line_breaks: Self::determine_line_breaks(source),
         }
     }
 
@@ -56,18 +54,32 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    pub fn get_line(&self, offset: SpanIndex) -> u32 {
+    fn determine_line_breaks(text: &str) -> Vec<Range<SpanIndex>> {
+        let mut line_breaks = Vec::new();
+        let mut cursor: SpanIndex = 0.into();
+        for (offset, byte) in text.bytes().enumerate() {
+            let offset = offset.into();
+            if byte == b'\n' {
+                line_breaks.push(cursor..offset);
+                cursor = offset;
+            }
+        }
+        line_breaks
+    }
+
+    pub fn get_line(&self, offset: SpanIndex) -> Option<u32> {
         self.line_breaks
             .binary_search_by(|r| {
                 if offset < r.start {
-                    std::cmp::Ordering::Less
-                } else if offset >= r.end {
                     std::cmp::Ordering::Greater
+                } else if offset >= r.end {
+                    std::cmp::Ordering::Less
                 } else {
                     std::cmp::Ordering::Equal
                 }
             })
-            .unwrap_or(self.line as usize) as u32
+            .map(|v| (v + 1) as u32)
+            .ok()
     }
 
     pub fn get_line_breaks(&self) -> &[Range<SpanIndex>] {
@@ -81,8 +93,6 @@ impl<'src> Lexer<'src> {
             LookAhead::None => {
                 if let Some(c) = self.chars.next() {
                     if c == '\n' {
-                        self.line_breaks.push(self.start_line..self.offset);
-                        self.start_line = self.offset;
                         self.line += 1;
                     }
 
