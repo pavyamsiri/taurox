@@ -3,7 +3,7 @@ pub mod expression;
 pub mod formatter;
 pub mod statement;
 
-use crate::lexer::{get_line, Lexer, LineBreaks, Token, TokenKind};
+use crate::lexer::{Lexer, LineBreaks, Token, TokenKind};
 use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
 use error::ParserErrorKind;
@@ -48,7 +48,7 @@ impl<'src> Parser<'src> {
 impl<'src> Parser<'src> {
     pub fn parse_statement(&mut self) -> Result<Option<Statement>, ParserError> {
         let first = self.peek()?;
-        let line = get_line(&self.line_breaks, first.span.start);
+        let line = self.line_breaks.get_line_from_span(first.span);
         let statement = match first.kind {
             TokenKind::KeywordFun => self.parse_function_declaration(line)?,
             TokenKind::KeywordVar => self.parse_variable_declaration()?,
@@ -415,7 +415,7 @@ impl<'src> Parser<'src> {
         tree: &mut IncompleteExpression,
     ) -> Result<ExpressionNodeRef, ParserError> {
         let token = self.next_token()?;
-        let line = get_line(&self.line_breaks, token.span.start);
+        let line = self.line_breaks.get_line_from_span(token.span);
 
         if matches!(token.kind, TokenKind::Eof) {
             return Err(ParserError {
@@ -664,7 +664,7 @@ impl<'src> Parser<'src> {
             None => {
                 let token_or_error = self.lexer.next_token();
                 token_or_error.map_err(|e| {
-                    let line = get_line(&self.line_breaks, e.span.start);
+                    let line = self.line_breaks.get_line_from_span(e.span);
                     ParserError {
                         kind: ParserErrorKind::LexicalError(e.clone()),
                         line,
@@ -677,7 +677,7 @@ impl<'src> Parser<'src> {
     fn expect_ident(&mut self) -> Result<CompactString, ParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != TokenKind::Ident {
-            let line = get_line(&self.line_breaks, next_token.span.start);
+            let line = self.line_breaks.get_line_from_span(next_token.span);
             return Err(ParserError {
                 kind: ParserErrorKind::UnexpectedToken {
                     actual: next_token.kind,
@@ -698,7 +698,7 @@ impl<'src> Parser<'src> {
     fn expect(&mut self, expected: TokenKind) -> Result<Token, ParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != expected {
-            let line = get_line(&self.line_breaks, next_token.span.start);
+            let line = self.line_breaks.get_line_from_span(next_token.span);
             Err(ParserError {
                 kind: ParserErrorKind::UnexpectedToken {
                     actual: next_token.kind,

@@ -11,21 +11,40 @@ use std::{ops::Range, rc::Rc, str::Chars};
 use token::{Span, SpanIndex};
 pub use token::{Token, TokenKind};
 
-pub type LineBreaks = Rc<[Range<SpanIndex>]>;
+#[derive(Debug, Clone)]
+pub struct LineBreaks(Rc<[Range<SpanIndex>]>);
 
-pub fn get_line(breaks: &LineBreaks, offset: SpanIndex) -> u32 {
-    breaks
-        .binary_search_by(|r| {
-            if offset < r.start {
-                std::cmp::Ordering::Greater
-            } else if offset >= r.end {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Equal
-            }
-        })
-        .map(|v| (v + 1))
-        .unwrap_or(breaks.len() + 1) as u32
+impl LineBreaks {
+    pub fn get_line(&self, offset: SpanIndex) -> u32 {
+        self.0
+            .binary_search_by(|r| {
+                if offset < r.start {
+                    std::cmp::Ordering::Greater
+                } else if offset >= r.end {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+            .map(|v| (v + 1))
+            .unwrap_or(self.0.len() + 1) as u32
+    }
+
+    pub fn get_line_from_span(&self, span: Span) -> u32 {
+        let offset = span.start;
+        self.0
+            .binary_search_by(|r| {
+                if offset < r.start {
+                    std::cmp::Ordering::Greater
+                } else if offset >= r.end {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+            .map(|v| (v + 1))
+            .unwrap_or(self.0.len() + 1) as u32
+    }
 }
 
 #[derive(Debug)]
@@ -55,7 +74,7 @@ impl<'src> Lexer<'src> {
             lookahead: LookAhead::None,
             offset: 0.into(),
             line: 1,
-            line_breaks: Self::determine_line_breaks(source).into(),
+            line_breaks: LineBreaks(Self::determine_line_breaks(source).into()),
         }
     }
 
