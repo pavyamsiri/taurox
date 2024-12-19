@@ -12,7 +12,10 @@ use token::{Span, SpanIndex};
 pub use token::{Token, TokenKind};
 
 #[derive(Debug, Clone)]
-pub struct LineBreaks(Rc<[Range<SpanIndex>]>);
+pub struct LineBreaks {
+    line_breaks: Rc<[Range<SpanIndex>]>,
+    max_offset: SpanIndex,
+}
 
 impl LineBreaks {
     fn new(text: &str) -> Self {
@@ -33,22 +36,18 @@ impl LineBreaks {
         } else {
             vec![0.into()..1.into()]
         };
-        Self(line_breaks.into())
-    }
-
-    pub fn get_max_line(&self) -> u32 {
-        (self.0.len() + 1) as u32
-    }
-
-    pub fn get_max_offset(&self) -> SpanIndex {
-        match self.0.last() {
-            Some(r) => r.end,
-            None => 0.into(),
+        Self {
+            line_breaks: line_breaks.into(),
+            max_offset: text.len().into(),
         }
     }
 
+    pub fn get_max_line(&self) -> u32 {
+        (self.line_breaks.len() + 1) as u32
+    }
+
     pub fn get_line(&self, offset: SpanIndex) -> u32 {
-        self.0
+        self.line_breaks
             .binary_search_by(|r| {
                 if offset < r.start {
                     std::cmp::Ordering::Greater
@@ -58,24 +57,13 @@ impl LineBreaks {
                     std::cmp::Ordering::Equal
                 }
             })
-            .map(|v| (v + 1))
-            .unwrap_or(self.0.len() + 1) as u32
+            .map(|v| (v + 1) as u32)
+            .unwrap_or(self.get_max_line())
     }
 
     pub fn get_line_from_span(&self, span: Span) -> u32 {
         let offset = span.start;
-        self.0
-            .binary_search_by(|r| {
-                if offset < r.start {
-                    std::cmp::Ordering::Greater
-                } else if offset >= r.end {
-                    std::cmp::Ordering::Less
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            })
-            .map(|v| (v + 1))
-            .unwrap_or(self.0.len() + 1) as u32
+        self.get_line(offset)
     }
 
     pub fn get_line_range_from_span(&self, span: Span) -> (Range<usize>, Range<usize>) {
@@ -84,7 +72,7 @@ impl LineBreaks {
 
         // A closure for binary search that returns the appropriate line range
         let binary_search = |offset: SpanIndex| -> Range<SpanIndex> {
-            match self.0.binary_search_by(|r| {
+            match self.line_breaks.binary_search_by(|r| {
                 if offset < r.start {
                     std::cmp::Ordering::Greater
                 } else if offset >= r.end {
@@ -93,13 +81,23 @@ impl LineBreaks {
                     std::cmp::Ordering::Equal
                 }
             }) {
-                Ok(index) => self.0[index].clone(),
-                Err(_) => end_offset..self.get_max_offset(),
+                Ok(index) => self.line_breaks[index].clone(),
+                Err(_) => end_offset..self.max_offset,
             }
         };
 
         let start_range = binary_search(start_offset);
         let end_range = binary_search(end_offset);
+
+        // Fix up last range to not include EOF
+        let end_range = if end_range.end >= self.max_offset {
+            let new_range = end_range.start..self.max_offset;
+            eprintln!("FIX UP {end_range:?} to {new_range:?}");
+            new_range
+        } else {
+            end_range
+        };
+
         (
             start_range.start.into()..span.start.into(),
             span.end().into()..end_range.end.into(),
