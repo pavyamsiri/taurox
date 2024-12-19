@@ -37,6 +37,7 @@ pub enum TokenFormat {
     Debug,
     Basic,
     Line,
+    Pretty,
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -107,7 +108,7 @@ fn taurox_main() -> Result<ExitCode> {
 
 fn tokenize(src: &str, format: &TokenFormat) -> bool {
     use taurox::lexer::formatter::{
-        BasicFormatter, DebugFormatter, LineFormatter, ToFormatter, TokenFormatter,
+        BasicFormatter, DebugFormatter, LineFormatter, PrettyFormatter, ToFormatter, TokenFormatter,
     };
     use taurox::lexer::{Lexer, TokenKind};
 
@@ -116,6 +117,7 @@ fn tokenize(src: &str, format: &TokenFormat) -> bool {
         TokenFormat::Debug => Box::new(ToFormatter::<DebugFormatter>::create_formatter(&scanner)),
         TokenFormat::Basic => Box::new(ToFormatter::<BasicFormatter>::create_formatter(&scanner)),
         TokenFormat::Line => Box::new(ToFormatter::<LineFormatter>::create_formatter(&scanner)),
+        TokenFormat::Pretty => Box::new(ToFormatter::<PrettyFormatter>::create_formatter(&scanner)),
     };
     let mut succeeded = true;
     loop {

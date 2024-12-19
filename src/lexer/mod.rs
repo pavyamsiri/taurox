@@ -15,6 +15,33 @@ pub use token::{Token, TokenKind};
 pub struct LineBreaks(Rc<[Range<SpanIndex>]>);
 
 impl LineBreaks {
+    fn new(text: &str) -> Self {
+        let mut line_breaks = Vec::new();
+        let mut cursor: SpanIndex = 0.into();
+        for (offset, byte) in text.bytes().enumerate() {
+            let offset = offset.into();
+            if byte == b'\n' {
+                line_breaks.push(cursor..offset);
+                cursor = offset + 1;
+            }
+        }
+        if !text.ends_with("\n") {
+            line_breaks.push(cursor..text.len().into());
+        }
+        Self(line_breaks.into())
+    }
+
+    pub fn get_max_line(&self) -> u32 {
+        (self.0.len() + 1) as u32
+    }
+
+    pub fn get_max_offset(&self) -> SpanIndex {
+        match self.0.last() {
+            Some(r) => r.end,
+            None => 0.into(),
+        }
+    }
+
     pub fn get_line(&self, offset: SpanIndex) -> u32 {
         self.0
             .binary_search_by(|r| {
@@ -45,6 +72,34 @@ impl LineBreaks {
             .map(|v| (v + 1))
             .unwrap_or(self.0.len() + 1) as u32
     }
+
+    pub fn get_line_range_from_span(&self, span: Span) -> (Range<usize>, Range<usize>) {
+        let start_offset = span.start;
+        let end_offset = span.end();
+
+        // A closure for binary search that returns the appropriate line range
+        let binary_search = |offset: SpanIndex| -> Range<SpanIndex> {
+            match self.0.binary_search_by(|r| {
+                if offset < r.start {
+                    std::cmp::Ordering::Greater
+                } else if offset >= r.end {
+                    std::cmp::Ordering::Less
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            }) {
+                Ok(index) => self.0[index].clone(),
+                Err(_) => end_offset..self.get_max_offset(),
+            }
+        };
+
+        let start_range = binary_search(start_offset);
+        let end_range = binary_search(end_offset);
+        (
+            start_range.start.into()..span.start.into(),
+            span.end().into()..end_range.end.into(),
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -74,7 +129,7 @@ impl<'src> Lexer<'src> {
             lookahead: LookAhead::None,
             offset: 0.into(),
             line: 1,
-            line_breaks: LineBreaks(Self::determine_line_breaks(source).into()),
+            line_breaks: LineBreaks::new(source),
         }
     }
 
@@ -92,19 +147,6 @@ impl<'src> Lexer<'src> {
             true => Some(&self.source[span.range()]),
             false => None,
         }
-    }
-
-    fn determine_line_breaks(text: &str) -> Vec<Range<SpanIndex>> {
-        let mut line_breaks = Vec::new();
-        let mut cursor: SpanIndex = 0.into();
-        for (offset, byte) in text.bytes().enumerate() {
-            let offset = offset.into();
-            if byte == b'\n' {
-                line_breaks.push(cursor..offset);
-                cursor = offset;
-            }
-        }
-        line_breaks
     }
 }
 

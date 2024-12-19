@@ -1,6 +1,12 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SpanIndex(u32);
 
+impl SpanIndex {
+    pub const fn to_usize(&self) -> usize {
+        self.0 as usize
+    }
+}
+
 impl From<SpanIndex> for usize {
     fn from(value: SpanIndex) -> Self {
         value.0 as usize
@@ -47,6 +53,12 @@ impl std::ops::Sub<SpanIndex> for usize {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SpanLength(u32);
+
+impl SpanLength {
+    pub const fn to_usize(&self) -> usize {
+        self.0 as usize
+    }
+}
 
 impl From<SpanLength> for usize {
     fn from(value: SpanLength) -> Self {
