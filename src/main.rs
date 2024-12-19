@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{fs::read_to_string, process::ExitCode};
 use taurox::interpreter::error::RuntimeError;
 use taurox::parser::ParserError;
@@ -57,15 +57,15 @@ fn taurox_main() -> Result<ExitCode> {
     match args.routine {
         TauroxCommand::Tokenize { path, format } => {
             eprintln!("Tokenizing {:?}...", path);
-            let src = read_to_string(path)?;
-            if !tokenize(&src, &format) {
+            let src = read_to_string(&path)?;
+            if !tokenize(&src, &path, &format) {
                 return Ok(ExitCode::from(65));
             }
         }
         TauroxCommand::Parse { path, format } => {
             eprintln!("Parsing {:?}...", path);
-            let src = read_to_string(path)?;
-            let res = parse(&src, &format);
+            let src = read_to_string(&path)?;
+            let res = parse(&src, &path, &format);
             match res {
                 Ok(_) => {}
                 Err(e) => {
@@ -76,8 +76,8 @@ fn taurox_main() -> Result<ExitCode> {
         }
         TauroxCommand::Evaluate { path } => {
             eprintln!("Evaluating {:?}...", path);
-            let src = read_to_string(path)?;
-            let res = evaluate(&src);
+            let src = read_to_string(&path)?;
+            let res = evaluate(&src, &path);
             match res {
                 Ok(_) => {}
                 Err(e) => {
@@ -88,8 +88,8 @@ fn taurox_main() -> Result<ExitCode> {
         }
         TauroxCommand::Run { path } => {
             eprintln!("Running {:?}...", path);
-            let src = read_to_string(path)?;
-            let res = run(&src);
+            let src = read_to_string(&path)?;
+            let res = run(&src, &path);
             match res {
                 Ok(_) => {}
                 Err(ProgramError::CompileError(e)) => {
@@ -106,13 +106,13 @@ fn taurox_main() -> Result<ExitCode> {
     Ok(ExitCode::SUCCESS)
 }
 
-fn tokenize(src: &str, format: &TokenFormat) -> bool {
+fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
     use taurox::lexer::formatter::{
         BasicFormatter, DebugFormatter, LineFormatter, PrettyFormatter, ToFormatter, TokenFormatter,
     };
     use taurox::lexer::{Lexer, TokenKind};
 
-    let mut scanner = Lexer::new(src);
+    let mut scanner = Lexer::new(src, file_path);
     let formatter: Box<dyn TokenFormatter> = match format {
         TokenFormat::Debug => Box::new(ToFormatter::<DebugFormatter>::create_formatter(&scanner)),
         TokenFormat::Basic => Box::new(ToFormatter::<BasicFormatter>::create_formatter(&scanner)),
@@ -136,11 +136,11 @@ fn tokenize(src: &str, format: &TokenFormat) -> bool {
     }
 }
 
-fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
+fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> Result<()> {
     use taurox::parser::formatter::{DebugFormatter, ExpressionFormatter, SExpressionFormatter};
     use taurox::parser::Parser;
 
-    let mut parser = Parser::new(src);
+    let mut parser = Parser::new(src, path);
     let formatter: Box<dyn ExpressionFormatter> = match format {
         ExpressionFormat::Debug => Box::new(DebugFormatter {}),
         ExpressionFormat::SExpr => Box::new(SExpressionFormatter {}),
@@ -150,13 +150,13 @@ fn parse(src: &str, format: &ExpressionFormat) -> Result<()> {
     Ok(())
 }
 
-fn evaluate(src: &str) -> Result<()> {
+fn evaluate(src: &str, path: &Path) -> Result<()> {
     use taurox::interpreter::environment::SharedEnvironment;
     use taurox::parser::Parser;
 
     use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
 
-    let mut parser = Parser::new(src);
+    let mut parser = Parser::new(src, path);
     let expression = parser.parse_expression()?;
 
     let mut environment = SharedEnvironment::new();
@@ -173,12 +173,12 @@ enum ProgramError {
     RuntimeError(RuntimeError),
 }
 
-fn run(src: &str) -> std::result::Result<(), ProgramError> {
+fn run(src: &str, path: &Path) -> std::result::Result<(), ProgramError> {
     use taurox::interpreter::ProgramState;
     use taurox::interpreter::{Interpreter, TreeWalkInterpreter, TreeWalkStatementInterpreter};
     use taurox::parser::Parser;
 
-    let mut parser = Parser::new(src);
+    let mut parser = Parser::new(src, path);
     let program = parser.parse().map_err(|e| ProgramError::CompileError(e))?;
     let mut interpreter = TreeWalkInterpreter::<TreeWalkStatementInterpreter>::new(program);
     loop {

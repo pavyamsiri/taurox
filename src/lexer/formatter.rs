@@ -1,10 +1,11 @@
-use ariadne::Fmt;
+use std::path::Path;
 
 use super::{
     token::{Token, TokenKind},
     LineBreaks,
 };
 use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
+use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 
 /// Interface for creating new token formatters.
 pub trait TokenFormatter {
@@ -214,12 +215,14 @@ impl<'src> TokenFormatter for LineFormatter<'src> {
 pub struct PrettyFormatter<'src> {
     text: &'src str,
     line_breaks: LineBreaks,
+    path: &'src Path,
 }
 
 impl<'src> ToFormatter<PrettyFormatter<'src>> for Lexer<'src> {
     fn create_formatter(&self) -> PrettyFormatter<'src> {
         PrettyFormatter {
             text: self.get_source(),
+            path: self.path,
             line_breaks: self.get_line_breaks(),
         }
     }
@@ -287,16 +290,18 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
 
     fn format_lexical_error(&self, error: &LexicalError) -> String {
         let line = self.line_breaks.get_line_from_span(error.span);
+        let path = self
+            .path
+            .to_str()
+            .expect("Non-UTF8 paths are not supported!");
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
-                use ariadne::{Color, Label, Report, ReportKind, Source};
-
                 let mut output = std::io::Cursor::new(Vec::new());
-                Report::build(ReportKind::Error, ("test.lox", error.span.range()))
-                    .with_code(3)
-                    .with_message("Unrecognized character")
+                Report::build(ReportKind::Error, (path, error.span.range()))
+                    .with_code(error.code())
+                    .with_message("Encountered an unrecognized character during lexing")
                     .with_label(
-                        Label::new(("test.lox", error.span.range()))
+                        Label::new((path, error.span.range()))
                             .with_message(format!(
                                 "Unrecognized character {}",
                                 c.fg(Color::BrightRed)
@@ -304,7 +309,7 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
                             .with_color(Color::BrightRed),
                     )
                     .finish()
-                    .write(("test.lox", Source::from(self.text)), &mut output)
+                    .write((path, Source::from(self.text)), &mut output)
                     .expect("Write into buffer should not fail.");
                 let output = String::from_utf8(output.into_inner())
                     .expect("Ariadne produces valid utf-8 strings.");

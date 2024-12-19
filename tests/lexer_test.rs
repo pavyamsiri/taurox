@@ -11,7 +11,7 @@ use taurox::lexer::{
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
-    let mut scanner = Lexer::new(input);
+    let mut scanner = Lexer::new(input, test_name.as_ref());
     let formatter: LineFormatter = scanner.create_formatter();
     let mut buffer = String::new();
     loop {
@@ -204,7 +204,7 @@ proptest! {
         // Add 1 to include EOF token
         let expected_num_tokens = input.len() + 1;
         let input = input.join(" ");
-        let mut scanner = Lexer::new(&input);
+        let mut scanner = Lexer::new_without_file(&input);
         let mut num_tokens = 0;
         loop {
             num_tokens += 1;
@@ -222,7 +222,7 @@ proptest! {
 
     #[test]
     fn lexer_handles_valid_tokens_with_comments(input in token_sequence_with_comments_strategy()) {
-        let mut scanner = Lexer::new(&input);
+        let mut scanner = Lexer::new_without_file(&input);
         loop {
             match scanner.next_token() {
                 Ok(Token {kind: TokenKind::Eof, ..}) => {
@@ -239,7 +239,7 @@ proptest! {
     fn lexer_handles_invalid_tokens(input in invalid_token_sequence_strategy()) {
         let expected_num_errors = input.len();
         let input = input.join(" ");
-        let mut scanner = Lexer::new(&input);
+        let mut scanner = Lexer::new_without_file(&input);
         let mut num_errors = 0;
         loop {
 
@@ -258,7 +258,7 @@ proptest! {
 
     #[test]
     fn lexer_handles_all_input(input in any_unicode_string()) {
-        let mut scanner = Lexer::new(&input);
+        let mut scanner = Lexer::new_without_file(&input);
         loop {
             match scanner.next_token() {
                 Ok(Token {kind: TokenKind::Eof, ..}) => {

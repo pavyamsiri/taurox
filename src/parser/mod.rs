@@ -3,6 +3,8 @@ pub mod expression;
 pub mod formatter;
 pub mod statement;
 
+use std::path::Path;
+
 use crate::lexer::{Lexer, LineBreaks, Token, TokenKind};
 use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
@@ -637,8 +639,8 @@ impl<'src> Parser<'src> {
 
 // Generic helpers
 impl<'src> Parser<'src> {
-    pub fn new(source: &'src str) -> Self {
-        let lexer = Lexer::new(source);
+    pub fn new(source: &'src str, path: &'src Path) -> Self {
+        let lexer = Lexer::new(source, path);
         let line_breaks = lexer.get_line_breaks();
         Self {
             lexer,

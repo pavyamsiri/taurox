@@ -10,7 +10,7 @@ use taurox::parser::{
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
-    let mut parser = Parser::new(input);
+    let mut parser = Parser::new(input, test_name.as_ref());
     let result = parser.parse_expression();
     let formatter = SExpressionFormatter;
     let actual = match result {

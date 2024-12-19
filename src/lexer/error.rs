@@ -16,3 +16,12 @@ pub struct LexicalError {
     pub kind: LexicalErrorKind,
     pub span: Span,
 }
+
+impl LexicalError {
+    pub const fn code(&self) -> usize {
+        match self.kind {
+            LexicalErrorKind::Unrecognized(_) => 1,
+            LexicalErrorKind::UnclosedString => 2,
+        }
+    }
+}

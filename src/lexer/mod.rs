@@ -7,7 +7,7 @@ mod token;
 use cursor::SourceChar;
 pub use error::{LexicalError, LexicalErrorKind};
 use state::{LexerState, LexerStateTransition};
-use std::{ops::Range, rc::Rc, str::Chars};
+use std::{ops::Range, path::Path, rc::Rc, str::Chars};
 use token::{Span, SpanIndex};
 pub use token::{Token, TokenKind};
 
@@ -126,6 +126,7 @@ enum LookAhead {
 #[derive(Debug)]
 pub struct Lexer<'src> {
     source: &'src str,
+    path: &'src Path,
     chars: Chars<'src>,
     state: LexerState,
     offset: SpanIndex,
@@ -135,7 +136,7 @@ pub struct Lexer<'src> {
 }
 
 impl<'src> Lexer<'src> {
-    pub fn new(source: &'src str) -> Self {
+    pub fn new(source: &'src str, path: &'src Path) -> Self {
         Self {
             source,
             chars: source.chars(),
@@ -144,6 +145,20 @@ impl<'src> Lexer<'src> {
             offset: 0.into(),
             line: 1,
             line_breaks: LineBreaks::new(source),
+            path,
+        }
+    }
+
+    pub fn new_without_file(source: &'src str) -> Self {
+        Self {
+            source,
+            chars: source.chars(),
+            state: LexerState::default(),
+            lookahead: LookAhead::None,
+            offset: 0.into(),
+            line: 1,
+            line_breaks: LineBreaks::new(source),
+            path: "no_file".as_ref(),
         }
     }
 

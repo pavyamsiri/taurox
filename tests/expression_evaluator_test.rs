@@ -16,7 +16,7 @@ use taurox::{
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
-    let mut parser = Parser::new(input);
+    let mut parser = Parser::new(input, test_name.as_ref());
     let result = parser.parse_expression();
     let expression_formatter = SExpressionFormatter;
     let value_formatter = BasicFormatter;
