@@ -5,6 +5,7 @@ use super::{
 use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
 use owo_colors::colors::*;
 use owo_colors::OwoColorize;
+use std::ops::Range;
 
 /// Interface for creating new token formatters.
 pub trait TokenFormatter {
@@ -290,21 +291,47 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
         match error.kind {
             LexicalErrorKind::Unrecognized(_) => {
                 let width = self.line_breaks.get_max_line().ilog10() as usize;
-                let (start_span, end_span) = self.line_breaks.get_line_range_from_span(error.span);
+                let ((start_span, start_line), (end_span, _)) =
+                    self.line_breaks.get_line_range_from_span(error.span);
+
+                let prelude_range = start_line.saturating_sub(4)..start_line.saturating_sub(1);
+
+                let spans = self.line_breaks.get_ranges(Range {
+                    start: prelude_range.start as usize,
+                    end: prelude_range.end as usize,
+                });
+
+                let mut buffer = String::new();
+
+                for (span, line_number) in spans.iter().zip(prelude_range) {
+                    let span = Range {
+                        start: span.start.to_usize(),
+                        end: span.end.to_usize(),
+                    };
+                    let line_content = &self.text[span];
+                    buffer.push_str(&format!(
+                        "{:width$} {}{}",
+                        (line_number + 1).fg::<BrightBlue>(),
+                        "|".fg::<BrightBlue>(),
+                        line_content,
+                    ));
+                }
+
                 let length = error.span.length.to_usize();
                 let start = &self.text[start_span];
                 let e = &self.text[error.span.range()];
-                let end = &self.text[end_span].trim_end();
-                format!(
-                    "{:width$} {}    {start}{}{end}\n{}{}{}{}",
+                let end = &self.text[end_span];
+                buffer.push_str(&format!(
+                    "{:width$} {}{start}{}{end}{}{}{}{}",
                     line.fg::<BrightBlue>(),
                     "|".fg::<BrightBlue>(),
                     e.fg::<BrightMagenta>(),
                     " ".repeat(width + 2),
                     "|".fg::<BrightBlue>(),
-                    " ".repeat(start.len() + 4),
+                    " ".repeat(start.len()),
                     "^".repeat(length).fg::<BrightYellow>(),
-                )
+                ));
+                buffer
             }
             LexicalErrorKind::UnclosedString => {
                 format!("({}) ERROR UNTERMINATED_STRING null", line)

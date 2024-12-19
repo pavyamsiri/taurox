@@ -46,6 +46,10 @@ impl LineBreaks {
         (self.line_breaks.len() + 1) as u32
     }
 
+    pub fn get_ranges(&self, range: Range<usize>) -> &[Range<SpanIndex>] {
+        &self.line_breaks[range]
+    }
+
     pub fn get_line(&self, offset: SpanIndex) -> u32 {
         self.line_breaks
             .binary_search_by(|r| {
@@ -66,7 +70,10 @@ impl LineBreaks {
         self.get_line(offset)
     }
 
-    pub fn get_line_range_from_span(&self, span: Span) -> (Range<usize>, Range<usize>) {
+    pub fn get_line_range_from_span(
+        &self,
+        span: Span,
+    ) -> ((Range<usize>, u32), (Range<usize>, u32)) {
         let start_offset = span.start;
         let end_offset = span.end();
 
@@ -97,8 +104,14 @@ impl LineBreaks {
         };
 
         (
-            start_range.start.into()..span.start.into(),
-            span.end().into()..end_range.end.into(),
+            (
+                start_range.start.into()..span.start.into(),
+                self.get_line(start_offset),
+            ),
+            (
+                span.end().into()..end_range.end.into(),
+                self.get_line(end_offset),
+            ),
         )
     }
 }
