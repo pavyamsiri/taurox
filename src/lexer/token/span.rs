@@ -2,6 +2,10 @@
 pub struct SpanIndex(u32);
 
 impl SpanIndex {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
     pub const fn to_usize(&self) -> usize {
         self.0 as usize
     }
@@ -55,6 +59,10 @@ impl std::ops::Sub<SpanIndex> for usize {
 pub struct SpanLength(u32);
 
 impl SpanLength {
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+
     pub const fn to_usize(&self) -> usize {
         self.0 as usize
     }

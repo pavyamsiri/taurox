@@ -1,7 +1,7 @@
 use std::path::Path;
 
 use super::{
-    token::{Token, TokenKind},
+    token::{SpanIndex, Token, TokenKind},
     LineBreaks,
 };
 use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
@@ -319,20 +319,14 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
                     .with_code(error.code())
                     .with_message("Encountered non-terminated string during lexing")
                     .with_label(
-                        Label::new((
-                            path,
-                            error.span.start.to_usize()..(error.span.start.to_usize() + 1),
-                        ))
-                        .with_message(format!("String starts here..."))
-                        .with_color(Color::BrightRed),
+                        Label::new((path, error.span.split_left(SpanIndex::new(1)).range()))
+                            .with_message(format!("String starts here..."))
+                            .with_color(Color::BrightRed),
                     )
                     .with_label(
-                        Label::new((
-                            path,
-                            (error.span.start.to_usize() + 1)..(error.span.end().to_usize()),
-                        ))
-                        .with_message(format!("and is not closed"))
-                        .with_color(Color::BrightCyan),
+                        Label::new((path, error.span.split_right(SpanIndex::new(1)).range()))
+                            .with_message(format!("and is not closed"))
+                            .with_color(Color::BrightCyan),
                     )
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)

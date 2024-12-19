@@ -44,6 +44,33 @@ impl Span {
     pub fn end(&self) -> SpanIndex {
         self.start + self.length
     }
+
+    pub fn split_left(&self, offset: SpanIndex) -> Span {
+        if offset > self.end() {
+            self.clone()
+        } else {
+            Span {
+                start: self.start,
+                length: SpanLength::new(offset.to_usize() as u32),
+            }
+        }
+    }
+
+    pub fn split_right(&self, offset: SpanIndex) -> Span {
+        let new_start = self.start + offset.to_usize();
+        if offset > self.end() {
+            Span {
+                start: new_start,
+                length: 0.into(),
+            }
+        } else {
+            let new_length = self.length - offset.to_usize();
+            Span {
+                start: new_start,
+                length: new_length,
+            }
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
