@@ -3,7 +3,7 @@ pub mod expression;
 pub mod formatter;
 pub mod statement;
 
-use crate::lexer::{Lexer, Token, TokenKind};
+use crate::lexer::{get_line, Lexer, LineBreaks, Token, TokenKind};
 use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
 use error::ParserErrorKind;
@@ -28,6 +28,7 @@ impl Program {
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, ParserError>>,
+    line_breaks: LineBreaks,
 }
 
 // Parse program
@@ -47,7 +48,7 @@ impl<'src> Parser<'src> {
 impl<'src> Parser<'src> {
     pub fn parse_statement(&mut self) -> Result<Option<Statement>, ParserError> {
         let first = self.peek()?;
-        let line = first.line;
+        let line = get_line(&self.line_breaks, first.span.start);
         let statement = match first.kind {
             TokenKind::KeywordFun => self.parse_function_declaration(line)?,
             TokenKind::KeywordVar => self.parse_variable_declaration()?,
@@ -414,11 +415,12 @@ impl<'src> Parser<'src> {
         tree: &mut IncompleteExpression,
     ) -> Result<ExpressionNodeRef, ParserError> {
         let token = self.next_token()?;
+        let line = get_line(&self.line_breaks, token.span.start);
 
         if matches!(token.kind, TokenKind::Eof) {
             return Err(ParserError {
                 kind: ParserErrorKind::UnexpectedEof,
-                line: token.line,
+                line,
             });
         }
 
@@ -435,14 +437,14 @@ impl<'src> Parser<'src> {
                             .parse()
                             .expect("Numeric literal tokens are valid `f64`"),
                     ),
-                    line: token.line,
+                    line,
                 });
                 tree.push(node)
             }
             TokenKind::Ident => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Identifier(lexeme.into()),
-                    line: token.line,
+                    line,
                 });
                 tree.push(node)
             }
@@ -452,28 +454,28 @@ impl<'src> Parser<'src> {
                     .expect("String literal tokens are at least length 2.");
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::StringLiteral(value.into()),
-                    line: token.line,
+                    line,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordNil => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Nil,
-                    line: token.line,
+                    line,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordTrue => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Bool(true),
-                    line: token.line,
+                    line,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordFalse => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Bool(false),
-                    line: token.line,
+                    line,
                 });
                 tree.push(node)
             }
@@ -499,7 +501,7 @@ impl<'src> Parser<'src> {
             kind => {
                 return Err(ParserError {
                     kind: ParserErrorKind::NonExpression(kind),
-                    line: token.line,
+                    line,
                 })
             }
         };
@@ -636,9 +638,12 @@ impl<'src> Parser<'src> {
 // Generic helpers
 impl<'src> Parser<'src> {
     pub fn new(source: &'src str) -> Self {
+        let lexer = Lexer::new(source);
+        let line_breaks = lexer.get_line_breaks();
         Self {
-            lexer: Lexer::new(source),
+            lexer,
             lookahead: None,
+            line_breaks,
         }
     }
 
@@ -658,9 +663,12 @@ impl<'src> Parser<'src> {
             Some(token_or_error) => token_or_error,
             None => {
                 let token_or_error = self.lexer.next_token();
-                token_or_error.map_err(|e| ParserError {
-                    kind: ParserErrorKind::LexicalError(e.clone()),
-                    line: e.line,
+                token_or_error.map_err(|e| {
+                    let line = get_line(&self.line_breaks, e.span.start);
+                    ParserError {
+                        kind: ParserErrorKind::LexicalError(e.clone()),
+                        line,
+                    }
                 })
             }
         }
@@ -669,12 +677,13 @@ impl<'src> Parser<'src> {
     fn expect_ident(&mut self) -> Result<CompactString, ParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != TokenKind::Ident {
+            let line = get_line(&self.line_breaks, next_token.span.start);
             return Err(ParserError {
-                line: next_token.line,
                 kind: ParserErrorKind::UnexpectedToken {
                     actual: next_token.kind,
                     expected: TokenKind::Ident,
                 },
+                line,
             });
         }
 
@@ -689,12 +698,13 @@ impl<'src> Parser<'src> {
     fn expect(&mut self, expected: TokenKind) -> Result<Token, ParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != expected {
+            let line = get_line(&self.line_breaks, next_token.span.start);
             Err(ParserError {
-                line: next_token.line,
                 kind: ParserErrorKind::UnexpectedToken {
                     actual: next_token.kind,
                     expected,
                 },
+                line,
             })
         } else {
             Ok(next_token)

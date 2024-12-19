@@ -1,8 +1,8 @@
 use super::{
-    token::{SpanIndex, Token, TokenKind},
+    token::{Token, TokenKind},
     LineBreaks,
 };
-use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
+use crate::lexer::{get_line, Lexer, LexicalError, LexicalErrorKind};
 
 /// Interface for creating new token formatters.
 pub trait TokenFormatter {
@@ -21,12 +21,14 @@ where
 
 pub struct BasicFormatter<'src> {
     text: &'src str,
+    line_breaks: LineBreaks,
 }
 
 impl<'src> ToFormatter<BasicFormatter<'src>> for Lexer<'src> {
     fn create_formatter(&self) -> BasicFormatter<'src> {
         BasicFormatter {
             text: self.get_source(),
+            line_breaks: self.get_line_breaks(),
         }
     }
 }
@@ -90,12 +92,13 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
     }
 
     fn format_lexical_error(&self, error: &LexicalError) -> String {
+        let line = get_line(&self.line_breaks, error.span.start);
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
-                format!("[line {}] Error: Unexpected character: {c}", error.line)
+                format!("[line {}] Error: Unexpected character: {c}", line)
             }
             LexicalErrorKind::UnclosedString => {
-                format!("[line {}] Error: Unterminated string.", error.line)
+                format!("[line {}] Error: Unterminated string.", line)
             }
         }
     }
@@ -124,23 +127,6 @@ pub struct LineFormatter<'src> {
     line_breaks: LineBreaks,
 }
 
-impl<'src> LineFormatter<'src> {
-    fn get_line(&self, offset: SpanIndex) -> u32 {
-        self.line_breaks
-            .binary_search_by(|r| {
-                if offset < r.start {
-                    std::cmp::Ordering::Greater
-                } else if offset >= r.end {
-                    std::cmp::Ordering::Less
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            })
-            .map(|v| (v + 1))
-            .unwrap_or(self.line_breaks.len() + 1) as u32
-    }
-}
-
 impl<'src> ToFormatter<LineFormatter<'src>> for Lexer<'src> {
     fn create_formatter(&self) -> LineFormatter<'src> {
         LineFormatter {
@@ -152,7 +138,7 @@ impl<'src> ToFormatter<LineFormatter<'src>> for Lexer<'src> {
 
 impl<'src> TokenFormatter for LineFormatter<'src> {
     fn format(&self, token: &Token) -> String {
-        let line = self.get_line(token.span.start);
+        let line = get_line(&self.line_breaks, token.span.start);
         let value = match token.kind {
             TokenKind::LeftParenthesis => "LEFT_PAREN ( null".into(),
             TokenKind::RightParenthesis => "RIGHT_PAREN ) null".into(),
@@ -211,7 +197,7 @@ impl<'src> TokenFormatter for LineFormatter<'src> {
     }
 
     fn format_lexical_error(&self, error: &LexicalError) -> String {
-        let line = self.get_line(error.span.start);
+        let line = get_line(&self.line_breaks, error.span.start);
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
                 format!("({}) ERROR UNEXPECTED_CHAR {c}", line)

@@ -4,7 +4,6 @@ use super::token::SpanIndex;
 pub struct SourceChar {
     pub value: char,
     pub offset: SpanIndex,
-    pub line: u32,
 }
 
 impl SourceChar {

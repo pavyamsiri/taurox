@@ -11,7 +11,22 @@ use std::{ops::Range, rc::Rc, str::Chars};
 use token::{Span, SpanIndex};
 pub use token::{Token, TokenKind};
 
-type LineBreaks = Rc<[Range<SpanIndex>]>;
+pub type LineBreaks = Rc<[Range<SpanIndex>]>;
+
+pub fn get_line(breaks: &LineBreaks, offset: SpanIndex) -> u32 {
+    breaks
+        .binary_search_by(|r| {
+            if offset < r.start {
+                std::cmp::Ordering::Greater
+            } else if offset >= r.end {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        })
+        .map(|v| (v + 1))
+        .unwrap_or(breaks.len() + 1) as u32
+}
 
 #[derive(Debug)]
 enum LookAhead {
@@ -72,21 +87,6 @@ impl<'src> Lexer<'src> {
         }
         line_breaks
     }
-
-    pub fn get_line(&self, offset: SpanIndex) -> u32 {
-        self.line_breaks
-            .binary_search_by(|r| {
-                if offset < r.start {
-                    std::cmp::Ordering::Greater
-                } else if offset >= r.end {
-                    std::cmp::Ordering::Less
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            })
-            .map(|v| (v + 1))
-            .unwrap_or(self.line_breaks.len() + 1) as u32
-    }
 }
 
 impl<'src> Lexer<'src> {
@@ -103,7 +103,6 @@ impl<'src> Lexer<'src> {
                     Some(SourceChar {
                         value: c,
                         offset: old_location,
-                        line: self.line,
                     })
                 } else {
                     None

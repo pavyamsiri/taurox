@@ -10,10 +10,9 @@ pub enum LexicalErrorKind {
 }
 
 #[derive(Debug, Error, Clone)]
-#[error("[line {line}] {kind}")]
+#[error("{kind}")]
 pub struct LexicalError {
     #[source]
     pub kind: LexicalErrorKind,
     pub span: Span,
-    pub line: u32,
 }
