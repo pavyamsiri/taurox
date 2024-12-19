@@ -16,18 +16,23 @@ pub struct LineBreaks(Rc<[Range<SpanIndex>]>);
 
 impl LineBreaks {
     fn new(text: &str) -> Self {
-        let mut line_breaks = Vec::new();
-        let mut cursor: SpanIndex = 0.into();
-        for (offset, byte) in text.bytes().enumerate() {
-            let offset = offset.into();
-            if byte == b'\n' {
-                line_breaks.push(cursor..offset);
-                cursor = offset + 1;
+        let line_breaks = if !text.is_empty() {
+            let mut line_breaks = Vec::new();
+            let mut cursor: SpanIndex = 0.into();
+            for (offset, byte) in text.bytes().enumerate() {
+                let offset = offset.into();
+                if byte == b'\n' {
+                    line_breaks.push(cursor..offset);
+                    cursor = offset + 1;
+                }
             }
-        }
-        if !text.ends_with("\n") {
-            line_breaks.push(cursor..text.len().into());
-        }
+            if !text.ends_with("\n") {
+                line_breaks.push(cursor..(text.len() + 1).into());
+            }
+            line_breaks
+        } else {
+            vec![0.into()..1.into()]
+        };
         Self(line_breaks.into())
     }
 
