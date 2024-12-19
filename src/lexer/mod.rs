@@ -14,7 +14,6 @@ pub use token::{Token, TokenKind};
 #[derive(Debug, Clone)]
 pub struct LineBreaks {
     line_breaks: Rc<[Range<SpanIndex>]>,
-    max_offset: SpanIndex,
 }
 
 impl LineBreaks {
@@ -38,16 +37,11 @@ impl LineBreaks {
         };
         Self {
             line_breaks: line_breaks.into(),
-            max_offset: text.len().into(),
         }
     }
 
     pub fn get_max_line(&self) -> u32 {
         (self.line_breaks.len() + 1) as u32
-    }
-
-    pub fn get_ranges(&self, range: Range<usize>) -> &[Range<SpanIndex>] {
-        &self.line_breaks[range]
     }
 
     pub fn get_line(&self, offset: SpanIndex) -> u32 {
@@ -68,51 +62,6 @@ impl LineBreaks {
     pub fn get_line_from_span(&self, span: Span) -> u32 {
         let offset = span.start;
         self.get_line(offset)
-    }
-
-    pub fn get_line_range_from_span(
-        &self,
-        span: Span,
-    ) -> ((Range<usize>, u32), (Range<usize>, u32)) {
-        let start_offset = span.start;
-        let end_offset = span.end();
-
-        // A closure for binary search that returns the appropriate line range
-        let binary_search = |offset: SpanIndex| -> Range<SpanIndex> {
-            match self.line_breaks.binary_search_by(|r| {
-                if offset < r.start {
-                    std::cmp::Ordering::Greater
-                } else if offset >= r.end {
-                    std::cmp::Ordering::Less
-                } else {
-                    std::cmp::Ordering::Equal
-                }
-            }) {
-                Ok(index) => self.line_breaks[index].clone(),
-                Err(_) => end_offset..self.max_offset,
-            }
-        };
-
-        let start_range = binary_search(start_offset);
-        let end_range = binary_search(end_offset);
-
-        // Fix up last range to not include EOF
-        let end_range = if end_range.end >= self.max_offset {
-            end_range.start..self.max_offset
-        } else {
-            end_range
-        };
-
-        (
-            (
-                start_range.start.into()..span.start.into(),
-                self.get_line(start_offset),
-            ),
-            (
-                span.end().into()..end_range.end.into(),
-                self.get_line(end_offset),
-            ),
-        )
     }
 }
 
