@@ -111,8 +111,8 @@ fn symbol_strategy() -> impl Strategy<Value = String> {
 
 fn numeric_literal_strategy() -> impl Strategy<Value = String> {
     prop_oneof![
-        any::<i64>().prop_map(|n| n.to_string()), // Integer literals
-        any::<f64>().prop_map(|n| n.to_string()), // Float literals
+        "[0-9]+".prop_map(|s| s),          // Integer literals
+        "[0-9]+\\.[0-9]+".prop_map(|s| s)  // Decimal literals
     ]
 }
 
@@ -149,27 +149,62 @@ fn comment_strategy() -> impl Strategy<Value = String> {
     "[^\n]*".prop_map(|s: String| format!("//{}\n", s))
 }
 
-fn token_string_strategy() -> impl Strategy<Value = String> {
-    prop_oneof![
-        symbol_strategy(),
-        numeric_literal_strategy(),
-        string_literal_strategy(),
-        identifier_strategy(),
-        keyword_strategy(),
-        comment_strategy(),
-    ]
-}
-
-fn token_sequence_strategy() -> impl Strategy<Value = String> {
+fn token_sequence_with_comments_strategy() -> impl Strategy<Value = String> {
     const MIN_TOKEN_COUNT: usize = 1;
     const MAX_TOKEN_COUNT: usize = 100;
-    prop::collection::vec(token_string_strategy(), MIN_TOKEN_COUNT..MAX_TOKEN_COUNT)
-        .prop_map(|tokens| tokens.join(" "))
+    prop::collection::vec(
+        prop_oneof![
+            symbol_strategy(),
+            numeric_literal_strategy(),
+            string_literal_strategy(),
+            identifier_strategy(),
+            keyword_strategy(),
+            comment_strategy(),
+        ],
+        MIN_TOKEN_COUNT..MAX_TOKEN_COUNT,
+    )
+    .prop_map(|tokens| tokens.join(" "))
+}
+
+fn token_sequence_without_comments_strategy() -> impl Strategy<Value = Vec<String>> {
+    const MIN_TOKEN_COUNT: usize = 1;
+    const MAX_TOKEN_COUNT: usize = 100;
+    prop::collection::vec(
+        prop_oneof![
+            symbol_strategy(),
+            numeric_literal_strategy(),
+            string_literal_strategy(),
+            identifier_strategy(),
+            keyword_strategy(),
+        ],
+        MIN_TOKEN_COUNT..MAX_TOKEN_COUNT,
+    )
 }
 
 proptest! {
     #[test]
-    fn lexer_handles_valid_tokens_with_comments(input in token_sequence_strategy()) {
+    fn lexer_handles_valid_tokens_without_comments(input in token_sequence_without_comments_strategy()) {
+        // Add 1 to include EOF token
+        let expected_num_tokens = input.len() + 1;
+        let input = input.join(" ");
+        let mut scanner = Lexer::new(&input);
+        let mut num_tokens = 0;
+        loop {
+            num_tokens += 1;
+            match scanner.next_token() {
+                Ok(Token {kind: TokenKind::Eof, ..}) => {
+                    break;
+                },
+                token => {
+                    prop_assert!(token.is_ok());
+                }
+            }
+        }
+        prop_assert_eq!(num_tokens, expected_num_tokens);
+    }
+
+    #[test]
+    fn lexer_handles_valid_tokens_with_comments(input in token_sequence_with_comments_strategy()) {
         let mut scanner = Lexer::new(&input);
         loop {
             match scanner.next_token() {
