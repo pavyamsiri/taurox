@@ -124,6 +124,10 @@ fn identifier_strategy() -> impl Strategy<Value = String> {
     "[a-zA-Z][a-zA-Z0-9_]*".prop_map(|s: String| s)
 }
 
+fn invalid_identifier_strategy() -> impl Strategy<Value = String> {
+    "[^a-zA-Z(){},.\\-+;*!=<>/0-9\"_ \r\t\n\x0C]".prop_map(|s: String| s)
+}
+
 fn keyword_strategy() -> impl Strategy<Value = String> {
     prop_oneof![
         Just("and".to_string()),
@@ -181,6 +185,14 @@ fn token_sequence_without_comments_strategy() -> impl Strategy<Value = Vec<Strin
     )
 }
 
+fn invalid_token_sequence_strategy() -> impl Strategy<Value = Vec<String>> {
+    const MIN_TOKEN_COUNT: usize = 1;
+    const MAX_TOKEN_COUNT: usize = 100;
+    prop::collection::vec(
+        invalid_identifier_strategy(),
+        MIN_TOKEN_COUNT..MAX_TOKEN_COUNT,
+    )
+}
 proptest! {
     #[test]
     fn lexer_handles_valid_tokens_without_comments(input in token_sequence_without_comments_strategy()) {
@@ -217,4 +229,26 @@ proptest! {
             }
         }
     }
+
+    #[test]
+    fn lexer_handles_invalid_tokens(input in invalid_token_sequence_strategy()) {
+        let expected_num_errors = input.len();
+        let input = input.join(" ");
+        let mut scanner = Lexer::new(&input);
+        let mut num_errors = 0;
+        loop {
+
+            match scanner.next_token() {
+                Ok(Token {kind: TokenKind::Eof, ..}) => {
+                    break;
+                },
+                token => {
+                    prop_assert!(token.is_err());
+                    num_errors += 1;
+                }
+            }
+        }
+        prop_assert_eq!(num_errors, expected_num_errors);
+    }
+
 }
