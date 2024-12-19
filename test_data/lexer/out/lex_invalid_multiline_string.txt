@@ -1,0 +1,5 @@
+(1) VAR var null
+(1) IDENTIFIER a null
+(1) EQUAL = null
+(1) ERROR UNTERMINATED_STRING null
+(3) EOF  null

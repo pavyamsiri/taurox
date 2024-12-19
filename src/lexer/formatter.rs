@@ -289,14 +289,13 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
     }
 
     fn format_lexical_error(&self, error: &LexicalError) -> String {
-        let line = self.line_breaks.get_line_from_span(error.span);
         let path = self
             .path
             .to_str()
             .expect("Non-UTF8 paths are not supported!");
+        let mut output = std::io::Cursor::new(Vec::new());
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
-                let mut output = std::io::Cursor::new(Vec::new());
                 Report::build(ReportKind::Error, (path, error.span.range()))
                     .with_code(error.code())
                     .with_message("Encountered an unrecognized character during lexing")
@@ -311,12 +310,35 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
                     .expect("Write into buffer should not fail.");
-                let output = String::from_utf8(output.into_inner())
-                    .expect("Ariadne produces valid utf-8 strings.");
-                output
+                String::from_utf8(output.into_inner())
+                    .expect("Ariadne produces valid utf-8 strings.")
             }
             LexicalErrorKind::UnclosedString => {
-                format!("({}) ERROR UNTERMINATED_STRING null", line)
+                let mut output = std::io::Cursor::new(Vec::new());
+                Report::build(ReportKind::Error, (path, error.span.range()))
+                    .with_code(error.code())
+                    .with_message("Encountered non-terminated string during lexing")
+                    .with_label(
+                        Label::new((
+                            path,
+                            error.span.start.to_usize()..(error.span.start.to_usize() + 1),
+                        ))
+                        .with_message(format!("String starts here..."))
+                        .with_color(Color::BrightRed),
+                    )
+                    .with_label(
+                        Label::new((
+                            path,
+                            (error.span.start.to_usize() + 1)..(error.span.end().to_usize()),
+                        ))
+                        .with_message(format!("and is not closed"))
+                        .with_color(Color::BrightCyan),
+                    )
+                    .finish()
+                    .write((path, Source::from(self.text)), &mut output)
+                    .expect("Write into buffer should not fail.");
+                String::from_utf8(output.into_inner())
+                    .expect("Ariadne produces valid utf-8 strings.")
             }
         }
     }

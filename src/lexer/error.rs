@@ -18,10 +18,10 @@ pub struct LexicalError {
 }
 
 impl LexicalError {
-    pub const fn code(&self) -> usize {
+    pub const fn code(&self) -> &'static str {
         match self.kind {
-            LexicalErrorKind::Unrecognized(_) => 1,
-            LexicalErrorKind::UnclosedString => 2,
+            LexicalErrorKind::Unrecognized(_) => "L001",
+            LexicalErrorKind::UnclosedString => "L002",
         }
     }
 }

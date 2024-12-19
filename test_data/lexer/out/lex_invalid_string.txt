@@ -1,0 +1,3 @@
+(1) PRINT print null
+(1) ERROR UNTERMINATED_STRING null
+(1) EOF  null
