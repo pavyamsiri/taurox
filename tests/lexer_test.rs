@@ -193,6 +193,11 @@ fn invalid_token_sequence_strategy() -> impl Strategy<Value = Vec<String>> {
         MIN_TOKEN_COUNT..MAX_TOKEN_COUNT,
     )
 }
+
+fn any_unicode_string() -> impl Strategy<Value = String> {
+    ".*".prop_map(|s: String| s)
+}
+
 proptest! {
     #[test]
     fn lexer_handles_valid_tokens_without_comments(input in token_sequence_without_comments_strategy()) {
@@ -251,4 +256,16 @@ proptest! {
         prop_assert_eq!(num_errors, expected_num_errors);
     }
 
+    #[test]
+    fn lexer_handles_all_input(input in any_unicode_string()) {
+        let mut scanner = Lexer::new(&input);
+        loop {
+            match scanner.next_token() {
+                Ok(Token {kind: TokenKind::Eof, ..}) => {
+                    break;
+                },
+                _ => {}
+            }
+        }
+    }
 }
