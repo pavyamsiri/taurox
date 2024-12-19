@@ -7,7 +7,7 @@ mod token;
 use cursor::SourceChar;
 pub use error::{LexicalError, LexicalErrorKind};
 use state::{LexerState, LexerStateTransition};
-use std::str::Chars;
+use std::{ops::Range, str::Chars};
 use token::{Span, SpanIndex};
 pub use token::{Token, TokenKind};
 
@@ -25,6 +25,8 @@ pub struct Lexer<'src> {
     state: LexerState,
     offset: SpanIndex,
     lookahead: LookAhead,
+    line_breaks: Vec<Range<SpanIndex>>,
+    start_line: SpanIndex,
     line: u32,
 }
 
@@ -37,6 +39,8 @@ impl<'src> Lexer<'src> {
             lookahead: LookAhead::None,
             offset: 0.into(),
             line: 1,
+            start_line: 0.into(),
+            line_breaks: Vec::new(),
         }
     }
 
@@ -51,6 +55,24 @@ impl<'src> Lexer<'src> {
             false => None,
         }
     }
+
+    pub fn get_line(&self, offset: SpanIndex) -> u32 {
+        self.line_breaks
+            .binary_search_by(|r| {
+                if offset < r.start {
+                    std::cmp::Ordering::Less
+                } else if offset >= r.end {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            })
+            .unwrap_or(self.line as usize) as u32
+    }
+
+    pub fn get_line_breaks(&self) -> &[Range<SpanIndex>] {
+        return &self.line_breaks;
+    }
 }
 
 impl<'src> Lexer<'src> {
@@ -59,6 +81,8 @@ impl<'src> Lexer<'src> {
             LookAhead::None => {
                 if let Some(c) = self.chars.next() {
                     if c == '\n' {
+                        self.line_breaks.push(self.start_line..self.offset);
+                        self.start_line = self.offset;
                         self.line += 1;
                     }
 
