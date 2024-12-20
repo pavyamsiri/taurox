@@ -99,7 +99,8 @@ impl<'src> SExpressionFormatter<'src> {
             }
             ExpressionNode::InfixAssignment { lhs, rhs } => {
                 format!(
-                    "(= {lhs} {})",
+                    "(= {} {})",
+                    lhs.get_name(),
                     SExpressionFormatter::format_node(tree, &rhs)
                 )
             }

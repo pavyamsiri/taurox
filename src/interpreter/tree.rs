@@ -1,8 +1,6 @@
 use super::{
-    environment::SharedEnvironment,
-    error::{RuntimeError, RuntimeErrorKind},
-    value::LoxValue,
-    Interpreter, ProgramState, StatementInterpreter,
+    environment::SharedEnvironment, error::RuntimeError, value::LoxValue, Interpreter,
+    ProgramState, StatementInterpreter,
 };
 use crate::parser::{
     expression::{
@@ -321,18 +319,12 @@ impl TreeWalkStatementInterpreter {
         let current_node = expr
             .get_node(node)
             .expect("Node ref came from the tree so it must exist.");
-        let line = expr
-            .get_line(node)
-            .expect("Node ref came from the tree so it must exist.");
 
         let result = match current_node {
-            ExpressionNode::Atom(atom) => self
-                .evaluate_atom(atom, environment)
-                .map_err(|kind| RuntimeError { kind, line })?,
+            ExpressionNode::Atom(atom) => self.evaluate_atom(atom, environment)?,
             ExpressionNode::Prefix { operator, rhs } => {
                 let rhs = self.evaluate_expression_node(expr, *rhs, environment)?;
-                self.evaluate_prefix(*operator, &rhs)
-                    .map_err(|kind| RuntimeError { kind, line })?
+                self.evaluate_prefix(*operator, &rhs)?
             }
             ExpressionNode::Group { inner } => {
                 self.evaluate_expression_node(expr, *inner, environment)?
@@ -340,24 +332,20 @@ impl TreeWalkStatementInterpreter {
             ExpressionNode::Infix { operator, lhs, rhs } => {
                 let lhs = self.evaluate_expression_node(expr, *lhs, environment)?;
                 let rhs = self.evaluate_expression_node(expr, *rhs, environment)?;
-                self.evaluate_infix(*operator, &lhs, &rhs)
-                    .map_err(|kind| RuntimeError { kind, line })?
+                self.evaluate_infix(*operator, &lhs, &rhs)?
             }
             ExpressionNode::InfixAssignment { lhs, rhs } => {
                 let rhs = self.evaluate_expression_node(expr, *rhs, environment)?;
                 let _ = environment
-                    .assign(lhs, rhs.clone())
-                    .map_err(|_| RuntimeError {
-                        kind: RuntimeErrorKind::InvalidAccess(lhs.clone()),
-                        line,
-                    })?;
+                    .assign(&lhs.get_name(), rhs.clone())
+                    .map_err(|_| RuntimeError::InvalidAccess(lhs.get_name()))?;
                 rhs
             }
             ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
                 self.evaluate_infix_short_circuit(*operator, *lhs, *rhs, expr, environment)?
             }
             ExpressionNode::Call { callee, arguments } => {
-                self.evaluate_call(*callee, arguments, expr, environment, line)?
+                self.evaluate_call(*callee, arguments, expr, environment)?
             }
         };
         Ok(result)
@@ -367,7 +355,7 @@ impl TreeWalkStatementInterpreter {
         &self,
         atom: &ExpressionAtom,
         environment: &mut SharedEnvironment,
-    ) -> Result<LoxValue, RuntimeErrorKind> {
+    ) -> Result<LoxValue, RuntimeError> {
         let result = match &atom.kind {
             ExpressionAtomKind::Number(v) => LoxValue::Number(*v),
             ExpressionAtomKind::Bool(v) => LoxValue::Bool(*v),
@@ -375,7 +363,7 @@ impl TreeWalkStatementInterpreter {
             ExpressionAtomKind::StringLiteral(ref v) => LoxValue::String(v.clone()),
             ExpressionAtomKind::Identifier(ref name) => environment
                 .access(name)
-                .ok_or(RuntimeErrorKind::InvalidAccess(name.clone()))?
+                .ok_or(RuntimeError::InvalidAccess(name.clone()))?
                 .clone(),
         };
         Ok(result)
@@ -385,7 +373,7 @@ impl TreeWalkStatementInterpreter {
         &self,
         operator: PrefixOperator,
         rhs: &LoxValue,
-    ) -> Result<LoxValue, RuntimeErrorKind> {
+    ) -> Result<LoxValue, RuntimeError> {
         type Operator = PrefixOperator;
         match operator {
             Operator::Bang => Ok(LoxValue::Bool(rhs.logical_not())),
@@ -398,7 +386,7 @@ impl TreeWalkStatementInterpreter {
         operator: InfixOperator,
         lhs: &LoxValue,
         rhs: &LoxValue,
-    ) -> Result<LoxValue, RuntimeErrorKind> {
+    ) -> Result<LoxValue, RuntimeError> {
         type Operator = InfixOperator;
         match operator {
             Operator::Add => lhs.add(rhs),
@@ -451,7 +439,6 @@ impl TreeWalkStatementInterpreter {
         arguments: &[ExpressionNodeRef],
         expr: &Expression,
         environment: &mut SharedEnvironment,
-        line: u32,
     ) -> Result<LoxValue, RuntimeError> {
         let callee = self.evaluate_expression_node(expr, callee, environment)?;
         let result = match callee {
@@ -461,12 +448,9 @@ impl TreeWalkStatementInterpreter {
 
                 // Check that the argument list is the same length as the parameter list.
                 if arguments.len() != fun.get_parameters().len() {
-                    return Err(RuntimeError {
-                        kind: RuntimeErrorKind::InvalidArgumentCount {
-                            actual: arguments.len(),
-                            expected: fun.get_parameters().len(),
-                        },
-                        line,
+                    return Err(RuntimeError::InvalidArgumentCount {
+                        actual: arguments.len(),
+                        expected: fun.get_parameters().len(),
                     });
                 }
 
@@ -493,12 +477,9 @@ impl TreeWalkStatementInterpreter {
 
                 // Check that the argument list is the same length as the parameter list.
                 if arguments.len() != parameters.len() {
-                    return Err(RuntimeError {
-                        kind: RuntimeErrorKind::InvalidArgumentCount {
-                            actual: arguments.len(),
-                            expected: parameters.len(),
-                        },
-                        line,
+                    return Err(RuntimeError::InvalidArgumentCount {
+                        actual: arguments.len(),
+                        expected: parameters.len(),
                     });
                 }
 
@@ -525,10 +506,7 @@ impl TreeWalkStatementInterpreter {
                 result
             }
             v => {
-                return Err(RuntimeError {
-                    kind: RuntimeErrorKind::InvalidCallee(v),
-                    line,
-                });
+                return Err(RuntimeError::InvalidCallee(v));
             }
         };
         Ok(result)

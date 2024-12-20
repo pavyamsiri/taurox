@@ -4,10 +4,7 @@ use compact_str::{CompactString, CompactStringExt};
 
 use crate::parser::statement::Statement;
 
-use super::{
-    environment::SharedEnvironment,
-    error::{RuntimeError, RuntimeErrorKind},
-};
+use super::{environment::SharedEnvironment, error::RuntimeError};
 
 pub trait NativeFunction: std::fmt::Debug + Send + Sync {
     fn get_name(&self) -> &'static str;
@@ -60,73 +57,73 @@ impl LoxValue {
         !self.is_truthy()
     }
 
-    pub fn numeric_negate(&self) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn numeric_negate(&self) -> Result<LoxValue, RuntimeError> {
         match self {
             LoxValue::Number(v) => Ok(LoxValue::Number(-v)),
-            v => Err(RuntimeErrorKind::NonNumeric(v.clone())),
+            v => Err(RuntimeError::NonNumeric(v.clone())),
         }
     }
 }
 
 impl LoxValue {
     // Arithmetic + string concatenation
-    pub fn add(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn add(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs + rhs)),
             (LoxValue::String(lhs), LoxValue::String(rhs)) => {
                 Ok(LoxValue::String([lhs, rhs].concat_compact()))
             }
-            (lhs, rhs) => Err(RuntimeErrorKind::NonAddable(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonAddable(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn subtract(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn subtract(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs - rhs)),
-            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn multiply(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn multiply(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs * rhs)),
-            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn divide(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn divide(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Number(lhs / rhs)),
-            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
     // Comparison
-    pub fn less_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn less_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs < rhs)),
-            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn less_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn less_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs <= rhs)),
-            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn greater_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn greater_than(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs > rhs)),
-            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 
-    pub fn greater_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeErrorKind> {
+    pub fn greater_than_or_equal(&self, other: &LoxValue) -> Result<LoxValue, RuntimeError> {
         match (self, other) {
             (LoxValue::Number(lhs), LoxValue::Number(rhs)) => Ok(LoxValue::Bool(lhs >= rhs)),
-            (lhs, rhs) => Err(RuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
+            (lhs, rhs) => Err(RuntimeError::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
 

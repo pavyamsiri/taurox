@@ -71,6 +71,33 @@ impl Span {
             }
         }
     }
+
+    pub fn merge(&self, other: &Span) -> Span {
+        let start = self.start.min(other.start);
+        let end = self.end().max(other.end());
+        let length = end - start;
+        Span { start, length }
+    }
+
+    pub fn expand(&self, size: usize) -> Span {
+        let start = self.start.to_usize().saturating_sub(size);
+        let end = self.end().to_usize().saturating_add(size);
+        let length = end - start;
+        Span {
+            start: SpanIndex::new(start as u32),
+            length: SpanLength::new(length as u32),
+        }
+    }
+
+    pub fn right_expand(&self, size: usize) -> Span {
+        let start = self.start.to_usize();
+        let end = self.end().to_usize().saturating_add(size);
+        let length = end - start;
+        Span {
+            start: SpanIndex::new(start as u32),
+            length: SpanLength::new(length as u32),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

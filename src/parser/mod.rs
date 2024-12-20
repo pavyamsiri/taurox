@@ -5,18 +5,16 @@ pub mod statement;
 
 use std::path::Path;
 
-use crate::lexer::{
-    Lexer, LexicalError, LineBreaks, Span, SpanIndex, SpanLength, Token, TokenKind,
-};
+use crate::lexer::{Lexer, LexicalError, Span, SpanIndex, SpanLength, Token, TokenKind};
 use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
 use error::{
     ExpressionParserError, GeneralExpressionParserError, GeneralParserError, StatementParserError,
 };
 use expression::{
-    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
-    IncompleteExpression, InfixAssignmentOperator, InfixOperator, InfixShortCircuitOperator,
-    PostfixOperator, PrefixOperator,
+    AssignmentDestination, Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode,
+    ExpressionNodeRef, IncompleteExpression, InfixAssignmentOperator, InfixOperator,
+    InfixShortCircuitOperator, PostfixOperator, PrefixOperator,
 };
 use statement::{Declaration, Initializer, NonDeclaration, Statement};
 
@@ -34,7 +32,6 @@ impl Program {
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, LexicalError>>,
-    line_breaks: LineBreaks,
 }
 
 // Lexer based helpers
@@ -403,7 +400,6 @@ impl<'src> Parser<'src> {
         tree: &mut IncompleteExpression,
     ) -> Result<ExpressionNodeRef, GeneralExpressionParserError> {
         let token = self.next_token()?;
-        let line = self.line_breaks.get_line_from_span(token.span);
 
         if matches!(token.kind, TokenKind::Eof) {
             return Err(self.create_eof_error().into());
@@ -422,14 +418,14 @@ impl<'src> Parser<'src> {
                             .parse()
                             .expect("Numeric literal tokens are valid `f64`"),
                     ),
-                    line,
+                    span: token.span,
                 });
                 tree.push(node)
             }
             TokenKind::Ident => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Identifier(lexeme.into()),
-                    line,
+                    span: token.span,
                 });
                 tree.push(node)
             }
@@ -439,28 +435,28 @@ impl<'src> Parser<'src> {
                     .expect("String literal tokens are at least length 2.");
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::StringLiteral(value.into()),
-                    line,
+                    span: token.span,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordNil => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Nil,
-                    line,
+                    span: token.span,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordTrue => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Bool(true),
-                    line,
+                    span: token.span,
                 });
                 tree.push(node)
             }
             TokenKind::KeywordFalse => {
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Bool(false),
-                    line,
+                    span: token.span,
                 });
                 tree.push(node)
             }
@@ -501,16 +497,16 @@ impl<'src> Parser<'src> {
     ) -> Result<PrattParseOutcome, GeneralExpressionParserError> {
         const MSG: &'static str = "Caller must make sure `lhs` is a valid expression node ref.";
         if let Some(operator) = self.peek_infix_assignment_operator()? {
-            let place = tree
-                .get_l_value(lhs)
-                .ok_or(ExpressionParserError::InvalidLValue(Token {
-                    kind: tree.get_kind(lhs).expect(MSG),
-                    span: Span {
-                        start: SpanIndex::new(0),
-                        length: SpanLength::new(0),
-                    },
-                }))?
-                .to_compact_string();
+            let (place, span) =
+                tree.get_l_value(lhs)
+                    .ok_or(ExpressionParserError::InvalidLValue(Token {
+                        kind: tree.get_kind(lhs).expect(MSG),
+                        span: Span {
+                            start: SpanIndex::new(0),
+                            length: SpanLength::new(0),
+                        },
+                    }))?;
+            let place = place.to_compact_string();
 
             let (lbp, rbp) = operator.get_binding_power();
             if lbp < min_bp {
@@ -519,9 +515,12 @@ impl<'src> Parser<'src> {
             let _ = self.next_token()?;
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
-            return Ok(PrattParseOutcome::NewLHS(
-                tree.push(ExpressionNode::InfixAssignment { lhs: place, rhs }),
-            ));
+            return Ok(PrattParseOutcome::NewLHS(tree.push(
+                ExpressionNode::InfixAssignment {
+                    lhs: AssignmentDestination { name: place, span },
+                    rhs,
+                },
+            )));
         }
         Ok(PrattParseOutcome::NoOperator)
     }
@@ -624,11 +623,9 @@ impl<'src> Parser<'src> {
 impl<'src> Parser<'src> {
     pub fn new(source: &'src str, path: &'src Path) -> Self {
         let lexer = Lexer::new(source, path);
-        let line_breaks = lexer.get_line_breaks();
         Self {
             lexer,
             lookahead: None,
-            line_breaks,
         }
     }
 

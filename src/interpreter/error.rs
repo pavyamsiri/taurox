@@ -4,7 +4,7 @@ use thiserror::Error;
 use super::value::LoxValue;
 
 #[derive(Debug, Error, Clone)]
-pub enum RuntimeErrorKind {
+pub enum RuntimeError {
     #[error("Non-Number {{Unary}}: {0}")]
     NonNumeric(LoxValue),
     #[error("Non-Numbers {{Binary}}: [{0} , {1}]")]
@@ -17,12 +17,4 @@ pub enum RuntimeErrorKind {
     InvalidCallee(LoxValue),
     #[error("Invalid Argument Count: {actual} of {expected}")]
     InvalidArgumentCount { actual: usize, expected: usize },
-}
-
-#[derive(Debug, Error, Clone)]
-#[error("({line}) {kind}")]
-pub struct RuntimeError {
-    #[source]
-    pub(crate) kind: RuntimeErrorKind,
-    pub(crate) line: u32,
 }

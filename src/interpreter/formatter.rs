@@ -1,7 +1,4 @@
-use super::{
-    error::{RuntimeError, RuntimeErrorKind},
-    value::LoxValue,
-};
+use super::{error::RuntimeError, value::LoxValue};
 
 pub trait ValueFormatter {
     fn format(&self, value: &LoxValue) -> String;
@@ -41,28 +38,28 @@ impl ValueFormatter for BasicFormatter {
     }
 
     fn format_error(&self, error: &RuntimeError) -> String {
-        let line = error.line;
-        match error.kind {
-            RuntimeErrorKind::NonNumeric(ref v) => {
+        let line = std::u32::MAX;
+        match error {
+            RuntimeError::NonNumeric(ref v) => {
                 format!("({line}) Non-Number {{Unary}}: {}", self.format_verbose(v))
             }
-            RuntimeErrorKind::NonNumerics(ref lhs, ref rhs) => format!(
+            RuntimeError::NonNumerics(ref lhs, ref rhs) => format!(
                 "({line}) Non-Numbers {{Binary}}: [{}, {}]",
                 self.format_verbose(lhs),
                 self.format_verbose(rhs)
             ),
-            RuntimeErrorKind::NonAddable(ref lhs, ref rhs) => format!(
+            RuntimeError::NonAddable(ref lhs, ref rhs) => format!(
                 "({line}) Non-Numbers/Non-Strings {{Binary}}: [{}, {}]",
                 self.format_verbose(lhs),
                 self.format_verbose(rhs)
             ),
-            RuntimeErrorKind::InvalidAccess(ref name) => {
+            RuntimeError::InvalidAccess(ref name) => {
                 format!("({line}) Invalid Access: {name}",)
             }
-            RuntimeErrorKind::InvalidCallee(ref callee) => {
+            RuntimeError::InvalidCallee(ref callee) => {
                 format!("({line}) Invalid Callee: {}", self.format_verbose(callee))
             }
-            RuntimeErrorKind::InvalidArgumentCount { actual, expected } => {
+            RuntimeError::InvalidArgumentCount { actual, expected } => {
                 format!("({line}) Invalid Argument Count: {actual} of {expected}")
             }
         }
