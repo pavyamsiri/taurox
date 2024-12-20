@@ -8,7 +8,7 @@ use cursor::SourceChar;
 pub use error::{LexicalError, LexicalErrorKind};
 use state::{LexerState, LexerStateTransition};
 use std::{ops::Range, path::Path, rc::Rc, str::Chars};
-use token::{Span, SpanIndex};
+pub use token::{Span, SpanIndex, SpanLength};
 pub use token::{Token, TokenKind};
 
 #[derive(Debug, Clone)]
@@ -124,6 +124,13 @@ impl<'src> Lexer<'src> {
         match start <= self.source.len() {
             true => Some(&self.source[span.range()]),
             false => None,
+        }
+    }
+
+    pub fn get_eof_span(&self) -> Span {
+        Span {
+            start: self.source.len().into(),
+            length: 0.into(),
         }
     }
 }

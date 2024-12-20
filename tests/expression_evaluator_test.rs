@@ -10,7 +10,7 @@ use taurox::{
         StatementInterpreter, TreeWalkStatementInterpreter,
     },
     parser::{
-        formatter::{ExpressionFormatter, SExpressionFormatter},
+        formatter::{ExpressionFormatter, SExpressionFormatter, ToFormatter},
         Parser,
     },
 };
@@ -18,7 +18,7 @@ use taurox::{
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut parser = Parser::new(input, test_name.as_ref());
     let result = parser.parse_expression();
-    let expression_formatter = SExpressionFormatter;
+    let expression_formatter: SExpressionFormatter = parser.create_formatter();
     let value_formatter = BasicFormatter;
     let mut environment = SharedEnvironment::new();
     let interpreter = TreeWalkStatementInterpreter;

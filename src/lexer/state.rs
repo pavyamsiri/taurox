@@ -141,7 +141,7 @@ impl LexerStateExecutor for NormalState {
                     kind: TokenKind::Eof,
                     span: Span {
                         start: self.location,
-                        length: source.len() + 1 - self.location,
+                        length: 0.into(),
                     },
                 }),
             };
@@ -578,7 +578,7 @@ impl LexerStateExecutor for CommentState {
                     kind: TokenKind::Eof,
                     span: Span {
                         start: self.start,
-                        length: source.len() - self.start,
+                        length: 0.into(),
                     },
                 }),
             };

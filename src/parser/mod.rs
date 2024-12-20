@@ -5,10 +5,11 @@ pub mod statement;
 
 use std::path::Path;
 
-use crate::lexer::{Lexer, LineBreaks, Token, TokenKind};
+use crate::lexer::{
+    Lexer, LexicalError, LineBreaks, Span, SpanIndex, SpanLength, Token, TokenKind,
+};
 use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
-use error::ParserErrorKind;
 use expression::{
     Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
     IncompleteExpression, InfixAssignmentOperator, InfixOperator, InfixShortCircuitOperator,
@@ -29,8 +30,15 @@ impl Program {
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
-    lookahead: Option<Result<Token, ParserError>>,
+    lookahead: Option<Result<Token, LexicalError>>,
     line_breaks: LineBreaks,
+}
+
+// Lexer based helpers
+impl<'src> Parser<'src> {
+    fn create_eof_error(&self) -> ParserError {
+        ParserError::UnexpectedEof(self.lexer.get_eof_span())
+    }
 }
 
 // Parse program
@@ -124,17 +132,11 @@ impl<'src> Parser<'src> {
         };
 
         let body = {
-            let body_statement = self.parse_statement()?.ok_or(ParserError {
-                kind: ParserErrorKind::UnexpectedEof,
-                line,
-            })?;
+            let body_statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
             match body_statement {
                 Statement::NonDeclaration(NonDeclaration::Block(body)) => body,
                 s => {
-                    return Err(ParserError {
-                        kind: ParserErrorKind::NonBlock(s),
-                        line,
-                    })
+                    return Err(ParserError::NonBlock(s));
                 }
             }
         };
@@ -155,10 +157,7 @@ impl<'src> Parser<'src> {
             Ok(Statement::NonDeclaration(NonDeclaration::Block(statements)))
         } else {
             loop {
-                let statement = self.parse_statement()?.ok_or(ParserError {
-                    kind: ParserErrorKind::UnexpectedEof,
-                    line,
-                })?;
+                let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
                 statements.push(statement);
                 if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
                     break;
@@ -173,16 +172,10 @@ impl<'src> Parser<'src> {
         let _ = self.expect(TokenKind::LeftParenthesis)?;
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
-        let success = self.parse_statement()?.ok_or(ParserError {
-            kind: ParserErrorKind::UnexpectedEof,
-            line,
-        })?;
+        let success = self.parse_statement()?.ok_or(self.create_eof_error())?;
 
         let failure = if let Some(_) = self.eat_if(TokenKind::KeywordElse)? {
-            Some(self.parse_statement()?.ok_or(ParserError {
-                kind: ParserErrorKind::UnexpectedEof,
-                line,
-            })?)
+            Some(self.parse_statement()?.ok_or(self.create_eof_error())?)
         } else {
             None
         };
@@ -199,10 +192,7 @@ impl<'src> Parser<'src> {
         let _ = self.expect(TokenKind::LeftParenthesis)?;
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
-        let body = self.parse_statement()?.ok_or(ParserError {
-            kind: ParserErrorKind::UnexpectedEof,
-            line,
-        })?;
+        let body = self.parse_statement()?.ok_or(self.create_eof_error())?;
 
         Ok(Statement::NonDeclaration(NonDeclaration::While {
             condition,
@@ -221,10 +211,7 @@ impl<'src> Parser<'src> {
             }
             // Initializer exists
             else {
-                let statement = self.parse_statement()?.ok_or(ParserError {
-                    kind: ParserErrorKind::UnexpectedEof,
-                    line,
-                })?;
+                let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
                 let initializer = match statement {
                     Statement::Declaration(Declaration::Variable { name, initial }) => {
                         Some(Initializer::VarDecl { name, initial })
@@ -265,16 +252,11 @@ impl<'src> Parser<'src> {
         };
 
         // Parse body
-        let body = self.parse_statement()?.ok_or(ParserError {
-            kind: ParserErrorKind::UnexpectedEof,
-            line,
-        })?;
-
+        let body = self.parse_statement()?.ok_or(self.create_eof_error())?;
         let body = match body {
-            Statement::Declaration(declaration) => Err(ParserError {
-                kind: ParserErrorKind::InvalidNonDeclaration(declaration),
-                line,
-            }),
+            Statement::Declaration(declaration) => {
+                Err(ParserError::InvalidNonDeclaration(declaration))
+            }
             Statement::NonDeclaration(non_declaration) => Ok(non_declaration),
         }?;
 
@@ -420,10 +402,7 @@ impl<'src> Parser<'src> {
         let line = self.line_breaks.get_line_from_span(token.span);
 
         if matches!(token.kind, TokenKind::Eof) {
-            return Err(ParserError {
-                kind: ParserErrorKind::UnexpectedEof,
-                line,
-            });
+            return Err(self.create_eof_error());
         }
 
         let lexeme = self
@@ -500,11 +479,8 @@ impl<'src> Parser<'src> {
                 self.expect(TokenKind::RightParenthesis)?;
                 tree.push(ExpressionNode::Group { inner })
             }
-            kind => {
-                return Err(ParserError {
-                    kind: ParserErrorKind::NonExpression(kind),
-                    line,
-                })
+            _ => {
+                return Err(ParserError::NonExpression(token));
             }
         };
         Ok(node)
@@ -523,10 +499,13 @@ impl<'src> Parser<'src> {
         if let Some(operator) = self.peek_infix_assignment_operator()? {
             let place = tree
                 .get_l_value(lhs)
-                .ok_or(ParserError {
-                    kind: ParserErrorKind::InvalidLValue(tree.get_kind(lhs).expect(MSG)),
-                    line: tree.get_line(lhs).expect(MSG),
-                })?
+                .ok_or(ParserError::InvalidLValue(Token {
+                    kind: tree.get_kind(lhs).expect(MSG),
+                    span: Span {
+                        start: SpanIndex::new(0),
+                        length: SpanLength::new(0),
+                    },
+                }))?
                 .to_compact_string();
 
             let (lbp, rbp) = operator.get_binding_power();
@@ -649,7 +628,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn peek(&mut self) -> Result<Token, ParserError> {
+    fn peek(&mut self) -> Result<Token, LexicalError> {
         match self.lookahead {
             Some(ref token_or_error) => token_or_error.clone(),
             None => {
@@ -660,18 +639,12 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn next_token(&mut self) -> Result<Token, ParserError> {
+    fn next_token(&mut self) -> Result<Token, LexicalError> {
         match self.lookahead.take() {
             Some(token_or_error) => token_or_error,
             None => {
                 let token_or_error = self.lexer.next_token();
-                token_or_error.map_err(|e| {
-                    let line = self.line_breaks.get_line_from_span(e.span);
-                    ParserError {
-                        kind: ParserErrorKind::LexicalError(e.clone()),
-                        line,
-                    }
-                })
+                token_or_error
             }
         }
     }
@@ -679,13 +652,9 @@ impl<'src> Parser<'src> {
     fn expect_ident(&mut self) -> Result<CompactString, ParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != TokenKind::Ident {
-            let line = self.line_breaks.get_line_from_span(next_token.span);
-            return Err(ParserError {
-                kind: ParserErrorKind::UnexpectedToken {
-                    actual: next_token.kind,
-                    expected: TokenKind::Ident,
-                },
-                line,
+            return Err(ParserError::UnexpectedToken {
+                actual: next_token,
+                expected: TokenKind::Ident,
             });
         }
 
@@ -701,12 +670,9 @@ impl<'src> Parser<'src> {
         let next_token = self.next_token()?;
         if next_token.kind != expected {
             let line = self.line_breaks.get_line_from_span(next_token.span);
-            Err(ParserError {
-                kind: ParserErrorKind::UnexpectedToken {
-                    actual: next_token.kind,
-                    expected,
-                },
-                line,
+            Err(ParserError::UnexpectedToken {
+                actual: next_token,
+                expected,
             })
         } else {
             Ok(next_token)

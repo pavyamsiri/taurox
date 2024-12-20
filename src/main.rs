@@ -137,13 +137,19 @@ fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
 }
 
 fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> Result<()> {
-    use taurox::parser::formatter::{DebugFormatter, ExpressionFormatter, SExpressionFormatter};
+    use taurox::parser::formatter::{
+        DebugFormatter, ExpressionFormatter, SExpressionFormatter, ToFormatter,
+    };
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src, path);
     let formatter: Box<dyn ExpressionFormatter> = match format {
-        ExpressionFormat::Debug => Box::new(DebugFormatter {}),
-        ExpressionFormat::SExpr => Box::new(SExpressionFormatter {}),
+        ExpressionFormat::Debug => {
+            Box::new(ToFormatter::<DebugFormatter>::create_formatter(&parser))
+        }
+        ExpressionFormat::SExpr => Box::new(ToFormatter::<SExpressionFormatter>::create_formatter(
+            &parser,
+        )),
     };
     let expression = parser.parse_expression()?;
     println!("{}", formatter.format(&expression));

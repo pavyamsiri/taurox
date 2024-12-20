@@ -1,8 +1,18 @@
-use crate::parser::{ParserError, ParserErrorKind};
-
-use super::expression::{
-    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
-    InfixOperator, InfixShortCircuitOperator, PrefixOperator,
+use super::{
+    expression::{
+        Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+        InfixOperator, InfixShortCircuitOperator, PrefixOperator,
+    },
+    Parser,
+};
+use crate::{
+    lexer::{
+        formatter::{
+            LineFormatter as LineTokenFormatter, ToFormatter as ToTokenFormatter, TokenFormatter,
+        },
+        LineBreaks, Token,
+    },
+    parser::ParserError,
 };
 
 pub trait ExpressionFormatter {
@@ -10,7 +20,20 @@ pub trait ExpressionFormatter {
     fn format_error(&self, error: &ParserError) -> String;
 }
 
+pub trait ToFormatter<F>
+where
+    F: ExpressionFormatter,
+{
+    fn create_formatter(&self) -> F;
+}
+
 pub struct DebugFormatter;
+
+impl<'src> ToFormatter<DebugFormatter> for Parser<'src> {
+    fn create_formatter(&self) -> DebugFormatter {
+        DebugFormatter {}
+    }
+}
 
 impl ExpressionFormatter for DebugFormatter {
     fn format(&self, tree: &Expression) -> String {
@@ -22,9 +45,23 @@ impl ExpressionFormatter for DebugFormatter {
     }
 }
 
-pub struct SExpressionFormatter;
+pub struct SExpressionFormatter<'src> {
+    text: &'src str,
+    line_breaks: LineBreaks,
+    lexer_formatter: LineTokenFormatter<'src>,
+}
 
-impl SExpressionFormatter {
+impl<'src> ToFormatter<SExpressionFormatter<'src>> for Parser<'src> {
+    fn create_formatter(&self) -> SExpressionFormatter<'src> {
+        SExpressionFormatter {
+            text: &self.lexer.get_source(),
+            line_breaks: self.lexer.get_line_breaks(),
+            lexer_formatter: self.lexer.create_formatter(),
+        }
+    }
+}
+
+impl<'src> SExpressionFormatter<'src> {
     fn format_atom(atom: &ExpressionAtom) -> String {
         match atom.kind {
             ExpressionAtomKind::Number(v) => format!("{v:?}"),
@@ -126,39 +163,49 @@ impl SExpressionFormatter {
     }
 }
 
-impl ExpressionFormatter for SExpressionFormatter {
+impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
     fn format(&self, tree: &Expression) -> String {
         SExpressionFormatter::format_node(tree, &tree.get_root_ref())
     }
 
     fn format_error(&self, error: &ParserError) -> String {
-        let line = error.line;
-        match error.kind {
-            ParserErrorKind::UnexpectedToken { actual, expected } => {
-                format!("({line}) Unexpected: A = {actual} E = {expected}")
+        match error {
+            ParserError::UnexpectedToken {
+                actual: Token { kind, span },
+                expected,
+            } => {
+                let line = self.line_breaks.get_line_from_span(*span);
+                format!("({line}) Unexpected: A = {kind} E = {expected}")
             }
-            ParserErrorKind::NonOperator(token) => {
-                format!("({line}) Non-operator: {token}")
+            ParserError::NonOperator(Token { kind, span }) => {
+                let line = self.line_breaks.get_line_from_span(*span);
+                format!("({line}) Non-operator: {kind}")
             }
-            ParserErrorKind::NonExpression(token) => {
-                format!("({line}) Non-Expression: {token}")
+            ParserError::NonExpression(Token { kind, span }) => {
+                let line = self.line_breaks.get_line_from_span(*span);
+                format!("({line}) Non-Expression: {kind}")
             }
-            ParserErrorKind::LexicalError(ref error) => {
-                format!("({line}) Lexical error: {error:?}")
+            ParserError::LexicalError(ref error) => {
+                self.lexer_formatter.format_lexical_error(error)
             }
-            ParserErrorKind::UnexpectedEof => {
+            ParserError::UnexpectedEof(span) => {
+                let line = self.line_breaks.get_line_from_span(*span);
                 format!("({line}) Unexpected EOF")
             }
-            ParserErrorKind::InvalidStatement(token) => {
-                format!("({line}) Invalid statement token: {token}")
+            ParserError::InvalidStatement(Token { kind, span }) => {
+                let line = self.line_breaks.get_line_from_span(*span);
+                format!("({line}) Invalid statement token: {kind}")
             }
-            ParserErrorKind::InvalidLValue(token) => {
-                format!("({line}) Invalid l-value: {token}")
+            ParserError::InvalidLValue(Token { kind, span }) => {
+                let line = self.line_breaks.get_line_from_span(*span);
+                format!("({line}) Invalid l-value: {kind}")
             }
-            ParserErrorKind::InvalidNonDeclaration(ref declaration) => {
+            ParserError::InvalidNonDeclaration(ref declaration) => {
+                let line = std::u32::MAX;
                 format!("({line}) Invalid non-declaration: {declaration:?}")
             }
-            ParserErrorKind::NonBlock(ref statement) => {
+            ParserError::NonBlock(ref statement) => {
+                let line = std::u32::MAX;
                 format!("({line}) Invalid block: {statement:?}")
             }
         }

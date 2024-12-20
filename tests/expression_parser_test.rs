@@ -5,14 +5,14 @@ use std::{
 };
 
 use taurox::parser::{
-    formatter::{ExpressionFormatter, SExpressionFormatter},
+    formatter::{ExpressionFormatter, SExpressionFormatter, ToFormatter},
     Parser,
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut parser = Parser::new(input, test_name.as_ref());
     let result = parser.parse_expression();
-    let formatter = SExpressionFormatter;
+    let formatter: SExpressionFormatter = parser.create_formatter();
     let actual = match result {
         Ok(ref tree) => formatter.format(tree),
         Err(ref e) => formatter.format_error(e),
