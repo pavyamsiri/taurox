@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use super::{
     error::{ExpressionParserError, GeneralExpressionParserError, GeneralParserError},
     expression::{
@@ -16,6 +14,7 @@ use crate::lexer::{
     LineBreaks, Token,
 };
 use ariadne::{Color, Label, Report, ReportKind, Source};
+use std::path::Path;
 
 const ARIADNE_MSG: &'static str = "Ariadne produces valid utf-8 strings";
 const ARIADNE_WRITE_MSG: &'static str = "Write into buffer should not fail.";

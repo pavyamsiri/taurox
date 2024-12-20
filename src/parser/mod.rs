@@ -45,6 +45,14 @@ impl<'src> Parser<'src> {
     pub fn get_line_breaks(&self) -> LineBreaks {
         self.lexer.get_line_breaks()
     }
+
+    pub fn get_source(&self) -> &'src str {
+        &self.lexer.get_source()
+    }
+
+    pub fn get_path(&self) -> &'src Path {
+        &self.lexer.get_path()
+    }
 }
 
 // Parse program

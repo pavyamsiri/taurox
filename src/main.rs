@@ -26,6 +26,8 @@ pub enum TauroxCommand {
     },
     Evaluate {
         path: PathBuf,
+        #[clap(long = "format", value_enum, default_value = "basic")]
+        format: ValueFormat,
     },
     Run {
         path: PathBuf,
@@ -45,6 +47,13 @@ pub enum ExpressionFormat {
     Debug,
     #[clap(name = "sexpr")]
     SExpr,
+    Pretty,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum ValueFormat {
+    Debug,
+    Basic,
     Pretty,
 }
 
@@ -70,13 +79,17 @@ fn taurox_main() -> Result<ExitCode> {
                 return Ok(ExitCode::from(65));
             }
         }
-        TauroxCommand::Evaluate { path } => {
+        TauroxCommand::Evaluate { path, format } => {
             eprintln!("Evaluating {:?}...", path);
             let src = read_to_string(&path)?;
-            let res = evaluate(&src, &path);
+            let res = evaluate(&src, &path, &format);
             match res {
                 Ok(_) => {}
-                Err(e) => {
+                Err(ProgramError::CompileError(e)) => {
+                    eprintln!("{e}");
+                    return Ok(ExitCode::from(65));
+                }
+                Err(ProgramError::RuntimeError(e)) => {
                     eprintln!("{e}");
                     return Ok(ExitCode::from(70));
                 }
@@ -162,27 +175,72 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
     }
 }
 
-fn evaluate(src: &str, path: &Path) -> Result<()> {
-    use taurox::interpreter::environment::SharedEnvironment;
-    use taurox::parser::Parser;
+enum ProgramError {
+    CompileError(ParserError),
+    RuntimeError(RuntimeError),
+}
 
+fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result<(), ProgramError> {
+    use taurox::interpreter::environment::SharedEnvironment;
+    use taurox::interpreter::formatter::{
+        BasicFormatter as BasicValueFormatter, DebugFormatter as DebugValueFormatter,
+        PrettyFormatter as PrettyValueFormatter, ToFormatter as ToValueFormatter, ValueFormatter,
+    };
     use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
+    use taurox::parser::{
+        formatter::{
+            DebugFormatter as DebugExpressionFormatter, ExpressionFormatter,
+            PrettyFormatter as PrettyExpressionFormatter, SExpressionFormatter,
+            ToFormatter as ToExpressionFormatter,
+        },
+        Parser,
+    };
 
     let mut parser = Parser::new(src, path);
-    let expression = parser.parse_expression()?;
+    let expression_formatter: Box<dyn ExpressionFormatter> = match format {
+        ValueFormat::Debug => {
+            Box::new(ToExpressionFormatter::<DebugExpressionFormatter>::create_formatter(&parser))
+        }
+        ValueFormat::Basic => {
+            Box::new(ToExpressionFormatter::<SExpressionFormatter>::create_formatter(&parser))
+        }
+        ValueFormat::Pretty => {
+            Box::new(ToExpressionFormatter::<PrettyExpressionFormatter>::create_formatter(&parser))
+        }
+    };
+    let expression = match parser.parse_expression() {
+        Ok(expr) => expr,
+        Err(e) => {
+            eprintln!("{}", expression_formatter.format_error(&e));
+            return Err(ProgramError::CompileError(e.into()));
+        }
+    };
+
+    let value_formatter: Box<dyn ValueFormatter> = match format {
+        ValueFormat::Debug => Box::new(ToValueFormatter::<DebugValueFormatter>::create_formatter(
+            &parser,
+        )),
+        ValueFormat::Basic => Box::new(ToValueFormatter::<BasicValueFormatter>::create_formatter(
+            &parser,
+        )),
+        ValueFormat::Pretty => Box::new(
+            ToValueFormatter::<PrettyValueFormatter>::create_formatter(&parser),
+        ),
+    };
 
     let mut environment = SharedEnvironment::new();
     let interpreter = TreeWalkStatementInterpreter;
-    let result = interpreter.evaluate(&expression, &mut environment)?;
+    let result = match interpreter.evaluate(&expression, &mut environment) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("{}", value_formatter.format_error(&e));
+            return Err(ProgramError::RuntimeError(e.into()));
+        }
+    };
 
     println!("{}", result);
 
     Ok(())
-}
-
-enum ProgramError {
-    CompileError(ParserError),
-    RuntimeError(RuntimeError),
 }
 
 fn run(src: &str, path: &Path) -> std::result::Result<(), ProgramError> {

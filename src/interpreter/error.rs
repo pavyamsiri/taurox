@@ -26,3 +26,16 @@ pub struct RuntimeError {
     pub kind: RuntimeErrorKind,
     pub span: Span,
 }
+
+impl RuntimeError {
+    pub fn code(&self) -> &'static str {
+        match self.kind {
+            RuntimeErrorKind::NonNumeric(_) => "RT001",
+            RuntimeErrorKind::NonNumerics(_, _) => "RT002",
+            RuntimeErrorKind::NonAddable(_, _) => "RT003",
+            RuntimeErrorKind::InvalidAccess(_) => "RT004",
+            RuntimeErrorKind::InvalidCallee(_) => "RT005",
+            RuntimeErrorKind::InvalidArgumentCount { .. } => "RT006",
+        }
+    }
+}
