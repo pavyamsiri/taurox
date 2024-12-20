@@ -6,11 +6,13 @@ use std::{
 use taurox::{
     interpreter::{
         environment::SharedEnvironment,
-        formatter::{BasicFormatter, ValueFormatter},
+        formatter::{BasicFormatter, ToFormatter as ToValueFormatter, ValueFormatter},
         StatementInterpreter, TreeWalkStatementInterpreter,
     },
     parser::{
-        formatter::{ExpressionFormatter, SExpressionFormatter, ToFormatter},
+        formatter::{
+            ExpressionFormatter, SExpressionFormatter, ToFormatter as ToExpressionFormatter,
+        },
         Parser,
     },
 };
@@ -18,8 +20,9 @@ use taurox::{
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut parser = Parser::new(input, test_name.as_ref());
     let result = parser.parse_expression();
-    let expression_formatter: SExpressionFormatter = parser.create_formatter();
-    let value_formatter = BasicFormatter;
+    let expression_formatter =
+        ToExpressionFormatter::<SExpressionFormatter>::create_formatter(&parser);
+    let value_formatter = ToValueFormatter::<BasicFormatter>::create_formatter(&parser);
     let mut environment = SharedEnvironment::new();
     let interpreter = TreeWalkStatementInterpreter;
     let actual = match result {

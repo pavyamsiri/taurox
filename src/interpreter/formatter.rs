@@ -1,11 +1,29 @@
-use super::{error::RuntimeError, value::LoxValue};
+use crate::{lexer::LineBreaks, parser::Parser};
+
+use super::{
+    error::{RuntimeError, RuntimeErrorKind},
+    value::LoxValue,
+};
 
 pub trait ValueFormatter {
     fn format(&self, value: &LoxValue) -> String;
     fn format_error(&self, error: &RuntimeError) -> String;
 }
 
+pub trait ToFormatter<F>
+where
+    F: ValueFormatter,
+{
+    fn create_formatter(&self) -> F;
+}
+
 pub struct DebugFormatter;
+
+impl<'src> ToFormatter<DebugFormatter> for Parser<'src> {
+    fn create_formatter(&self) -> DebugFormatter {
+        DebugFormatter {}
+    }
+}
 
 impl ValueFormatter for DebugFormatter {
     fn format(&self, value: &LoxValue) -> String {
@@ -17,7 +35,17 @@ impl ValueFormatter for DebugFormatter {
     }
 }
 
-pub struct BasicFormatter;
+pub struct BasicFormatter {
+    line_breaks: LineBreaks,
+}
+
+impl<'src> ToFormatter<BasicFormatter> for Parser<'src> {
+    fn create_formatter(&self) -> BasicFormatter {
+        BasicFormatter {
+            line_breaks: self.get_line_breaks(),
+        }
+    }
+}
 
 impl BasicFormatter {
     fn format_verbose(&self, value: &LoxValue) -> String {
@@ -38,28 +66,28 @@ impl ValueFormatter for BasicFormatter {
     }
 
     fn format_error(&self, error: &RuntimeError) -> String {
-        let line = std::u32::MAX;
-        match error {
-            RuntimeError::NonNumeric(ref v) => {
+        let line = self.line_breaks.get_line_from_span(error.span);
+        match error.kind {
+            RuntimeErrorKind::NonNumeric(ref v) => {
                 format!("({line}) Non-Number {{Unary}}: {}", self.format_verbose(v))
             }
-            RuntimeError::NonNumerics(ref lhs, ref rhs) => format!(
+            RuntimeErrorKind::NonNumerics(ref lhs, ref rhs) => format!(
                 "({line}) Non-Numbers {{Binary}}: [{}, {}]",
                 self.format_verbose(lhs),
                 self.format_verbose(rhs)
             ),
-            RuntimeError::NonAddable(ref lhs, ref rhs) => format!(
+            RuntimeErrorKind::NonAddable(ref lhs, ref rhs) => format!(
                 "({line}) Non-Numbers/Non-Strings {{Binary}}: [{}, {}]",
                 self.format_verbose(lhs),
                 self.format_verbose(rhs)
             ),
-            RuntimeError::InvalidAccess(ref name) => {
+            RuntimeErrorKind::InvalidAccess(ref name) => {
                 format!("({line}) Invalid Access: {name}",)
             }
-            RuntimeError::InvalidCallee(ref callee) => {
+            RuntimeErrorKind::InvalidCallee(ref callee) => {
                 format!("({line}) Invalid Callee: {}", self.format_verbose(callee))
             }
-            RuntimeError::InvalidArgumentCount { actual, expected } => {
+            RuntimeErrorKind::InvalidArgumentCount { actual, expected } => {
                 format!("({line}) Invalid Argument Count: {actual} of {expected}")
             }
         }

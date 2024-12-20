@@ -5,7 +5,9 @@ pub mod statement;
 
 use std::path::Path;
 
-use crate::lexer::{Lexer, LexicalError, Span, SpanIndex, SpanLength, Token, TokenKind};
+use crate::lexer::{
+    Lexer, LexicalError, LineBreaks, Span, SpanIndex, SpanLength, Token, TokenKind,
+};
 use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
 use error::{
@@ -38,6 +40,10 @@ pub struct Parser<'src> {
 impl<'src> Parser<'src> {
     fn create_eof_error(&self) -> GeneralParserError {
         GeneralParserError::UnexpectedEof(self.lexer.get_eof_span())
+    }
+
+    pub fn get_line_breaks(&self) -> LineBreaks {
+        self.lexer.get_line_breaks()
     }
 }
 

@@ -188,6 +188,16 @@ impl Expression {
         self.inner.get_node(node)
     }
 
+    pub fn get_span(&self) -> Span {
+        self.inner
+            .get_span(self.get_root_ref())
+            .expect("The root exists within the tree")
+    }
+
+    pub fn get_subspan(&self, node: ExpressionNodeRef) -> Option<Span> {
+        self.inner.get_span(node)
+    }
+
     pub fn get_kind(&self, node: ExpressionNodeRef) -> Option<TokenKind> {
         self.inner.get_kind(node)
     }
