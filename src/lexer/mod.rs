@@ -115,6 +115,10 @@ impl<'src> Lexer<'src> {
         self.source
     }
 
+    pub fn get_path(&self) -> &'src Path {
+        self.path
+    }
+
     pub fn get_line_breaks(&self) -> LineBreaks {
         self.line_breaks.clone()
     }

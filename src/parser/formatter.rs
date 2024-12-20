@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use super::{
     error::{ExpressionParserError, GeneralExpressionParserError, GeneralParserError},
     expression::{
@@ -8,10 +10,15 @@ use super::{
 };
 use crate::lexer::{
     formatter::{
-        LineFormatter as LineTokenFormatter, ToFormatter as ToTokenFormatter, TokenFormatter,
+        LineFormatter as LineTokenFormatter, PrettyFormatter as PrettyTokenFormatter,
+        ToFormatter as ToTokenFormatter, TokenFormatter,
     },
     LineBreaks, Token,
 };
+use ariadne::{Color, Label, Report, ReportKind, Source};
+
+const ARIADNE_MSG: &'static str = "Ariadne produces valid utf-8 strings";
+const ARIADNE_WRITE_MSG: &'static str = "Write into buffer should not fail.";
 
 pub trait ExpressionFormatter {
     fn format(&self, tree: &Expression) -> String;
@@ -167,10 +174,6 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
     fn format_error(&self, error: &GeneralExpressionParserError) -> String {
         match error {
             GeneralExpressionParserError::Inner(expr) => match expr {
-                ExpressionParserError::NonOperator(Token { kind, span }) => {
-                    let line = self.line_breaks.get_line_from_span(*span);
-                    format!("({line}) Non-operator: {kind}")
-                }
                 ExpressionParserError::NonExpression(Token { kind, span }) => {
                     let line = self.line_breaks.get_line_from_span(*span);
                     format!("({line}) Non-Expression: {kind}")
@@ -191,6 +194,105 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                 GeneralParserError::UnexpectedEof(span) => {
                     let line = self.line_breaks.get_line_from_span(*span);
                     format!("({line}) Unexpected EOF")
+                }
+                GeneralParserError::LexicalError(err) => {
+                    self.lexer_formatter.format_lexical_error(err)
+                }
+            },
+        }
+    }
+}
+
+pub struct PrettyFormatter<'src> {
+    text: &'src str,
+    path: &'src Path,
+    lexer_formatter: PrettyTokenFormatter<'src>,
+}
+
+impl<'src> ToFormatter<PrettyFormatter<'src>> for Parser<'src> {
+    fn create_formatter(&self) -> PrettyFormatter<'src> {
+        PrettyFormatter {
+            lexer_formatter: self.lexer.create_formatter(),
+            path: &self.lexer.get_path(),
+            text: &self.lexer.get_source(),
+        }
+    }
+}
+
+impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
+    fn format(&self, tree: &Expression) -> String {
+        SExpressionFormatter::format_node(tree, &tree.get_root_ref())
+    }
+
+    fn format_error(&self, error: &GeneralExpressionParserError) -> String {
+        let path = self
+            .path
+            .to_str()
+            .expect("Non-UTF8 paths are not supported!");
+        let mut output = std::io::Cursor::new(Vec::new());
+        match error {
+            GeneralExpressionParserError::Inner(expr) => match expr {
+                ExpressionParserError::NonExpression(Token { kind, span }) => {
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Expected a valid expression operator or atom token")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message(format!("Not an expression token {}", kind))
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(self.text)), &mut output)
+                        .expect(ARIADNE_WRITE_MSG);
+                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
+                }
+                ExpressionParserError::InvalidLValue(Token { kind, span }) => {
+                    // TODO(pavyamsiri): L-value spans are not correct
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Expected an l-value")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message(format!("Not an l-value {}", kind))
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(self.text)), &mut output)
+                        .expect(ARIADNE_WRITE_MSG);
+                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
+                }
+            },
+            GeneralExpressionParserError::General(gen) => match gen {
+                GeneralParserError::UnexpectedToken {
+                    actual: Token { kind, span },
+                    expected,
+                } => {
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Expected a different token")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message(format!("Expected {} but got {}", expected, kind))
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(self.text)), &mut output)
+                        .expect(ARIADNE_WRITE_MSG);
+                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
+                }
+                GeneralParserError::UnexpectedEof(span) => {
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Unexpected EOF")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message("File ends here...")
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(self.text)), &mut output)
+                        .expect(ARIADNE_WRITE_MSG);
+                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
                 GeneralParserError::LexicalError(err) => {
                     self.lexer_formatter.format_lexical_error(err)

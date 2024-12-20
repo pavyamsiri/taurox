@@ -45,6 +45,7 @@ pub enum ExpressionFormat {
     Debug,
     #[clap(name = "sexpr")]
     SExpr,
+    Pretty,
 }
 
 fn main() -> ExitCode {
@@ -65,13 +66,8 @@ fn taurox_main() -> Result<ExitCode> {
         TauroxCommand::Parse { path, format } => {
             eprintln!("Parsing {:?}...", path);
             let src = read_to_string(&path)?;
-            let res = parse(&src, &path, &format);
-            match res {
-                Ok(_) => {}
-                Err(e) => {
-                    eprintln!("{e}");
-                    return Ok(ExitCode::from(65));
-                }
+            if !parse(&src, &path, &format) {
+                return Ok(ExitCode::from(65));
             }
         }
         TauroxCommand::Evaluate { path } => {
@@ -136,9 +132,9 @@ fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
     }
 }
 
-fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> Result<()> {
+fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
     use taurox::parser::formatter::{
-        DebugFormatter, ExpressionFormatter, SExpressionFormatter, ToFormatter,
+        DebugFormatter, ExpressionFormatter, PrettyFormatter, SExpressionFormatter, ToFormatter,
     };
     use taurox::parser::Parser;
 
@@ -150,10 +146,20 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> Result<()> {
         ExpressionFormat::SExpr => Box::new(ToFormatter::<SExpressionFormatter>::create_formatter(
             &parser,
         )),
+        ExpressionFormat::Pretty => {
+            Box::new(ToFormatter::<PrettyFormatter>::create_formatter(&parser))
+        }
     };
-    let expression = parser.parse_expression()?;
-    println!("{}", formatter.format(&expression));
-    Ok(())
+    match parser.parse_expression() {
+        Ok(expression) => {
+            println!("{}", formatter.format(&expression));
+            true
+        }
+        Err(err) => {
+            println!("{}", formatter.format_error(&err));
+            false
+        }
+    }
 }
 
 fn evaluate(src: &str, path: &Path) -> Result<()> {

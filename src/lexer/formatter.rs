@@ -1,11 +1,10 @@
-use std::path::Path;
-
 use super::{
     token::{SpanIndex, Token, TokenKind},
     LineBreaks,
 };
 use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
+use std::path::Path;
 
 /// Interface for creating new token formatters.
 pub trait TokenFormatter {
