@@ -168,11 +168,7 @@ impl TreeWalkStatementInterpreter {
             name,
             LoxValue::Function {
                 name: name.into(),
-                parameters: parameters
-                    .to_vec()
-                    .iter()
-                    .map(|&s| s.to_compact_string())
-                    .collect(),
+                parameters: parameters.to_vec().iter().map(|&s| s.into()).collect(),
                 body: body.to_vec(),
                 closure: environment.new_scope(),
             },
@@ -290,8 +286,8 @@ impl TreeWalkStatementInterpreter {
 
         loop {
             let flag = match condition {
-                Some(condition) => self.evaluate(condition, &mut environment)?.is_truthy(),
-                None => true,
+                Option::Some(condition) => self.evaluate(condition, &mut environment)?.is_truthy(),
+                Option::None => true,
             };
 
             if !flag {
@@ -300,10 +296,10 @@ impl TreeWalkStatementInterpreter {
 
             self.interpret_non_declaration(body, &mut environment)?;
             match increment {
-                Some(increment) => {
+                Option::Some(increment) => {
                     self.evaluate(increment, &mut environment)?;
                 }
-                None => {}
+                Option::None => {}
             }
         }
         Ok(ProgramState::Run)
@@ -370,7 +366,7 @@ impl TreeWalkStatementInterpreter {
             ExpressionAtomKind::Number(v) => LoxValue::Number(*v),
             ExpressionAtomKind::Bool(v) => LoxValue::Bool(*v),
             ExpressionAtomKind::Nil => LoxValue::Nil,
-            ExpressionAtomKind::StringLiteral(ref v) => LoxValue::String(v.clone()),
+            ExpressionAtomKind::StringLiteral(ref v) => LoxValue::String(v.to_compact_string()),
             ExpressionAtomKind::Identifier(ref name) => environment
                 .access(name)
                 .ok_or(RuntimeError {

@@ -1,5 +1,5 @@
 use super::{environment::SharedEnvironment, error::RuntimeError, error::RuntimeErrorKind};
-use crate::parser::statement::Statement;
+use crate::{parser::statement::Statement, string::IdentifierString};
 use compact_str::{CompactString, CompactStringExt};
 use std::sync::Arc;
 
@@ -17,8 +17,8 @@ pub enum LoxValue {
     Bool(bool),
     NativeFunction(Arc<dyn NativeFunction>),
     Function {
-        name: CompactString,
-        parameters: Vec<CompactString>,
+        name: IdentifierString,
+        parameters: Vec<IdentifierString>,
         body: Vec<Statement>,
         closure: SharedEnvironment,
     },

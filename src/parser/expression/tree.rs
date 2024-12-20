@@ -1,14 +1,16 @@
 use super::{InfixOperator, InfixShortCircuitOperator, PrefixOperator};
-use crate::lexer::{Span, TokenKind};
-use compact_str::CompactString;
+use crate::{
+    lexer::{Span, TokenKind},
+    string::IdentifierString,
+};
 
 #[derive(Debug, Clone)]
 pub enum ExpressionAtomKind {
     Number(f64),
     Bool(bool),
     Nil,
-    Identifier(CompactString),
-    StringLiteral(CompactString),
+    Identifier(IdentifierString),
+    StringLiteral(IdentifierString),
 }
 
 #[derive(Debug, Clone)]
@@ -19,12 +21,12 @@ pub struct ExpressionAtom {
 
 #[derive(Debug, Clone)]
 pub struct AssignmentDestination {
-    pub name: CompactString,
+    pub name: IdentifierString,
     pub span: Span,
 }
 
 impl AssignmentDestination {
-    pub fn get_name(&self) -> CompactString {
+    pub fn get_name(&self) -> IdentifierString {
         self.name.clone()
     }
 }

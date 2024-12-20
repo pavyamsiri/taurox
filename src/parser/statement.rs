@@ -1,6 +1,5 @@
-use compact_str::CompactString;
-
 use super::expression::Expression;
+use crate::string::IdentifierString;
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -11,12 +10,12 @@ pub enum Statement {
 #[derive(Debug, Clone)]
 pub enum Declaration {
     Variable {
-        name: CompactString,
+        name: IdentifierString,
         initial: Option<Expression>,
     },
     Function {
-        name: CompactString,
-        parameters: Vec<CompactString>,
+        name: IdentifierString,
+        parameters: Vec<IdentifierString>,
         body: Vec<Statement>,
     },
 }
@@ -24,7 +23,7 @@ pub enum Declaration {
 #[derive(Debug, Clone)]
 pub enum Initializer {
     VarDecl {
-        name: CompactString,
+        name: IdentifierString,
         initial: Option<Expression>,
     },
     Expression(Expression),

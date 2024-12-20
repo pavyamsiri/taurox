@@ -1,5 +1,5 @@
 use crate::lexer::Span;
-use compact_str::CompactString;
+use crate::string::IdentifierString;
 use thiserror::Error;
 
 use super::value::LoxValue;
@@ -13,7 +13,7 @@ pub enum RuntimeErrorKind {
     #[error("Non-Numbers/Non-Strings {{Binary}}: [{0} , {1}]")]
     NonAddable(LoxValue, LoxValue),
     #[error("Invalid Access: {0}")]
-    InvalidAccess(CompactString),
+    InvalidAccess(IdentifierString),
     #[error("Invalid Callee: {0}")]
     InvalidCallee(LoxValue),
     #[error("Invalid Argument Count: {actual} of {expected}")]

@@ -2,7 +2,7 @@ use super::{
     native::NativeClock,
     value::{LoxValue, NativeFunction},
 };
-use compact_str::{CompactString, ToCompactString};
+use crate::string::IdentifierString;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -15,7 +15,7 @@ pub struct SharedEnvironment {
 
 #[derive(Debug, Clone)]
 struct Environment {
-    values: HashMap<CompactString, LoxValue>,
+    values: HashMap<IdentifierString, LoxValue>,
     parent: Option<SharedEnvironment>,
 }
 
@@ -28,7 +28,7 @@ impl SharedEnvironment {
             let clock = NativeClock;
 
             globals.insert(
-                clock.get_name().to_compact_string(),
+                clock.get_name().into(),
                 LoxValue::NativeFunction(Arc::new(clock)),
             );
         }
@@ -79,7 +79,7 @@ impl Environment {
 
     pub fn assign(&mut self, name: &str, value: LoxValue) -> Result<(), ()> {
         if self.values.contains_key(name) {
-            self.values.insert(name.to_compact_string(), value);
+            self.values.insert(name.into(), value);
             Ok(())
         } else if let Some(mut parent) = self.parent.clone() {
             parent.assign(name, value)
@@ -89,7 +89,7 @@ impl Environment {
     }
 
     pub fn declare(&mut self, name: &str, value: LoxValue) {
-        self.values.insert(name.to_compact_string(), value);
+        self.values.insert(name.into(), value);
     }
 }
 

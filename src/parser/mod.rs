@@ -3,12 +3,10 @@ pub mod expression;
 pub mod formatter;
 pub mod statement;
 
-use std::path::Path;
-
-use crate::lexer::{
-    Lexer, LexicalError, LineBreaks, Span, SpanIndex, SpanLength, Token, TokenKind,
+use crate::{
+    lexer::{Lexer, LexicalError, LineBreaks, Span, SpanIndex, SpanLength, Token, TokenKind},
+    string::IdentifierString,
 };
-use compact_str::{CompactString, ToCompactString};
 pub use error::ParserError;
 use error::{
     ExpressionParserError, GeneralExpressionParserError, GeneralParserError, StatementParserError,
@@ -19,6 +17,7 @@ use expression::{
     InfixShortCircuitOperator, PostfixOperator, PrefixOperator,
 };
 use statement::{Declaration, Initializer, NonDeclaration, Statement};
+use std::path::Path;
 
 #[derive(Debug)]
 pub struct Program {
@@ -114,7 +113,7 @@ impl<'src> Parser<'src> {
         }
 
         let statement = Statement::Declaration(Declaration::Variable {
-            name: place.clone(),
+            name: place.into(),
             initial,
         });
         let _ = self.expect(TokenKind::Semicolon)?;
@@ -520,7 +519,7 @@ impl<'src> Parser<'src> {
                             length: SpanLength::new(0),
                         },
                     }))?;
-            let place = place.to_compact_string();
+            let place: IdentifierString = place.into();
 
             let (lbp, rbp) = operator.get_binding_power();
             if lbp < min_bp {
@@ -645,8 +644,8 @@ impl<'src> Parser<'src> {
 
     fn peek(&mut self) -> Result<Token, LexicalError> {
         match self.lookahead {
-            Some(ref token_or_error) => token_or_error.clone(),
-            None => {
+            Option::Some(ref token_or_error) => token_or_error.clone(),
+            Option::None => {
                 let next_token = self.next_token();
                 self.lookahead = Some(next_token.clone());
                 next_token
@@ -656,15 +655,15 @@ impl<'src> Parser<'src> {
 
     fn next_token(&mut self) -> Result<Token, LexicalError> {
         match self.lookahead.take() {
-            Some(token_or_error) => token_or_error,
-            None => {
+            Option::Some(token_or_error) => token_or_error,
+            Option::None => {
                 let token_or_error = self.lexer.next_token();
                 token_or_error
             }
         }
     }
 
-    fn expect_ident(&mut self) -> Result<CompactString, GeneralParserError> {
+    fn expect_ident(&mut self) -> Result<IdentifierString, GeneralParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != TokenKind::Ident {
             return Err(GeneralParserError::UnexpectedToken {
@@ -678,7 +677,7 @@ impl<'src> Parser<'src> {
             .get_lexeme(&next_token.span)
             .expect("Token came from lexer so it is valid.");
 
-        Ok(name.to_compact_string())
+        Ok(name.into())
     }
 
     fn expect(&mut self, expected: TokenKind) -> Result<Token, GeneralParserError> {
