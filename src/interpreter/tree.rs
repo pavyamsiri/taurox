@@ -412,12 +412,8 @@ impl TreeWalkStatementInterpreter {
             ExpressionNode::InfixAssignment { lhs, rhs } => {
                 let rhs =
                     self.evaluate_expression_node(expr, *rhs, environment, context, resolution)?;
-                let _ = environment
-                    .assign(&lhs.get_name(), rhs.clone())
-                    .map_err(|_| RuntimeError {
-                        kind: RuntimeErrorKind::InvalidAccess(lhs.get_name()),
-                        span,
-                    })?;
+                self.assign_variable(&lhs.get_name(), rhs.clone(), &span, environment, resolution)
+                    .map_err(|kind| RuntimeError { kind, span })?;
 
                 rhs
             }
@@ -652,5 +648,20 @@ impl TreeWalkStatementInterpreter {
             Some(depth) => environment.access_at(name, *depth),
             None => environment.access_global(name),
         }
+    }
+
+    fn assign_variable(
+        &self,
+        name: &IdentifierString,
+        value: LoxValue,
+        span: &Span,
+        environment: &mut SharedEnvironment,
+        resolution: &HashMap<Span, usize>,
+    ) -> Result<(), RuntimeErrorKind> {
+        let result = match resolution.get(span) {
+            Some(depth) => environment.assign_at(name, value, *depth),
+            None => environment.assign_global(name, value),
+        };
+        result.map_err(|_| RuntimeErrorKind::InvalidAccess(name.clone()))
     }
 }

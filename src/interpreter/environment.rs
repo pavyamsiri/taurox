@@ -55,16 +55,6 @@ impl SharedEnvironment {
         inner.access(name)
     }
 
-    pub fn assign(&mut self, name: &str, value: LoxValue) -> Result<(), ()> {
-        let mut inner = self.inner.lock().unwrap();
-        inner.assign(name, value)
-    }
-
-    pub fn declare(&mut self, name: &str, value: LoxValue) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.declare(name, value)
-    }
-
     pub fn access_at(&self, name: &str, distance: usize) -> Option<LoxValue> {
         let mut current = self.clone();
         for _ in 0..distance {
@@ -92,6 +82,44 @@ impl SharedEnvironment {
             }
         }
         current.access(name)
+    }
+
+    pub fn assign(&mut self, name: &str, value: LoxValue) -> Result<(), ()> {
+        let mut inner = self.inner.lock().unwrap();
+        inner.assign(name, value)
+    }
+
+    pub fn assign_at(&mut self, name: &str, value: LoxValue, distance: usize) -> Result<(), ()> {
+        let mut current = self.clone();
+        for _ in 0..distance {
+            let parent = {
+                let inner = current.inner.lock().unwrap();
+                inner.parent.clone()
+            };
+            current = parent.ok_or(())?;
+        }
+        current.assign(name, value)
+    }
+
+    pub fn assign_global(&self, name: &str, value: LoxValue) -> Result<(), ()> {
+        let mut current = self.clone();
+        loop {
+            let parent = {
+                let inner = current.inner.lock().unwrap();
+                inner.parent.clone()
+            };
+            match parent {
+                Some(parent) => {
+                    current = parent;
+                }
+                None => break,
+            }
+        }
+        current.assign(name, value)
+    }
+    pub fn declare(&mut self, name: &str, value: LoxValue) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.declare(name, value)
     }
 }
 
