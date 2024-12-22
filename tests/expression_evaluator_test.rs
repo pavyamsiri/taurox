@@ -8,6 +8,7 @@ use taurox::{
         context::BufferedContext,
         environment::SharedEnvironment,
         formatter::{BasicFormatter, ToFormatter as ToValueFormatter, ValueFormatter},
+        resolver::Resolver,
         StatementInterpreter, TreeWalkStatementInterpreter,
     },
     parser::{
@@ -20,22 +21,40 @@ use taurox::{
 
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut parser = Parser::new(input, test_name.as_ref());
-    let result = parser.parse_expression();
+    // Create formatters
     let expression_formatter =
         ToExpressionFormatter::<SExpressionFormatter>::create_formatter(&parser);
     let value_formatter = ToValueFormatter::<BasicFormatter>::create_formatter(&parser);
+
+    let expr = match parser.parse_expression() {
+        Ok(expr) => expr,
+        Err(e) => {
+            let actual = format!("{}", expression_formatter.format_error(&e));
+            assert_eq!(actual, expected, "Failed the test {test_name} [value]");
+            return;
+        }
+    };
+
+    let resolver = Resolver::new();
+    let resolution = match resolver.resolve_expression_and_consume(&expr) {
+        Ok(r) => r,
+        Err(e) => {
+            let actual = format!("{}", e);
+            assert_eq!(actual, expected, "Failed the test {test_name} [value]");
+            return;
+        }
+    };
+
     let mut environment = SharedEnvironment::new();
     let interpreter = TreeWalkStatementInterpreter;
     let mut context = BufferedContext::new();
-    let actual = match result {
-        Ok(ref t) => {
-            let v = interpreter.evaluate(t, &mut environment, &mut context);
-            match v {
-                Ok(ref v) => format!("{}", value_formatter.format(v)),
-                Err(ref e) => format!("{}", value_formatter.format_error(e)),
-            }
+    let actual = match interpreter.evaluate(&expr, &mut environment, &mut context, &resolution) {
+        Ok(v) => {
+            format!("{}", value_formatter.format(&v))
         }
-        Err(ref e) => format!("{}", expression_formatter.format_error(e)),
+        Err(e) => {
+            format!("{}", value_formatter.format_error(&e))
+        }
     };
 
     let actual_io = context.into_data();

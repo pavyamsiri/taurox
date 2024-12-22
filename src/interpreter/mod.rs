@@ -7,7 +7,12 @@ pub mod resolver;
 mod tree;
 mod value;
 
-use crate::parser::{expression::Expression, statement::Statement};
+use std::collections::HashMap;
+
+use crate::{
+    lexer::Span,
+    parser::{expression::Expression, statement::Statement},
+};
 use environment::SharedEnvironment;
 use error::RuntimeError;
 pub use tree::{TreeWalkInterpreter, TreeWalkStatementInterpreter};
@@ -34,6 +39,7 @@ pub trait StatementInterpreter<C> {
         statement: &Statement,
         environment: &mut SharedEnvironment,
         context: &mut C,
+        resolution: &HashMap<Span, usize>,
     ) -> Result<ProgramState, RuntimeError>;
 
     fn evaluate(
@@ -41,6 +47,7 @@ pub trait StatementInterpreter<C> {
         expr: &Expression,
         environment: &mut SharedEnvironment,
         context: &mut C,
+        resolution: &HashMap<Span, usize>,
     ) -> Result<LoxValue, RuntimeError>;
 
     fn create() -> Self;

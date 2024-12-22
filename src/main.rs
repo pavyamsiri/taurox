@@ -3,6 +3,7 @@ use color_eyre::eyre::Result;
 use std::path::{Path, PathBuf};
 use std::{fs::read_to_string, process::ExitCode};
 use taurox::interpreter::error::RuntimeError;
+use taurox::interpreter::resolver::ResolutionError;
 use taurox::parser::ParserError;
 
 #[derive(Debug, Parser)]
@@ -89,6 +90,10 @@ fn taurox_main() -> Result<ExitCode> {
                     eprintln!("{e}");
                     return Ok(ExitCode::from(65));
                 }
+                Err(ProgramError::AnalysisError(e)) => {
+                    eprintln!("{e}");
+                    return Ok(ExitCode::from(67));
+                }
                 Err(ProgramError::RuntimeError(e)) => {
                     eprintln!("{e}");
                     return Ok(ExitCode::from(70));
@@ -104,6 +109,10 @@ fn taurox_main() -> Result<ExitCode> {
                 Err(ProgramError::CompileError(e)) => {
                     eprintln!("{e}");
                     return Ok(ExitCode::from(65));
+                }
+                Err(ProgramError::AnalysisError(e)) => {
+                    eprintln!("{e}");
+                    return Ok(ExitCode::from(67));
                 }
                 Err(ProgramError::RuntimeError(e)) => {
                     eprintln!("{e}");
@@ -177,6 +186,7 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
 
 enum ProgramError {
     CompileError(ParserError),
+    AnalysisError(ResolutionError),
     RuntimeError(RuntimeError),
 }
 
@@ -187,6 +197,7 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
         BasicFormatter as BasicValueFormatter, DebugFormatter as DebugValueFormatter,
         PrettyFormatter as PrettyValueFormatter, ToFormatter as ToValueFormatter, ValueFormatter,
     };
+    use taurox::interpreter::resolver::Resolver;
     use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
     use taurox::parser::{
         formatter::{
@@ -230,15 +241,24 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
     };
 
     let mut environment = SharedEnvironment::new();
-    let interpreter = TreeWalkStatementInterpreter;
-    let mut context = StdioContext;
-    let result = match interpreter.evaluate(&expression, &mut environment, &mut context) {
-        Ok(result) => result,
+    let resolver = Resolver::new();
+    let resolution = match resolver.resolve_expression_and_consume(&expression) {
+        Ok(r) => r,
         Err(e) => {
-            eprintln!("{}", value_formatter.format_error(&e));
-            return Err(ProgramError::RuntimeError(e.into()));
+            eprintln!("{e}");
+            return Err(ProgramError::AnalysisError(e.into()));
         }
     };
+    let interpreter = TreeWalkStatementInterpreter;
+    let mut context = StdioContext;
+    let result =
+        match interpreter.evaluate(&expression, &mut environment, &mut context, &resolution) {
+            Ok(result) => result,
+            Err(e) => {
+                eprintln!("{}", value_formatter.format_error(&e));
+                return Err(ProgramError::RuntimeError(e.into()));
+            }
+        };
 
     println!("{}", result);
 
@@ -258,11 +278,16 @@ fn run(src: &str, path: &Path) -> std::result::Result<(), ProgramError> {
 
     // Static analysis
     let resolver = Resolver::new();
-    let resolution = resolver.resolve(&program);
-    eprintln!("Resolved =\n\t{resolution:?}");
+    let resolution = match resolver.resolve_program(&program) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("{e}");
+            return Err(ProgramError::AnalysisError(e.into()));
+        }
+    };
 
     let mut interpreter =
-        TreeWalkInterpreter::<TreeWalkStatementInterpreter, StdioContext>::new(program);
+        TreeWalkInterpreter::<TreeWalkStatementInterpreter, StdioContext>::new(program, resolution);
     let mut context = StdioContext;
     loop {
         let state = interpreter

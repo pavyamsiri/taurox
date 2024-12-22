@@ -64,6 +64,35 @@ impl SharedEnvironment {
         let mut inner = self.inner.lock().unwrap();
         inner.declare(name, value)
     }
+
+    pub fn access_at(&self, name: &str, distance: usize) -> Option<LoxValue> {
+        let mut current = self.clone();
+        for _ in 0..distance {
+            let parent = {
+                let inner = current.inner.lock().unwrap();
+                inner.parent.clone()
+            };
+            current = parent?;
+        }
+        current.access(name)
+    }
+
+    pub fn access_global(&self, name: &str) -> Option<LoxValue> {
+        let mut current = self.clone();
+        loop {
+            let parent = {
+                let inner = current.inner.lock().unwrap();
+                inner.parent.clone()
+            };
+            match parent {
+                Some(parent) => {
+                    current = parent;
+                }
+                None => break,
+            }
+        }
+        current.access(name)
+    }
 }
 
 impl Environment {

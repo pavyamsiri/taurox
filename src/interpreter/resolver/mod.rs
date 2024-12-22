@@ -1,5 +1,5 @@
 mod error;
-use error::{ResolutionError, ResolutionErrorKind};
+pub use error::{ResolutionError, ResolutionErrorKind};
 
 use crate::{
     lexer::Span,
@@ -32,13 +32,24 @@ impl Resolver {
         }
     }
 
-    pub fn resolve(mut self, program: &Program) -> Result<HashMap<Span, usize>, ResolutionError> {
+    pub fn resolve_program(
+        mut self,
+        program: &Program,
+    ) -> Result<HashMap<Span, usize>, ResolutionError> {
         for index in 0..program.len() {
             let statement = program
                 .get_statement(index)
                 .expect("Iterating over valid indices.");
             self.resolve_statement(statement)?;
         }
+        Ok(self.resolution)
+    }
+
+    pub fn resolve_expression_and_consume(
+        mut self,
+        expr: &Expression,
+    ) -> Result<HashMap<Span, usize>, ResolutionError> {
+        self.resolve_expression(expr)?;
         Ok(self.resolution)
     }
 
