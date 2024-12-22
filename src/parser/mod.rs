@@ -28,6 +28,10 @@ impl Program {
     pub fn get_statement(&self, index: usize) -> Option<&Statement> {
         self.statements.get(index)
     }
+
+    pub fn len(&self) -> usize {
+        self.statements.len()
+    }
 }
 
 pub struct Parser<'src> {

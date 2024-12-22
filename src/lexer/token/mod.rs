@@ -28,7 +28,7 @@ pub static KEYWORD_HASHMAP: LazyLock<HashMap<&'static str, TokenKind>> = LazyLoc
     map
 });
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Span {
     /// The byte position of the start of the token.
     pub start: SpanIndex,

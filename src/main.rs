@@ -248,12 +248,19 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
 fn run(src: &str, path: &Path) -> std::result::Result<(), ProgramError> {
     use taurox::interpreter::ProgramState;
     use taurox::interpreter::{
-        context::StdioContext, Interpreter, TreeWalkInterpreter, TreeWalkStatementInterpreter,
+        context::StdioContext, resolver::Resolver, Interpreter, TreeWalkInterpreter,
+        TreeWalkStatementInterpreter,
     };
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src, path);
     let program = parser.parse().map_err(|e| ProgramError::CompileError(e))?;
+
+    // Static analysis
+    let resolver = Resolver::new();
+    let resolution = resolver.resolve(&program);
+    eprintln!("Resolved =\n\t{resolution:?}");
+
     let mut interpreter =
         TreeWalkInterpreter::<TreeWalkStatementInterpreter, StdioContext>::new(program);
     let mut context = StdioContext;

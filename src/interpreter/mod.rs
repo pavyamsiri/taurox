@@ -3,6 +3,7 @@ pub mod environment;
 pub mod error;
 pub mod formatter;
 mod native;
+pub mod resolver;
 mod tree;
 mod value;
 
