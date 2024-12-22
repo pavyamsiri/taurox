@@ -7,6 +7,8 @@ pub enum ResolutionErrorKind {
     SelfReferentialInitializer,
     #[error("Shadowing a local.")]
     ShadowLocal,
+    #[error("Returning in a non-function scope.")]
+    NonFunctionReturn,
 }
 
 #[derive(Debug, Error, Clone)]

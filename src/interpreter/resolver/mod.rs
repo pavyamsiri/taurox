@@ -1,5 +1,4 @@
 mod error;
-pub use error::{ResolutionError, ResolutionErrorKind};
 
 use crate::{
     lexer::Span,
@@ -12,6 +11,7 @@ use crate::{
     },
     string::IdentifierString,
 };
+pub use error::{ResolutionError, ResolutionErrorKind};
 use std::collections::HashMap;
 
 enum Resolution {
@@ -19,8 +19,15 @@ enum Resolution {
     Defined,
 }
 
+#[derive(Clone, Copy)]
+enum FunctionEnvironment {
+    None,
+    Function,
+}
+
 pub struct Resolver {
     resolution: HashMap<Span, usize>,
+    function: FunctionEnvironment,
     scopes: Vec<HashMap<IdentifierString, Resolution>>,
 }
 
@@ -29,6 +36,7 @@ impl Resolver {
         Self {
             resolution: HashMap::new(),
             scopes: Vec::new(),
+            function: FunctionEnvironment::None,
         }
     }
 
@@ -168,7 +176,7 @@ impl Resolver {
             },
         )?;
         self.define(name);
-        self.resolve_function(parameters, body)?;
+        self.resolve_function(parameters, body, FunctionEnvironment::Function)?;
 
         Ok(())
     }
@@ -177,7 +185,10 @@ impl Resolver {
         &mut self,
         parameters: &[IdentifierString],
         body: &[Statement],
+        environment: FunctionEnvironment,
     ) -> Result<(), ResolutionError> {
+        let enclosing = self.function;
+        self.function = environment;
         self.enter_scope();
         for param in parameters {
             // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
@@ -194,6 +205,7 @@ impl Resolver {
             self.resolve_statement(statement)?;
         }
         self.exit_scope();
+        self.function = enclosing;
         Ok(())
     }
 }
@@ -238,9 +250,7 @@ impl Resolver {
                 )?;
             }
             NonDeclaration::Return { value } => {
-                if let Some(value) = value {
-                    self.resolve_expression(value)?;
-                }
+                self.resolve_return_statement(value.as_ref())?;
             }
         }
         Ok(())
@@ -294,6 +304,27 @@ impl Resolver {
             self.resolve_expression(increment)?;
         }
         self.resolve_non_declaration(body)?;
+        Ok(())
+    }
+
+    fn resolve_return_statement(
+        &mut self,
+        expr: Option<&Expression>,
+    ) -> Result<(), ResolutionError> {
+        if matches!(self.function, FunctionEnvironment::None) {
+            // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
+            return Err(ResolutionError {
+                kind: ResolutionErrorKind::NonFunctionReturn,
+                span: Span {
+                    start: 0.into(),
+                    length: 0.into(),
+                },
+            });
+        }
+
+        if let Some(expr) = expr {
+            self.resolve_expression(expr)?;
+        }
         Ok(())
     }
 }
