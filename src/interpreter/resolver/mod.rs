@@ -76,10 +76,18 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &IdentifierString) {
+    fn declare(&mut self, name: &IdentifierString, span: &Span) -> Result<(), ResolutionError> {
         if let Some(inner_scope) = self.scopes.last_mut() {
+            if inner_scope.contains_key(name) {
+                return Err(ResolutionError {
+                    kind: ResolutionErrorKind::ShadowLocal,
+                    span: span.clone(),
+                });
+            }
+
             inner_scope.insert(name.clone(), Resolution::Declared);
         }
+        Ok(())
     }
 
     fn define(&mut self, name: &IdentifierString) {
@@ -130,7 +138,14 @@ impl Resolver {
         name: &IdentifierString,
         initializer: Option<&Expression>,
     ) -> Result<(), ResolutionError> {
-        self.declare(&name);
+        // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
+        self.declare(
+            &name,
+            &Span {
+                start: 0.into(),
+                length: 0.into(),
+            },
+        )?;
         if let Some(initializer) = initializer {
             self.resolve_expression(initializer)?;
         }
@@ -144,7 +159,14 @@ impl Resolver {
         parameters: &[IdentifierString],
         body: &[Statement],
     ) -> Result<(), ResolutionError> {
-        self.declare(name);
+        // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
+        self.declare(
+            &name,
+            &Span {
+                start: 0.into(),
+                length: 0.into(),
+            },
+        )?;
         self.define(name);
         self.resolve_function(parameters, body)?;
 
@@ -158,7 +180,14 @@ impl Resolver {
     ) -> Result<(), ResolutionError> {
         self.enter_scope();
         for param in parameters {
-            self.declare(param);
+            // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
+            self.declare(
+                &param,
+                &Span {
+                    start: 0.into(),
+                    length: 0.into(),
+                },
+            )?;
             self.define(param);
         }
         for statement in body {

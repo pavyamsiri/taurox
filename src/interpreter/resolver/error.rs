@@ -5,6 +5,8 @@ use thiserror::Error;
 pub enum ResolutionErrorKind {
     #[error("Reading a local variable in its own initializer.")]
     SelfReferentialInitializer,
+    #[error("Shadowing a local.")]
+    ShadowLocal,
 }
 
 #[derive(Debug, Error, Clone)]

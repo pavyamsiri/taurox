@@ -281,7 +281,6 @@ fn run(src: &str, path: &Path) -> std::result::Result<(), ProgramError> {
     let resolution = match resolver.resolve_program(&program) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("{e}");
             return Err(ProgramError::AnalysisError(e.into()));
         }
     };
