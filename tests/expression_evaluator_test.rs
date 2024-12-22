@@ -5,6 +5,7 @@ use std::{
 };
 use taurox::{
     interpreter::{
+        context::{BufferedContext, StdioContext},
         environment::SharedEnvironment,
         formatter::{BasicFormatter, ToFormatter as ToValueFormatter, ValueFormatter},
         StatementInterpreter, TreeWalkStatementInterpreter,
@@ -25,9 +26,10 @@ fn check(input: &str, expected: &str, test_name: &str) {
     let value_formatter = ToValueFormatter::<BasicFormatter>::create_formatter(&parser);
     let mut environment = SharedEnvironment::new();
     let interpreter = TreeWalkStatementInterpreter;
+    let mut context = BufferedContext::new();
     let actual = match result {
         Ok(ref t) => {
-            let v = interpreter.evaluate(t, &mut environment);
+            let v = interpreter.evaluate(t, &mut environment, &mut context);
             match v {
                 Ok(ref v) => format!("{}", value_formatter.format(v)),
                 Err(ref e) => format!("{}", value_formatter.format_error(e)),
@@ -36,7 +38,10 @@ fn check(input: &str, expected: &str, test_name: &str) {
         Err(ref e) => format!("{}", expression_formatter.format_error(e)),
     };
 
-    assert_eq!(actual, expected, "Failed the test {test_name}");
+    let actual_io = context.into_data();
+
+    assert_eq!(actual, expected, "Failed the test {test_name} [value]");
+    assert_eq!(actual_io, "", "Failed the test {test_name} [IO]");
 }
 
 #[test]
