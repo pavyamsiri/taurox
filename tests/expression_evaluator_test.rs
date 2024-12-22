@@ -5,7 +5,7 @@ use std::{
 };
 use taurox::{
     interpreter::{
-        context::{BufferedContext, StdioContext},
+        context::BufferedContext,
         environment::SharedEnvironment,
         formatter::{BasicFormatter, ToFormatter as ToValueFormatter, ValueFormatter},
         StatementInterpreter, TreeWalkStatementInterpreter,
