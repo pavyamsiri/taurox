@@ -153,21 +153,15 @@ fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
 
 fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
     use taurox::parser::formatter::{
-        DebugFormatter, ExpressionFormatter, PrettyFormatter, SExpressionFormatter, ToFormatter,
+        DebugFormatter, ExpressionFormatter, PrettyFormatter, SExpressionFormatter,
     };
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src, path);
     let formatter: Box<dyn ExpressionFormatter> = match format {
-        ExpressionFormat::Debug => {
-            Box::new(ToFormatter::<DebugFormatter>::create_formatter(&parser))
-        }
-        ExpressionFormat::SExpr => Box::new(ToFormatter::<SExpressionFormatter>::create_formatter(
-            &parser,
-        )),
-        ExpressionFormat::Pretty => {
-            Box::new(ToFormatter::<PrettyFormatter>::create_formatter(&parser))
-        }
+        ExpressionFormat::Debug => Box::new(DebugFormatter {}),
+        ExpressionFormat::SExpr => Box::new(SExpressionFormatter::new(src)),
+        ExpressionFormat::Pretty => Box::new(PrettyFormatter::new(src, path)),
     };
     match parser.parse_expression() {
         Ok(expression) => {
@@ -200,22 +194,15 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
         formatter::{
             DebugFormatter as DebugExpressionFormatter, ExpressionFormatter,
             PrettyFormatter as PrettyExpressionFormatter, SExpressionFormatter,
-            ToFormatter as ToExpressionFormatter,
         },
         Parser,
     };
 
     let mut parser = Parser::new(src, path);
     let expression_formatter: Box<dyn ExpressionFormatter> = match format {
-        ValueFormat::Debug => {
-            Box::new(ToExpressionFormatter::<DebugExpressionFormatter>::create_formatter(&parser))
-        }
-        ValueFormat::Basic => {
-            Box::new(ToExpressionFormatter::<SExpressionFormatter>::create_formatter(&parser))
-        }
-        ValueFormat::Pretty => {
-            Box::new(ToExpressionFormatter::<PrettyExpressionFormatter>::create_formatter(&parser))
-        }
+        ValueFormat::Debug => Box::new(DebugExpressionFormatter {}),
+        ValueFormat::Basic => Box::new(SExpressionFormatter::new(src)),
+        ValueFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
     let expression = match parser.parse_expression() {
         Ok(expr) => expr,

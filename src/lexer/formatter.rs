@@ -119,6 +119,10 @@ impl<'src> LineFormatter<'src> {
         let line_breaks = LineBreaks::new(text);
         Self { text, line_breaks }
     }
+
+    pub fn get_line_breaks(&self) -> &LineBreaks {
+        &self.line_breaks
+    }
 }
 
 impl<'src> TokenFormatter for LineFormatter<'src> {
@@ -208,6 +212,18 @@ impl<'src> PrettyFormatter<'src> {
             line_breaks,
             path,
         }
+    }
+
+    pub fn get_line_breaks(&self) -> &LineBreaks {
+        &self.line_breaks
+    }
+
+    pub fn get_path(&self) -> &'src Path {
+        self.path
+    }
+
+    pub fn get_text(&self) -> &'src str {
+        self.text
     }
 }
 

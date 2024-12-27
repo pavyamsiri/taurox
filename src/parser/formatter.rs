@@ -4,14 +4,13 @@ use super::{
         Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
-    Parser,
 };
 use crate::lexer::{
     formatter::{
         LineFormatter as LineTokenFormatter, PrettyFormatter as PrettyTokenFormatter,
         TokenFormatter,
     },
-    LineBreaks, Token,
+    Token,
 };
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use std::path::Path;
@@ -24,20 +23,7 @@ pub trait ExpressionFormatter {
     fn format_error(&self, error: &GeneralExpressionParserError) -> String;
 }
 
-pub trait ToFormatter<F>
-where
-    F: ExpressionFormatter,
-{
-    fn create_formatter(&self) -> F;
-}
-
 pub struct DebugFormatter;
-
-impl<'src> ToFormatter<DebugFormatter> for Parser<'src> {
-    fn create_formatter(&self) -> DebugFormatter {
-        DebugFormatter {}
-    }
-}
 
 impl ExpressionFormatter for DebugFormatter {
     fn format(&self, tree: &Expression) -> String {
@@ -50,15 +36,13 @@ impl ExpressionFormatter for DebugFormatter {
 }
 
 pub struct SExpressionFormatter<'src> {
-    line_breaks: LineBreaks,
-    lexer_formatter: LineTokenFormatter<'src>,
+    token_formatter: LineTokenFormatter<'src>,
 }
 
-impl<'src> ToFormatter<SExpressionFormatter<'src>> for Parser<'src> {
-    fn create_formatter(&self) -> SExpressionFormatter<'src> {
-        SExpressionFormatter {
-            line_breaks: self.lexer.get_line_breaks(),
-            lexer_formatter: LineTokenFormatter::new(&self.get_source()),
+impl<'src> SExpressionFormatter<'src> {
+    pub fn new(text: &'src str) -> Self {
+        Self {
+            token_formatter: LineTokenFormatter::new(text),
         }
     }
 }
@@ -175,11 +159,17 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
         match error {
             GeneralExpressionParserError::Inner(expr) => match expr {
                 ExpressionParserError::NonExpression(Token { kind, span }) => {
-                    let line = self.line_breaks.get_line_from_span(*span);
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(*span);
                     format!("({line}) Non-Expression: {kind}")
                 }
                 ExpressionParserError::InvalidLValue(Token { kind, span }) => {
-                    let line = self.line_breaks.get_line_from_span(*span);
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(*span);
                     format!("({line}) Invalid l-value: {kind}")
                 }
             },
@@ -188,15 +178,21 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                     actual: Token { kind, span },
                     expected,
                 } => {
-                    let line = self.line_breaks.get_line_from_span(*span);
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(*span);
                     format!("({line}) Unexpected: A = {kind} E = {expected}")
                 }
                 GeneralParserError::UnexpectedEof(span) => {
-                    let line = self.line_breaks.get_line_from_span(*span);
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(*span);
                     format!("({line}) Unexpected EOF")
                 }
                 GeneralParserError::LexicalError(err) => {
-                    self.lexer_formatter.format_lexical_error(err)
+                    self.token_formatter.format_lexical_error(err)
                 }
             },
         }
@@ -204,17 +200,13 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
 }
 
 pub struct PrettyFormatter<'src> {
-    text: &'src str,
-    path: &'src Path,
-    lexer_formatter: PrettyTokenFormatter<'src>,
+    token_formatter: PrettyTokenFormatter<'src>,
 }
 
-impl<'src> ToFormatter<PrettyFormatter<'src>> for Parser<'src> {
-    fn create_formatter(&self) -> PrettyFormatter<'src> {
-        PrettyFormatter {
-            lexer_formatter: PrettyTokenFormatter::new(&self.get_source(), &self.get_path()),
-            path: &self.lexer.get_path(),
-            text: &self.lexer.get_source(),
+impl<'src> PrettyFormatter<'src> {
+    pub fn new(text: &'src str, path: &'src Path) -> Self {
+        Self {
+            token_formatter: PrettyTokenFormatter::new(text, path),
         }
     }
 }
@@ -225,10 +217,8 @@ impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
     }
 
     fn format_error(&self, error: &GeneralExpressionParserError) -> String {
-        let path = self
-            .path
-            .to_str()
-            .expect("Non-UTF8 paths are not supported!");
+        let text = self.token_formatter.get_text();
+        let path = &self.token_formatter.get_path().to_string_lossy();
         let mut output = std::io::Cursor::new(Vec::new());
         match error {
             GeneralExpressionParserError::Inner(expr) => match expr {
@@ -242,7 +232,7 @@ impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
                                 .with_color(Color::BrightRed),
                         )
                         .finish()
-                        .write((path, Source::from(self.text)), &mut output)
+                        .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
                     String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
@@ -256,7 +246,7 @@ impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
                                 .with_color(Color::BrightRed),
                         )
                         .finish()
-                        .write((path, Source::from(self.text)), &mut output)
+                        .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
                     String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
@@ -275,7 +265,7 @@ impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
                                 .with_color(Color::BrightRed),
                         )
                         .finish()
-                        .write((path, Source::from(self.text)), &mut output)
+                        .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
                     String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
@@ -289,12 +279,12 @@ impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
                                 .with_color(Color::BrightRed),
                         )
                         .finish()
-                        .write((path, Source::from(self.text)), &mut output)
+                        .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
                     String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
                 GeneralParserError::LexicalError(err) => {
-                    self.lexer_formatter.format_lexical_error(err)
+                    self.token_formatter.format_lexical_error(err)
                 }
             },
         }
