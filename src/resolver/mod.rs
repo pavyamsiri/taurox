@@ -1,4 +1,5 @@
 mod error;
+pub mod formatter;
 
 use crate::{
     lexer::Span,

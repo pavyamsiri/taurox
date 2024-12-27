@@ -2,7 +2,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
 use std::path::{Path, PathBuf};
 use std::{fs::read_to_string, process::ExitCode};
-use taurox::resolver::ResolutionError;
 use taurox::value::error::RuntimeError;
 
 #[derive(Debug, Parser)]
@@ -97,7 +96,7 @@ fn taurox_main() -> Result<ExitCode> {
                 Err(ProgramError::CompileError) => {
                     return Ok(ExitCode::from(65));
                 }
-                Err(ProgramError::AnalysisError(_)) => {
+                Err(ProgramError::AnalysisError) => {
                     return Ok(ExitCode::from(67));
                 }
                 Err(ProgramError::RuntimeError(_)) => {
@@ -114,8 +113,7 @@ fn taurox_main() -> Result<ExitCode> {
                 Err(ProgramError::CompileError) => {
                     return Ok(ExitCode::from(65));
                 }
-                Err(ProgramError::AnalysisError(e)) => {
-                    eprintln!("{e}");
+                Err(ProgramError::AnalysisError) => {
                     return Ok(ExitCode::from(67));
                 }
                 Err(ProgramError::RuntimeError(e)) => {
@@ -184,7 +182,7 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
 
 enum ProgramError {
     CompileError,
-    AnalysisError(ResolutionError),
+    AnalysisError,
     RuntimeError(RuntimeError),
 }
 
@@ -231,7 +229,7 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
         Ok(r) => r,
         Err(e) => {
             eprintln!("{e}");
-            return Err(ProgramError::AnalysisError(e.into()));
+            return Err(ProgramError::AnalysisError);
         }
     };
     let interpreter = TreeWalkStatementInterpreter;
@@ -261,19 +259,30 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
         },
         Parser,
     };
-    use taurox::resolver::Resolver;
+    use taurox::resolver::{
+        formatter::{
+            BasicResolverFormatter, DebugResolverFormatter, PrettyResolverFormatter,
+            ResolverFormatter,
+        },
+        Resolver,
+    };
 
-    let program_formatter: Box<dyn ParserFormatter> = match format {
+    let parser_formatter: Box<dyn ParserFormatter> = match format {
         ProgramFormat::Debug => Box::new(DebugParserFormatter {}),
         ProgramFormat::Basic => Box::new(BasicParserFormatter::new(src)),
         ProgramFormat::Pretty => Box::new(PrettyParserFormatter::new(src, path)),
+    };
+    let resolver_formatter: Box<dyn ResolverFormatter> = match format {
+        ProgramFormat::Debug => Box::new(DebugResolverFormatter {}),
+        ProgramFormat::Basic => Box::new(BasicResolverFormatter::new(src)),
+        ProgramFormat::Pretty => Box::new(PrettyResolverFormatter::new(src, path)),
     };
 
     let mut parser = Parser::new(src, path);
     let program = match parser.parse() {
         Ok(program) => program,
         Err(e) => {
-            eprintln!("{}", program_formatter.format_error(&e));
+            eprintln!("{}", parser_formatter.format_error(&e));
             return Err(ProgramError::CompileError);
         }
     };
@@ -283,7 +292,8 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
     let resolution = match resolver.resolve_program(&program) {
         Ok(r) => r,
         Err(e) => {
-            return Err(ProgramError::AnalysisError(e.into()));
+            eprintln!("{}", resolver_formatter.format_error(&e));
+            return Err(ProgramError::AnalysisError);
         }
     };
 

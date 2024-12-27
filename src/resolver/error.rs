@@ -17,3 +17,13 @@ pub struct ResolutionError {
     pub kind: ResolutionErrorKind,
     pub span: Span,
 }
+
+impl ResolutionError {
+    pub fn code(&self) -> &'static str {
+        match self.kind {
+            ResolutionErrorKind::SelfReferentialInitializer => "RA001",
+            ResolutionErrorKind::ShadowLocal => "RA002",
+            ResolutionErrorKind::NonFunctionReturn => "RA003",
+        }
+    }
+}
