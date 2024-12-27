@@ -228,7 +228,7 @@ impl Resolver {
                 )?;
             }
             NonDeclarationKind::Return { value } => {
-                self.resolve_return_statement(value.as_ref())?;
+                self.resolve_return_statement(value.as_ref(), &stmt.span)?;
             }
         }
         Ok(())
@@ -288,15 +288,12 @@ impl Resolver {
     fn resolve_return_statement(
         &mut self,
         expr: Option<&Expression>,
+        span: &Span,
     ) -> Result<(), ResolutionError> {
         if matches!(self.function, FunctionEnvironment::None) {
-            // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
             return Err(ResolutionError {
                 kind: ResolutionErrorKind::NonFunctionReturn,
-                span: Span {
-                    start: 0.into(),
-                    length: 0.into(),
-                },
+                span: span.clone(),
             });
         }
 
