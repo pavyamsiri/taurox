@@ -21,8 +21,24 @@ use std::collections::HashMap;
 pub type ResolutionMap = HashMap<Ident, usize>;
 
 enum Resolution {
-    Declared(Ident),
-    Defined(Ident),
+    Declared { name: Ident, span: Span },
+    Defined { name: Ident, span: Span },
+}
+
+impl Resolution {
+    pub fn get_ident(&self) -> &Ident {
+        match self {
+            Resolution::Declared { name, .. } => name,
+            Resolution::Defined { name, .. } => name,
+        }
+    }
+
+    pub fn get_span(&self) -> &Span {
+        match self {
+            Resolution::Declared { span, .. } => span,
+            Resolution::Defined { span, .. } => span,
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -87,15 +103,13 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, ident: &Ident) -> Result<(), ResolutionError> {
+    fn declare(&mut self, ident: &Ident, span: &Span) -> Result<(), ResolutionError> {
         if let Some(inner_scope) = self.scopes.last_mut() {
             if let Some(resolution) = inner_scope.get(&ident.name) {
-                let old_ident = match resolution {
-                    Resolution::Declared(ident) => ident,
-                    Resolution::Defined(ident) => ident,
-                };
+                let old_ident = resolution.get_ident();
+                let old_span = resolution.get_span();
                 if inner_scope.contains_key(&ident.name) {
-                    let encompassing = old_ident.span.merge(&ident.span);
+                    let encompassing = old_span.merge(span);
                     return Err(ResolutionError {
                         kind: ResolutionErrorKind::ShadowLocal {
                             old: old_ident.clone(),
@@ -106,14 +120,26 @@ impl Resolver {
                 }
             }
 
-            inner_scope.insert(ident.name.clone(), Resolution::Declared(ident.clone()));
+            inner_scope.insert(
+                ident.name.clone(),
+                Resolution::Declared {
+                    name: ident.clone(),
+                    span: span.clone(),
+                },
+            );
         }
         Ok(())
     }
 
-    fn define(&mut self, ident: &Ident) {
+    fn define(&mut self, ident: &Ident, span: &Span) {
         if let Some(inner_scope) = self.scopes.last_mut() {
-            inner_scope.insert(ident.name.clone(), Resolution::Defined(ident.clone()));
+            inner_scope.insert(
+                ident.name.clone(),
+                Resolution::Defined {
+                    name: ident.clone(),
+                    span: span.clone(),
+                },
+            );
         }
     }
 
@@ -128,7 +154,7 @@ impl Resolver {
     fn resolve_variable(&mut self, ident: &Ident) {
         let total_depth = self.scopes.len();
         for (depth, scope) in self.scopes.iter_mut().enumerate().rev() {
-            if let Some(Resolution::Defined(_)) = scope.get(&ident.name) {
+            if let Some(Resolution::Defined { .. }) = scope.get(&ident.name) {
                 self.resolution
                     .insert(ident.clone(), total_depth - 1 - depth);
             }
@@ -138,17 +164,17 @@ impl Resolver {
 
 // Implementation
 impl Resolver {
-    fn resolve_declaration(&mut self, declaration: &Declaration) -> Result<(), ResolutionError> {
-        match &declaration.kind {
+    fn resolve_declaration(&mut self, decl: &Declaration) -> Result<(), ResolutionError> {
+        match &decl.kind {
             DeclarationKind::Variable { name, initial } => {
-                self.resolve_variable_declaration(name, initial.as_ref())?;
+                self.resolve_variable_declaration(name, &decl.span, initial.as_ref())?;
             }
             DeclarationKind::Function {
                 name,
                 parameters,
                 body,
             } => {
-                self.resolve_function_declaration(name, parameters, body)?;
+                self.resolve_function_declaration(name, &decl.span, parameters, body)?;
             }
         }
         Ok(())
@@ -156,25 +182,27 @@ impl Resolver {
 
     fn resolve_variable_declaration(
         &mut self,
-        name: &Ident,
+        ident: &Ident,
+        span: &Span,
         initializer: Option<&Expression>,
     ) -> Result<(), ResolutionError> {
-        self.declare(&name)?;
+        self.declare(ident, span)?;
         if let Some(initializer) = initializer {
             self.resolve_expression(initializer)?;
         }
-        self.define(&name);
+        self.define(ident, span);
         Ok(())
     }
 
     fn resolve_function_declaration(
         &mut self,
-        name: &Ident,
+        ident: &Ident,
+        span: &Span,
         parameters: &[Ident],
         body: &[Statement],
     ) -> Result<(), ResolutionError> {
-        self.declare(&name)?;
-        self.define(name);
+        self.declare(ident, span)?;
+        self.define(ident, span);
         self.resolve_function(parameters, body, FunctionEnvironment::Function)?;
 
         Ok(())
@@ -190,8 +218,8 @@ impl Resolver {
         self.function = environment;
         self.enter_scope();
         for param in parameters {
-            self.declare(&param)?;
-            self.define(param);
+            self.declare(param, &param.span)?;
+            self.define(param, &param.span);
         }
         for statement in body {
             self.resolve_statement(statement)?;
@@ -279,7 +307,8 @@ impl Resolver {
         if let Some(initializer) = initializer {
             match initializer {
                 Initializer::VarDecl { name, initial } => {
-                    self.resolve_variable_declaration(name, initial.as_ref())?;
+                    // TODO(pavyamsiri): This span is wrong, it should be the span of decl.
+                    self.resolve_variable_declaration(name, &name.span, initial.as_ref())?;
                 }
                 Initializer::Expression(expression) => {
                     self.resolve_expression(expression)?;
@@ -376,7 +405,7 @@ impl Resolver {
 
     fn resolve_variable_expression(&mut self, ident: &Ident) -> Result<(), ResolutionError> {
         // Can't access variable when it is declared but not defined
-        if let Some(Resolution::Declared(_)) = self.get_resolution(ident) {
+        if let Some(Resolution::Declared { .. }) = self.get_resolution(ident) {
             Err(ResolutionError {
                 kind: ResolutionErrorKind::SelfReferentialInitializer,
                 span: ident.span,

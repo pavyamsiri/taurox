@@ -45,9 +45,8 @@ impl ResolverFormatter for BasicResolverFormatter {
             ResolutionErrorKind::SelfReferentialInitializer => {
                 buffer.push_str("Self referential initializer")
             }
-            ResolutionErrorKind::ShadowLocal { old, new } => {
-                write!(buffer, "Shadowing the local {} with {}", old.name, new.name)
-                    .expect(&WRITE_FMT_MSG)
+            ResolutionErrorKind::ShadowLocal { old, .. } => {
+                write!(buffer, "Shadowing the local {}", old.name).expect(&WRITE_FMT_MSG)
             }
             ResolutionErrorKind::NonFunctionReturn => {
                 buffer.push_str("Returning in a non-function context")
@@ -103,6 +102,7 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
                             .with_message("but is declared again over here")
                             .with_color(Color::BrightRed),
                     )
+                    .with_label(Label::new((path, span.range())).with_color(Color::BrightYellow))
                     .finish()
                     .write((path, Source::from(text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
