@@ -66,8 +66,6 @@ impl From<LexicalError> for GeneralExpressionParserError {
 pub enum StatementParserError {
     #[error("Expected a block but got {0:?}.")]
     NonBlock(Statement),
-    #[error("Expected a statement but got {0:?}.")]
-    InvalidStatement(Token),
     #[error("Expected a non-declaration but got {0:?}.")]
     InvalidNonDeclaration(Declaration),
 }

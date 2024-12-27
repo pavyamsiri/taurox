@@ -15,7 +15,7 @@ use crate::lexer::{
         LineFormatter as LineTokenFormatter, PrettyFormatter as PrettyTokenFormatter,
         TokenFormatter,
     },
-    LineBreaks, Token,
+    LineBreaks, Span, Token,
 };
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use std::{fmt::Write, path::Path};
@@ -241,6 +241,14 @@ impl<'src> PrettyExpressionFormatter<'src> {
             token_formatter: PrettyTokenFormatter::new(text, path),
         }
     }
+
+    pub fn get_text(&self) -> &'src str {
+        &self.token_formatter.get_text()
+    }
+
+    pub fn get_path(&self) -> &'src Path {
+        &self.token_formatter.get_path()
+    }
 }
 
 impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
@@ -321,14 +329,19 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
 }
 
 pub trait ParserFormatter {
-    fn format_error(&self, error: &ParserError) -> String;
+    fn format_error(&self, error: &ParserError) -> String {
+        let mut buffer = String::new();
+        self.format_error_in_place(&mut buffer, error);
+        buffer
+    }
+    fn format_error_in_place(&self, buffer: &mut String, error: &ParserError);
 }
 
 pub struct DebugParserFormatter;
 
 impl ParserFormatter for DebugParserFormatter {
-    fn format_error(&self, error: &ParserError) -> String {
-        format!("{error}")
+    fn format_error_in_place(&self, buffer: &mut String, error: &ParserError) {
+        write!(buffer, "{error}").expect(&WRITE_FMT_MSG);
     }
 }
 
@@ -361,15 +374,6 @@ impl<'src> BasicParserFormatter<'src> {
                     .write_fmt(format_args!("({line}) Non-Block: "))
                     .expect(&WRITE_FMT_MSG);
                 self.format_statement(buffer, stmt);
-            }
-            StatementParserError::InvalidStatement(Token { kind, span }) => {
-                let line = self
-                    .expr_formatter
-                    .get_line_breaks()
-                    .get_line_from_span(*span);
-                buffer
-                    .write_fmt(format_args!("({line}) Invalid statement token: {kind:?}"))
-                    .expect(&WRITE_FMT_MSG);
             }
             StatementParserError::InvalidNonDeclaration(decl) => {
                 let line = 0;
@@ -433,13 +437,85 @@ impl<'src> BasicParserFormatter<'src> {
 }
 
 impl<'src> ParserFormatter for BasicParserFormatter<'src> {
-    fn format_error(&self, error: &ParserError) -> String {
-        let mut buffer = String::new();
+    fn format_error_in_place(&self, buffer: &mut String, error: &ParserError) {
         match error {
-            ParserError::Expression(e) => self.format_expression_parser_error(&mut buffer, e),
-            ParserError::General(e) => self.format_general_parser_error(&mut buffer, e),
-            ParserError::Statement(e) => self.format_statement_parser_error(&mut buffer, e),
+            ParserError::Expression(e) => self.format_expression_parser_error(buffer, e),
+            ParserError::General(e) => self.format_general_parser_error(buffer, e),
+            ParserError::Statement(e) => self.format_statement_parser_error(buffer, e),
         }
-        buffer
+    }
+}
+
+pub struct PrettyParserFormatter<'src> {
+    expr_formatter: PrettyExpressionFormatter<'src>,
+}
+
+impl<'src> PrettyParserFormatter<'src> {
+    pub fn new(text: &'src str, path: &'src Path) -> Self {
+        Self {
+            expr_formatter: PrettyExpressionFormatter::new(text, path),
+        }
+    }
+
+    fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
+        let text = self.expr_formatter.get_text();
+        let path = &self.expr_formatter.get_path().to_string_lossy();
+        let mut output = std::io::Cursor::new(Vec::new());
+        // TODO(pavyamsiri): The spans are wrong along with the statement kinds display
+        match error {
+            StatementParserError::NonBlock(_stmt) => {
+                let span = Span {
+                    start: 0.into(),
+                    length: 0.into(),
+                };
+                let code = "SP001";
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(code)
+                    .with_message("Expected a block statement")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message(format!("Not a block statement {}", "PLACEHOLDER"))
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(&ARIADNE_WRITE_MSG);
+            }
+            StatementParserError::InvalidNonDeclaration(_decl) => {
+                let span = Span {
+                    start: 0.into(),
+                    length: 0.into(),
+                };
+                let code = "SP001";
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(code)
+                    .with_message("Expected a non-declarative statement")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message(format!("This is a declaration {}", "PLACEHOLDER"))
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(&ARIADNE_WRITE_MSG);
+            }
+        }
+        buffer.push_str(&String::from_utf8(output.into_inner()).expect(ARIADNE_MSG));
+    }
+}
+
+impl<'src> ParserFormatter for PrettyParserFormatter<'src> {
+    fn format_error_in_place(&self, buffer: &mut String, error: &ParserError) {
+        match error {
+            ParserError::Expression(e) => {
+                let error: GeneralExpressionParserError = e.clone().into();
+                self.expr_formatter.format_error_in_place(buffer, &error);
+            }
+            ParserError::General(e) => {
+                let error: GeneralExpressionParserError = e.clone().into();
+                self.expr_formatter.format_error_in_place(buffer, &error);
+            }
+            ParserError::Statement(e) => self.format_statement_parser_error(buffer, e),
+        }
     }
 }
