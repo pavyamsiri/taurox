@@ -86,16 +86,13 @@ fn taurox_main() -> Result<ExitCode> {
             let res = evaluate(&src, &path, &format);
             match res {
                 Ok(_) => {}
-                Err(ProgramError::CompileError(e)) => {
-                    eprintln!("{e}");
+                Err(ProgramError::CompileError(_)) => {
                     return Ok(ExitCode::from(65));
                 }
-                Err(ProgramError::AnalysisError(e)) => {
-                    eprintln!("{e}");
+                Err(ProgramError::AnalysisError(_)) => {
                     return Ok(ExitCode::from(67));
                 }
-                Err(ProgramError::RuntimeError(e)) => {
-                    eprintln!("{e}");
+                Err(ProgramError::RuntimeError(_)) => {
                     return Ok(ExitCode::from(70));
                 }
             }
