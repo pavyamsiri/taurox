@@ -42,9 +42,12 @@ impl ResolverFormatter for BasicResolverFormatter {
         let line = self.line_breaks.get_line_from_span(error.span);
         write!(buffer, "({line}) ").expect(&WRITE_FMT_MSG);
         match &error.kind {
-            ResolutionErrorKind::SelfReferentialInitializer => {
-                buffer.push_str("Self referential initializer")
-            }
+            ResolutionErrorKind::SelfReferentialInitializer { destination, .. } => write!(
+                buffer,
+                "Referencing {} in its own initializer",
+                destination.name
+            )
+            .expect(&WRITE_FMT_MSG),
             ResolutionErrorKind::ShadowLocal { old, .. } => {
                 write!(buffer, "Shadowing the local {}", old.name).expect(&WRITE_FMT_MSG)
             }
@@ -73,15 +76,26 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
         let mut output = std::io::Cursor::new(Vec::new());
         let span = error.span;
         match &error.kind {
-            ResolutionErrorKind::SelfReferentialInitializer => {
+            ResolutionErrorKind::SelfReferentialInitializer {
+                destination,
+                reference,
+            } => {
+                let dest_span = destination.span;
+                let reference_span = reference.span;
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
                     .with_message("Attempted to reference a variable in its own initializer")
                     .with_label(
-                        Label::new((path, span.range()))
-                            .with_message("Self reference occurs here...")
+                        Label::new((path, dest_span.range()))
+                            .with_message("The variable declared here...")
                             .with_color(Color::BrightRed),
                     )
+                    .with_label(
+                        Label::new((path, reference_span.range()))
+                            .with_message("is used its own initializer, creating a self-reference")
+                            .with_color(Color::BrightRed),
+                    )
+                    .with_label(Label::new((path, span.range())).with_color(Color::BrightYellow))
                     .finish()
                     .write((path, Source::from(text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);

@@ -405,10 +405,13 @@ impl Resolver {
 
     fn resolve_variable_expression(&mut self, ident: &Ident) -> Result<(), ResolutionError> {
         // Can't access variable when it is declared but not defined
-        if let Some(Resolution::Declared { .. }) = self.get_resolution(ident) {
+        if let Some(Resolution::Declared { name, span }) = self.get_resolution(ident) {
             Err(ResolutionError {
-                kind: ResolutionErrorKind::SelfReferentialInitializer,
-                span: ident.span,
+                kind: ResolutionErrorKind::SelfReferentialInitializer {
+                    destination: name.clone(),
+                    reference: ident.clone(),
+                },
+                span: span.clone(),
             })
         } else {
             self.resolve_variable(ident);

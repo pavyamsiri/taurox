@@ -4,7 +4,10 @@ use thiserror::Error;
 #[derive(Debug, Error, Clone)]
 pub enum ResolutionErrorKind {
     #[error("Reading a local variable in its own initializer.")]
-    SelfReferentialInitializer,
+    SelfReferentialInitializer {
+        destination: Ident,
+        reference: Ident,
+    },
     #[error("Shadowing a local.")]
     ShadowLocal { old: Ident, new: Ident },
     #[error("Returning in a non-function scope.")]
@@ -21,7 +24,7 @@ pub struct ResolutionError {
 impl ResolutionError {
     pub fn code(&self) -> &'static str {
         match self.kind {
-            ResolutionErrorKind::SelfReferentialInitializer => "RA001",
+            ResolutionErrorKind::SelfReferentialInitializer { .. } => "RA001",
             ResolutionErrorKind::ShadowLocal { .. } => "RA002",
             ResolutionErrorKind::NonFunctionReturn => "RA003",
         }
