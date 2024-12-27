@@ -5,14 +5,12 @@ use std::{
 };
 use taurox::{
     environment::SharedEnvironment,
-    interpreter::{
-        context::BufferedContext, resolver::Resolver, StatementInterpreter,
-        TreeWalkStatementInterpreter,
-    },
+    interpreter::{context::BufferedContext, StatementInterpreter, TreeWalkStatementInterpreter},
     parser::{
         formatter::{ExpressionFormatter, SExpressionFormatter},
         Parser,
     },
+    resolver::Resolver,
     value::formatter::{BasicFormatter, ValueFormatter},
 };
 

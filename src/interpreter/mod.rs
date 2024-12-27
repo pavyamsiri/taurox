@@ -1,5 +1,4 @@
 pub mod context;
-pub mod resolver;
 mod tree;
 
 use std::collections::HashMap;
