@@ -12,7 +12,7 @@ use crate::{
         },
         Program,
     },
-    string::Ident,
+    string::{Ident, IdentName},
 };
 pub use error::{ResolutionError, ResolutionErrorKind};
 use std::collections::HashMap;
@@ -33,7 +33,7 @@ enum FunctionEnvironment {
 pub struct Resolver {
     resolution: ResolutionMap,
     function: FunctionEnvironment,
-    scopes: Vec<HashMap<Ident, Resolution>>,
+    scopes: Vec<HashMap<IdentName, Resolution>>,
 }
 
 impl Resolver {
@@ -86,29 +86,29 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &Ident) -> Result<(), ResolutionError> {
+    fn declare(&mut self, ident: &Ident) -> Result<(), ResolutionError> {
         if let Some(inner_scope) = self.scopes.last_mut() {
-            if inner_scope.contains_key(name) {
+            if inner_scope.contains_key(&ident.name) {
                 return Err(ResolutionError {
                     kind: ResolutionErrorKind::ShadowLocal,
-                    span: name.span,
+                    span: ident.span,
                 });
             }
 
-            inner_scope.insert(name.clone(), Resolution::Declared);
+            inner_scope.insert(ident.name.clone(), Resolution::Declared);
         }
         Ok(())
     }
 
-    fn define(&mut self, name: &Ident) {
+    fn define(&mut self, ident: &Ident) {
         if let Some(inner_scope) = self.scopes.last_mut() {
-            inner_scope.insert(name.clone(), Resolution::Defined);
+            inner_scope.insert(ident.name.clone(), Resolution::Defined);
         }
     }
 
-    fn get_resolution(&self, name: &Ident) -> Option<&Resolution> {
+    fn get_resolution(&self, ident: &Ident) -> Option<&Resolution> {
         if let Some(inner_scope) = self.scopes.last() {
-            inner_scope.get(name)
+            inner_scope.get(&ident.name)
         } else {
             None
         }
@@ -117,7 +117,7 @@ impl Resolver {
     fn resolve_variable(&mut self, ident: &Ident) {
         let total_depth = self.scopes.len();
         for (depth, scope) in self.scopes.iter_mut().enumerate().rev() {
-            if let Some(Resolution::Defined) = scope.get(ident) {
+            if let Some(Resolution::Defined) = scope.get(&ident.name) {
                 self.resolution
                     .insert(ident.clone(), total_depth - 1 - depth);
             }
