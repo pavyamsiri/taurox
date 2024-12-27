@@ -35,6 +35,15 @@ pub enum DeclarationKind {
     },
 }
 
+impl std::fmt::Display for DeclarationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DeclarationKind::Variable { .. } => write!(f, "VARDECL"),
+            DeclarationKind::Function { .. } => write!(f, "FUNDECL"),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Initializer {
     VarDecl {
@@ -73,4 +82,18 @@ pub enum NonDeclarationKind {
     Return {
         value: Option<Expression>,
     },
+}
+
+impl std::fmt::Display for NonDeclarationKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            NonDeclarationKind::Expression(_) => write!(f, "EXPR"),
+            NonDeclarationKind::Print(_) => write!(f, "PRINT"),
+            NonDeclarationKind::Block(_) => write!(f, "BLOCK"),
+            NonDeclarationKind::If { .. } => write!(f, "IF"),
+            NonDeclarationKind::While { .. } => write!(f, "WHILE"),
+            NonDeclarationKind::For { .. } => write!(f, "FOR"),
+            NonDeclarationKind::Return { .. } => write!(f, "RETURN"),
+        }
+    }
 }

@@ -15,7 +15,7 @@ use crate::lexer::{
         LineFormatter as LineTokenFormatter, PrettyFormatter as PrettyTokenFormatter,
         TokenFormatter,
     },
-    LineBreaks, Span, Token,
+    LineBreaks, Token,
 };
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use std::{fmt::Write, path::Path};
@@ -369,14 +369,20 @@ impl<'src> BasicParserFormatter<'src> {
     fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
         match error {
             StatementParserError::NonBlock(stmt) => {
-                let line = 0;
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(stmt.get_span());
                 buffer
                     .write_fmt(format_args!("({line}) Non-Block: "))
                     .expect(&WRITE_FMT_MSG);
                 self.format_statement(buffer, stmt);
             }
             StatementParserError::InvalidNonDeclaration(decl) => {
-                let line = 0;
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(decl.span);
                 buffer
                     .write_fmt(format_args!("({line}) Invalid non declaration: "))
                     .expect(&WRITE_FMT_MSG);
@@ -462,38 +468,38 @@ impl<'src> PrettyParserFormatter<'src> {
         let text = self.expr_formatter.get_text();
         let path = &self.expr_formatter.get_path().to_string_lossy();
         let mut output = std::io::Cursor::new(Vec::new());
-        // TODO(pavyamsiri): The spans are wrong along with the statement kinds display
         match error {
-            StatementParserError::NonBlock(_stmt) => {
-                let span = Span {
-                    start: 0.into(),
-                    length: 0.into(),
-                };
-                let code = "SP001";
+            StatementParserError::NonBlock(stmt) => {
+                let span = stmt.get_span();
+                let mut msg = format!("Not a block statement ");
+                match stmt {
+                    Statement::Declaration(Declaration { kind, .. }) => {
+                        write!(msg, "{}", kind).expect(&WRITE_FMT_MSG);
+                    }
+                    Statement::NonDeclaration(NonDeclaration { kind, .. }) => {
+                        write!(msg, "{}", kind).expect(&WRITE_FMT_MSG);
+                    }
+                }
                 Report::build(ReportKind::Error, (path, span.range()))
-                    .with_code(code)
+                    .with_code(error.code())
                     .with_message("Expected a block statement")
                     .with_label(
                         Label::new((path, span.range()))
-                            .with_message(format!("Not a block statement {}", "PLACEHOLDER"))
+                            .with_message(msg)
                             .with_color(Color::BrightRed),
                     )
                     .finish()
                     .write((path, Source::from(text)), &mut output)
                     .expect(&ARIADNE_WRITE_MSG);
             }
-            StatementParserError::InvalidNonDeclaration(_decl) => {
-                let span = Span {
-                    start: 0.into(),
-                    length: 0.into(),
-                };
-                let code = "SP001";
+            StatementParserError::InvalidNonDeclaration(decl) => {
+                let span = decl.span;
                 Report::build(ReportKind::Error, (path, span.range()))
-                    .with_code(code)
+                    .with_code(error.code())
                     .with_message("Expected a non-declarative statement")
                     .with_label(
                         Label::new((path, span.range()))
-                            .with_message(format!("This is a declaration {}", "PLACEHOLDER"))
+                            .with_message(format!("This is a declaration {}", decl.kind))
                             .with_color(Color::BrightRed),
                     )
                     .finish()

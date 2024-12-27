@@ -70,6 +70,15 @@ pub enum StatementParserError {
     InvalidNonDeclaration(Declaration),
 }
 
+impl StatementParserError {
+    pub fn code(&self) -> &'static str {
+        match self {
+            StatementParserError::NonBlock(_) => "SP001",
+            StatementParserError::InvalidNonDeclaration(_) => "SP002",
+        }
+    }
+}
+
 #[derive(Debug, Error, Clone)]
 pub enum ParserError {
     #[error(transparent)]

@@ -256,7 +256,9 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
         context::StdioContext, Interpreter, TreeWalkInterpreter, TreeWalkStatementInterpreter,
     };
     use taurox::parser::{
-        formatter::{BasicParserFormatter, DebugParserFormatter, ParserFormatter},
+        formatter::{
+            BasicParserFormatter, DebugParserFormatter, ParserFormatter, PrettyParserFormatter,
+        },
         Parser,
     };
     use taurox::resolver::Resolver;
@@ -264,7 +266,7 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
     let program_formatter: Box<dyn ParserFormatter> = match format {
         ProgramFormat::Debug => Box::new(DebugParserFormatter {}),
         ProgramFormat::Basic => Box::new(BasicParserFormatter::new(src)),
-        ProgramFormat::Pretty => todo!(),
+        ProgramFormat::Pretty => Box::new(PrettyParserFormatter::new(src, path)),
     };
 
     let mut parser = Parser::new(src, path);
