@@ -2,7 +2,7 @@ use super::{
     error::{RuntimeError, RuntimeErrorKind},
     value::LoxValue,
 };
-use crate::{lexer::LineBreaks, parser::Parser};
+use crate::lexer::LineBreaks;
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 use std::path::Path;
 
@@ -14,20 +14,7 @@ pub trait ValueFormatter {
     fn format_error(&self, error: &RuntimeError) -> String;
 }
 
-pub trait ToFormatter<F>
-where
-    F: ValueFormatter,
-{
-    fn create_formatter(&self) -> F;
-}
-
 pub struct DebugFormatter;
-
-impl<'src> ToFormatter<DebugFormatter> for Parser<'src> {
-    fn create_formatter(&self) -> DebugFormatter {
-        DebugFormatter {}
-    }
-}
 
 impl ValueFormatter for DebugFormatter {
     fn format(&self, value: &LoxValue) -> String {
@@ -43,11 +30,10 @@ pub struct BasicFormatter {
     line_breaks: LineBreaks,
 }
 
-impl<'src> ToFormatter<BasicFormatter> for Parser<'src> {
-    fn create_formatter(&self) -> BasicFormatter {
-        BasicFormatter {
-            line_breaks: self.get_line_breaks(),
-        }
+impl BasicFormatter {
+    pub fn new(text: &str) -> Self {
+        let line_breaks = LineBreaks::new(text);
+        Self { line_breaks }
     }
 }
 
@@ -103,12 +89,9 @@ pub struct PrettyFormatter<'src> {
     path: &'src Path,
 }
 
-impl<'src> ToFormatter<PrettyFormatter<'src>> for Parser<'src> {
-    fn create_formatter(&self) -> PrettyFormatter<'src> {
-        PrettyFormatter {
-            text: &self.get_source(),
-            path: &self.get_path(),
-        }
+impl<'src> PrettyFormatter<'src> {
+    pub fn new(text: &'src str, path: &'src Path) -> Self {
+        Self { text, path }
     }
 }
 

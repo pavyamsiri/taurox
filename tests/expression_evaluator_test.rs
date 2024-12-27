@@ -7,7 +7,7 @@ use taurox::{
     interpreter::{
         context::BufferedContext,
         environment::SharedEnvironment,
-        formatter::{BasicFormatter, ToFormatter as ToValueFormatter, ValueFormatter},
+        formatter::{BasicFormatter, ValueFormatter},
         resolver::Resolver,
         StatementInterpreter, TreeWalkStatementInterpreter,
     },
@@ -21,7 +21,7 @@ fn check(input: &str, expected: &str, test_name: &str) {
     let mut parser = Parser::new(input, test_name.as_ref());
     // Create formatters
     let expression_formatter = SExpressionFormatter::new(input);
-    let value_formatter = ToValueFormatter::<BasicFormatter>::create_formatter(&parser);
+    let value_formatter = BasicFormatter::new(input);
 
     let expr = match parser.parse_expression() {
         Ok(expr) => expr,

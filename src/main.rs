@@ -186,7 +186,7 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
     use taurox::interpreter::environment::SharedEnvironment;
     use taurox::interpreter::formatter::{
         BasicFormatter as BasicValueFormatter, DebugFormatter as DebugValueFormatter,
-        PrettyFormatter as PrettyValueFormatter, ToFormatter as ToValueFormatter, ValueFormatter,
+        PrettyFormatter as PrettyValueFormatter, ValueFormatter,
     };
     use taurox::interpreter::resolver::Resolver;
     use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
@@ -213,15 +213,9 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
     };
 
     let value_formatter: Box<dyn ValueFormatter> = match format {
-        ValueFormat::Debug => Box::new(ToValueFormatter::<DebugValueFormatter>::create_formatter(
-            &parser,
-        )),
-        ValueFormat::Basic => Box::new(ToValueFormatter::<BasicValueFormatter>::create_formatter(
-            &parser,
-        )),
-        ValueFormat::Pretty => Box::new(
-            ToValueFormatter::<PrettyValueFormatter>::create_formatter(&parser),
-        ),
+        ValueFormat::Debug => Box::new(DebugValueFormatter {}),
+        ValueFormat::Basic => Box::new(BasicValueFormatter::new(src)),
+        ValueFormat::Pretty => Box::new(PrettyValueFormatter::new(src, path)),
     };
 
     let mut environment = SharedEnvironment::new();

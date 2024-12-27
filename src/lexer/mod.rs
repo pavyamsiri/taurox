@@ -17,7 +17,7 @@ pub struct LineBreaks {
 }
 
 impl LineBreaks {
-    fn new(text: &str) -> Self {
+    pub fn new(text: &str) -> Self {
         let line_breaks = if !text.is_empty() {
             let mut line_breaks = Vec::new();
             let mut cursor: SpanIndex = 0.into();
