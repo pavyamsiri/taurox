@@ -1,10 +1,6 @@
+use super::SharedEnvironment;
+use crate::value::{error::RuntimeError, LoxValue, NativeFunction};
 use std::time::{SystemTime, UNIX_EPOCH};
-
-use super::error::RuntimeError;
-use super::{
-    environment::SharedEnvironment,
-    value::{LoxValue, NativeFunction},
-};
 
 #[derive(Debug)]
 pub struct NativeClock;

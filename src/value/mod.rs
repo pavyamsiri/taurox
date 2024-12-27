@@ -1,6 +1,10 @@
-use super::{environment::SharedEnvironment, error::RuntimeError, error::RuntimeErrorKind};
+pub mod error;
+pub mod formatter;
+
+use super::environment::SharedEnvironment;
 use crate::{parser::statement::Statement, string::IdentifierString};
 use compact_str::{CompactString, CompactStringExt};
+use error::{RuntimeError, RuntimeErrorKind};
 use std::sync::Arc;
 
 pub trait NativeFunction: std::fmt::Debug + Send + Sync {

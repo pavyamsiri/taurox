@@ -1,8 +1,7 @@
+use super::LoxValue;
 use crate::lexer::Span;
 use crate::string::IdentifierString;
 use thiserror::Error;
-
-use super::value::LoxValue;
 
 #[derive(Debug, Error, Clone)]
 pub enum RuntimeErrorKind {

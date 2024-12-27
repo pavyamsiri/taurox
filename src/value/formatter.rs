@@ -1,7 +1,5 @@
-use super::{
-    error::{RuntimeError, RuntimeErrorKind},
-    value::LoxValue,
-};
+use super::error::{RuntimeError, RuntimeErrorKind};
+use super::LoxValue;
 use crate::lexer::LineBreaks;
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 use std::path::Path;

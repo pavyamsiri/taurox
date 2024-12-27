@@ -1,8 +1,8 @@
-use super::{
-    native::NativeClock,
-    value::{LoxValue, NativeFunction},
-};
+mod native;
+
+use super::value::{LoxValue, NativeFunction};
 use crate::string::IdentifierString;
+use native::NativeClock;
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},

@@ -4,17 +4,16 @@ use std::{
     path::Path,
 };
 use taurox::{
+    environment::SharedEnvironment,
     interpreter::{
-        context::BufferedContext,
-        environment::SharedEnvironment,
-        formatter::{BasicFormatter, ValueFormatter},
-        resolver::Resolver,
-        StatementInterpreter, TreeWalkStatementInterpreter,
+        context::BufferedContext, resolver::Resolver, StatementInterpreter,
+        TreeWalkStatementInterpreter,
     },
     parser::{
         formatter::{ExpressionFormatter, SExpressionFormatter},
         Parser,
     },
+    value::formatter::{BasicFormatter, ValueFormatter},
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {

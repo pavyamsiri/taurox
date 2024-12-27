@@ -1,22 +1,17 @@
 pub mod context;
-pub mod environment;
-pub mod error;
-pub mod formatter;
-mod native;
 pub mod resolver;
 mod tree;
-mod value;
 
 use std::collections::HashMap;
 
+use crate::environment::SharedEnvironment;
+use crate::value::error::RuntimeError;
+use crate::value::LoxValue;
 use crate::{
     lexer::Span,
     parser::{expression::Expression, statement::Statement},
 };
-use environment::SharedEnvironment;
-use error::RuntimeError;
 pub use tree::{TreeWalkInterpreter, TreeWalkStatementInterpreter};
-use value::LoxValue;
 
 #[derive(Debug)]
 pub enum ProgramState {

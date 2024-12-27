@@ -1,11 +1,7 @@
-use std::collections::HashMap;
-
-use super::{
-    environment::SharedEnvironment,
-    error::{RuntimeError, RuntimeErrorKind},
-    value::LoxValue,
-    Interpreter, ProgramState, StatementInterpreter, SystemContext,
-};
+use super::{Interpreter, ProgramState, StatementInterpreter, SystemContext};
+use crate::environment::SharedEnvironment;
+use crate::value::error::{RuntimeError, RuntimeErrorKind};
+use crate::value::LoxValue;
 use crate::{
     lexer::Span,
     parser::{
@@ -19,6 +15,7 @@ use crate::{
     string::IdentifierString,
 };
 use compact_str::ToCompactString;
+use std::collections::HashMap;
 
 pub struct TreeWalkInterpreter<S, C> {
     program: Program,

@@ -2,9 +2,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
 use std::path::{Path, PathBuf};
 use std::{fs::read_to_string, process::ExitCode};
-use taurox::interpreter::error::RuntimeError;
 use taurox::interpreter::resolver::ResolutionError;
 use taurox::parser::ParserError;
+use taurox::value::error::RuntimeError;
 
 #[derive(Debug, Parser)]
 #[clap(name = "taurox", version)]
@@ -182,12 +182,8 @@ enum ProgramError {
 }
 
 fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result<(), ProgramError> {
+    use taurox::environment::SharedEnvironment;
     use taurox::interpreter::context::StdioContext;
-    use taurox::interpreter::environment::SharedEnvironment;
-    use taurox::interpreter::formatter::{
-        BasicFormatter as BasicValueFormatter, DebugFormatter as DebugValueFormatter,
-        PrettyFormatter as PrettyValueFormatter, ValueFormatter,
-    };
     use taurox::interpreter::resolver::Resolver;
     use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
     use taurox::parser::{
@@ -196,6 +192,10 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
             PrettyFormatter as PrettyExpressionFormatter, SExpressionFormatter,
         },
         Parser,
+    };
+    use taurox::value::formatter::{
+        BasicFormatter as BasicValueFormatter, DebugFormatter as DebugValueFormatter,
+        PrettyFormatter as PrettyValueFormatter, ValueFormatter,
     };
 
     let mut parser = Parser::new(src, path);
