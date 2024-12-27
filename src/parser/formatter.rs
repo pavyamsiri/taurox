@@ -201,9 +201,7 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                         .get_line_from_span(*span);
                     format!("({line}) Unexpected EOF")
                 }
-                GeneralParserError::LexicalError(err) => {
-                    self.token_formatter.format_lexical_error(err)
-                }
+                GeneralParserError::LexicalError(err) => self.token_formatter.format_error(err),
             },
         }
     }
@@ -293,9 +291,7 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .expect(ARIADNE_WRITE_MSG);
                     String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
-                GeneralParserError::LexicalError(err) => {
-                    self.token_formatter.format_lexical_error(err)
-                }
+                GeneralParserError::LexicalError(err) => self.token_formatter.format_error(err),
             },
         }
     }

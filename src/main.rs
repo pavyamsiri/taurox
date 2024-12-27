@@ -150,7 +150,7 @@ fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
                 }
             }
             Err(error) => {
-                eprintln!("{}", formatter.format_lexical_error(&error));
+                eprintln!("{}", formatter.format_error(&error));
                 succeeded = false;
             }
         };

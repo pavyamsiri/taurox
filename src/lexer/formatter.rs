@@ -4,14 +4,88 @@ use super::{
 };
 use crate::lexer::{LexicalError, LexicalErrorKind};
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
-use std::path::Path;
+use std::{fmt::Write, path::Path};
 
+const WRITE_FMT_MSG: &'static str =
+    "Encountered an error while attempting to write format string to buffer.";
+const ARIADNE_MSG: &'static str = "Ariadne produces valid utf-8 strings";
+const ARIADNE_WRITE_MSG: &'static str = "Write into buffer should not fail.";
+
+fn format_token_in_place_basic(text: &str, buffer: &mut String, token: &Token) {
+    match token.kind {
+        TokenKind::LeftParenthesis => buffer.push_str("LEFT_PAREN ( null"),
+        TokenKind::RightParenthesis => buffer.push_str("RIGHT_PAREN ) null"),
+        TokenKind::LeftBrace => buffer.push_str("LEFT_BRACE { null"),
+        TokenKind::RightBrace => buffer.push_str("RIGHT_BRACE } null"),
+        TokenKind::Comma => buffer.push_str("COMMA , null"),
+        TokenKind::Dot => buffer.push_str("DOT . null"),
+        TokenKind::Minus => buffer.push_str("MINUS - null"),
+        TokenKind::Plus => buffer.push_str("PLUS + null"),
+        TokenKind::Semicolon => buffer.push_str("SEMICOLON ; null"),
+        TokenKind::Star => buffer.push_str("STAR * null"),
+        TokenKind::Bang => buffer.push_str("BANG ! null"),
+        TokenKind::BangEqual => buffer.push_str("BANG_EQUAL != null"),
+        TokenKind::Equal => buffer.push_str("EQUAL = null"),
+        TokenKind::EqualEqual => buffer.push_str("EQUAL_EQUAL == null"),
+        TokenKind::LessThan => buffer.push_str("LESS < null"),
+        TokenKind::LessThanEqual => buffer.push_str("LESS_EQUAL <= null"),
+        TokenKind::GreaterThan => buffer.push_str("GREATER > null"),
+        TokenKind::GreaterThanEqual => buffer.push_str("GREATER_EQUAL >= null"),
+        TokenKind::Slash => buffer.push_str("SLASH / null"),
+        TokenKind::Eof => buffer.push_str("EOF  null"),
+        TokenKind::KeywordAnd => buffer.push_str("AND and null"),
+        TokenKind::KeywordClass => buffer.push_str("CLASS class null"),
+        TokenKind::KeywordElse => buffer.push_str("ELSE else null"),
+        TokenKind::KeywordFalse => buffer.push_str("FALSE false null"),
+        TokenKind::KeywordFor => buffer.push_str("FOR for null"),
+        TokenKind::KeywordFun => buffer.push_str("FUN fun null"),
+        TokenKind::KeywordIf => buffer.push_str("IF if null"),
+        TokenKind::KeywordNil => buffer.push_str("NIL nil null"),
+        TokenKind::KeywordOr => buffer.push_str("OR or null"),
+        TokenKind::KeywordPrint => buffer.push_str("PRINT print null"),
+        TokenKind::KeywordReturn => buffer.push_str("RETURN return null"),
+        TokenKind::KeywordSuper => buffer.push_str("SUPER super null"),
+        TokenKind::KeywordThis => buffer.push_str("THIS this null"),
+        TokenKind::KeywordTrue => buffer.push_str("TRUE true null"),
+        TokenKind::KeywordVar => buffer.push_str("VAR var null"),
+        TokenKind::KeywordWhile => buffer.push_str("WHILE while null"),
+        TokenKind::NumericLiteral => {
+            let lexeme = &text[token.span.range()];
+            let value: f64 = lexeme
+                .parse()
+                .expect("Numeric literals are guaranteed to be parseable into f64.");
+            write!(buffer, "NUMBER {lexeme} {value:?}").expect(&WRITE_FMT_MSG);
+        }
+        TokenKind::StringLiteral => {
+            let lexeme = &text[token.span.range()];
+            let value = &lexeme[1..lexeme.len() - 1];
+            write!(buffer, "STRING {lexeme} {value}").expect(&WRITE_FMT_MSG);
+        }
+        TokenKind::Ident => {
+            let lexeme = &text[token.span.range()];
+            write!(buffer, "IDENTIFIER {lexeme} null").expect(&WRITE_FMT_MSG);
+        }
+    }
+}
 /// Interface for creating new token formatters.
 pub trait TokenFormatter {
     /// Formats a token into a string.
-    fn format(&self, token: &Token) -> String;
+    fn format(&self, token: &Token) -> String {
+        let mut buffer = String::new();
+        self.format_in_place(&mut buffer, token);
+        buffer
+    }
     /// Formats a lexer error into a string.
-    fn format_lexical_error(&self, error: &LexicalError) -> String;
+    fn format_error(&self, error: &LexicalError) -> String {
+        let mut buffer = String::new();
+        self.format_error_in_place(&mut buffer, error);
+        buffer
+    }
+
+    /// Formats a token into a string.
+    fn format_in_place(&self, buffer: &mut String, token: &Token);
+    /// Formats a lexer error into a string.
+    fn format_error_in_place(&self, buffer: &mut String, error: &LexicalError);
 }
 
 pub struct BasicFormatter<'src> {
@@ -27,71 +101,25 @@ impl<'src> BasicFormatter<'src> {
 }
 
 impl<'src> TokenFormatter for BasicFormatter<'src> {
-    fn format(&self, token: &Token) -> String {
-        match token.kind {
-            TokenKind::LeftParenthesis => "LEFT_PAREN ( null".into(),
-            TokenKind::RightParenthesis => "RIGHT_PAREN ) null".into(),
-            TokenKind::LeftBrace => "LEFT_BRACE { null".into(),
-            TokenKind::RightBrace => "RIGHT_BRACE } null".into(),
-            TokenKind::Comma => "COMMA , null".into(),
-            TokenKind::Dot => "DOT . null".into(),
-            TokenKind::Minus => "MINUS - null".into(),
-            TokenKind::Plus => "PLUS + null".into(),
-            TokenKind::Semicolon => "SEMICOLON ; null".into(),
-            TokenKind::Star => "STAR * null".into(),
-            TokenKind::Bang => "BANG ! null".into(),
-            TokenKind::BangEqual => "BANG_EQUAL != null".into(),
-            TokenKind::Equal => "EQUAL = null".into(),
-            TokenKind::EqualEqual => "EQUAL_EQUAL == null".into(),
-            TokenKind::LessThan => "LESS < null".into(),
-            TokenKind::LessThanEqual => "LESS_EQUAL <= null".into(),
-            TokenKind::GreaterThan => "GREATER > null".into(),
-            TokenKind::GreaterThanEqual => "GREATER_EQUAL >= null".into(),
-            TokenKind::Slash => "SLASH / null".into(),
-            TokenKind::Eof => "EOF  null".into(),
-            TokenKind::NumericLiteral => {
-                let lexeme = &self.text[token.span.range()];
-                let value: f64 = lexeme
-                    .parse()
-                    .expect("Numeric literals are guaranteed to be parseable into f64.");
-                format!("NUMBER {lexeme} {value:?}")
-            }
-            TokenKind::StringLiteral => {
-                let lexeme = &self.text[token.span.range()];
-                let value = &lexeme[1..lexeme.len() - 1];
-                format!("STRING {lexeme} {value}")
-            }
-            TokenKind::Ident => {
-                let lexeme = &self.text[token.span.range()];
-                format!("IDENTIFIER {lexeme} null")
-            }
-            TokenKind::KeywordAnd => "AND and null".into(),
-            TokenKind::KeywordClass => "CLASS class null".into(),
-            TokenKind::KeywordElse => "ELSE else null".into(),
-            TokenKind::KeywordFalse => "FALSE false null".into(),
-            TokenKind::KeywordFor => "FOR for null".into(),
-            TokenKind::KeywordFun => "FUN fun null".into(),
-            TokenKind::KeywordIf => "IF if null".into(),
-            TokenKind::KeywordNil => "NIL nil null".into(),
-            TokenKind::KeywordOr => "OR or null".into(),
-            TokenKind::KeywordPrint => "PRINT print null".into(),
-            TokenKind::KeywordReturn => "RETURN return null".into(),
-            TokenKind::KeywordSuper => "SUPER super null".into(),
-            TokenKind::KeywordThis => "THIS this null".into(),
-            TokenKind::KeywordTrue => "TRUE true null".into(),
-            TokenKind::KeywordVar => "VAR var null".into(),
-            TokenKind::KeywordWhile => "WHILE while null".into(),
-        }
+    fn format_in_place(&self, buffer: &mut String, token: &Token) {
+        format_token_in_place_basic(&self.text, buffer, token);
     }
 
-    fn format_lexical_error(&self, error: &LexicalError) -> String {
+    fn format_error_in_place(&self, buffer: &mut String, error: &LexicalError) {
         let line = self.line_breaks.get_line_from_span(error.span);
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
-                format!("[line {}] Error: Unexpected character: {c}", line)
+                buffer
+                    .write_fmt(format_args!(
+                        "[line {}] Error: Unexpected character: {c}",
+                        line
+                    ))
+                    .expect(&WRITE_FMT_MSG);
             }
             LexicalErrorKind::UnclosedString => {
-                format!("[line {}] Error: Unterminated string.", line)
+                buffer
+                    .write_fmt(format_args!("[line {}] Error: Unterminated string.", line))
+                    .expect(&WRITE_FMT_MSG);
             }
         }
     }
@@ -100,12 +128,12 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
 pub struct DebugFormatter;
 
 impl TokenFormatter for DebugFormatter {
-    fn format(&self, token: &Token) -> String {
-        format!("{token:?}")
+    fn format_in_place(&self, buffer: &mut String, token: &Token) {
+        write!(buffer, "{token:?}").expect(&WRITE_FMT_MSG);
     }
 
-    fn format_lexical_error(&self, error: &LexicalError) -> String {
-        format!("{error:?}")
+    fn format_error_in_place(&self, buffer: &mut String, error: &LexicalError) {
+        write!(buffer, "{error:?}").expect(&WRITE_FMT_MSG);
     }
 }
 
@@ -126,73 +154,20 @@ impl<'src> LineFormatter<'src> {
 }
 
 impl<'src> TokenFormatter for LineFormatter<'src> {
-    fn format(&self, token: &Token) -> String {
+    fn format_in_place(&self, buffer: &mut String, token: &Token) {
         let line = self.line_breaks.get_line_from_span(token.span);
-        let value = match token.kind {
-            TokenKind::LeftParenthesis => "LEFT_PAREN ( null".into(),
-            TokenKind::RightParenthesis => "RIGHT_PAREN ) null".into(),
-            TokenKind::LeftBrace => "LEFT_BRACE { null".into(),
-            TokenKind::RightBrace => "RIGHT_BRACE } null".into(),
-            TokenKind::Comma => "COMMA , null".into(),
-            TokenKind::Dot => "DOT . null".into(),
-            TokenKind::Minus => "MINUS - null".into(),
-            TokenKind::Plus => "PLUS + null".into(),
-            TokenKind::Semicolon => "SEMICOLON ; null".into(),
-            TokenKind::Star => "STAR * null".into(),
-            TokenKind::Bang => "BANG ! null".into(),
-            TokenKind::BangEqual => "BANG_EQUAL != null".into(),
-            TokenKind::Equal => "EQUAL = null".into(),
-            TokenKind::EqualEqual => "EQUAL_EQUAL == null".into(),
-            TokenKind::LessThan => "LESS < null".into(),
-            TokenKind::LessThanEqual => "LESS_EQUAL <= null".into(),
-            TokenKind::GreaterThan => "GREATER > null".into(),
-            TokenKind::GreaterThanEqual => "GREATER_EQUAL >= null".into(),
-            TokenKind::Slash => "SLASH / null".into(),
-            TokenKind::Eof => "EOF  null".into(),
-            TokenKind::NumericLiteral => {
-                let lexeme = &self.text[token.span.range()];
-                let value: f64 = lexeme
-                    .parse()
-                    .expect("Numeric literals are guaranteed to be parseable into f64.");
-                format!("NUMBER {lexeme} {value:?}")
-            }
-            TokenKind::StringLiteral => {
-                let lexeme = &self.text[token.span.range()];
-                let value = &lexeme[1..lexeme.len() - 1];
-                format!("STRING {lexeme} {value}")
-            }
-            TokenKind::Ident => {
-                let lexeme = &self.text[token.span.range()];
-                format!("IDENTIFIER {lexeme} null")
-            }
-            TokenKind::KeywordAnd => "AND and null".into(),
-            TokenKind::KeywordClass => "CLASS class null".into(),
-            TokenKind::KeywordElse => "ELSE else null".into(),
-            TokenKind::KeywordFalse => "FALSE false null".into(),
-            TokenKind::KeywordFor => "FOR for null".into(),
-            TokenKind::KeywordFun => "FUN fun null".into(),
-            TokenKind::KeywordIf => "IF if null".into(),
-            TokenKind::KeywordNil => "NIL nil null".into(),
-            TokenKind::KeywordOr => "OR or null".into(),
-            TokenKind::KeywordPrint => "PRINT print null".into(),
-            TokenKind::KeywordReturn => "RETURN return null".into(),
-            TokenKind::KeywordSuper => "SUPER super null".into(),
-            TokenKind::KeywordThis => "THIS this null".into(),
-            TokenKind::KeywordTrue => "TRUE true null".into(),
-            TokenKind::KeywordVar => "VAR var null".into(),
-            TokenKind::KeywordWhile => "WHILE while null".into(),
-        };
-        format!("({line}) {value}")
+        write!(buffer, "({line}) ").expect(&WRITE_FMT_MSG);
+        format_token_in_place_basic(&self.text, buffer, token);
     }
 
-    fn format_lexical_error(&self, error: &LexicalError) -> String {
+    fn format_error_in_place(&self, buffer: &mut String, error: &LexicalError) {
         let line = self.line_breaks.get_line_from_span(error.span);
         match error.kind {
             LexicalErrorKind::Unrecognized(c) => {
-                format!("({}) ERROR UNEXPECTED_CHAR {c}", line)
+                write!(buffer, "({}) ERROR UNEXPECTED_CHAR {c}", line).expect(&WRITE_FMT_MSG)
             }
             LexicalErrorKind::UnclosedString => {
-                format!("({}) ERROR UNTERMINATED_STRING null", line)
+                write!(buffer, "({}) ERROR UNTERMINATED_STRING null", line).expect(&WRITE_FMT_MSG)
             }
         }
     }
@@ -228,66 +203,11 @@ impl<'src> PrettyFormatter<'src> {
 }
 
 impl<'src> TokenFormatter for PrettyFormatter<'src> {
-    fn format(&self, token: &Token) -> String {
-        let line = self.line_breaks.get_line_from_span(token.span);
-        let value = match token.kind {
-            TokenKind::LeftParenthesis => "LEFT_PAREN ( null".into(),
-            TokenKind::RightParenthesis => "RIGHT_PAREN ) null".into(),
-            TokenKind::LeftBrace => "LEFT_BRACE { null".into(),
-            TokenKind::RightBrace => "RIGHT_BRACE } null".into(),
-            TokenKind::Comma => "COMMA , null".into(),
-            TokenKind::Dot => "DOT . null".into(),
-            TokenKind::Minus => "MINUS - null".into(),
-            TokenKind::Plus => "PLUS + null".into(),
-            TokenKind::Semicolon => "SEMICOLON ; null".into(),
-            TokenKind::Star => "STAR * null".into(),
-            TokenKind::Bang => "BANG ! null".into(),
-            TokenKind::BangEqual => "BANG_EQUAL != null".into(),
-            TokenKind::Equal => "EQUAL = null".into(),
-            TokenKind::EqualEqual => "EQUAL_EQUAL == null".into(),
-            TokenKind::LessThan => "LESS < null".into(),
-            TokenKind::LessThanEqual => "LESS_EQUAL <= null".into(),
-            TokenKind::GreaterThan => "GREATER > null".into(),
-            TokenKind::GreaterThanEqual => "GREATER_EQUAL >= null".into(),
-            TokenKind::Slash => "SLASH / null".into(),
-            TokenKind::Eof => "EOF  null".into(),
-            TokenKind::NumericLiteral => {
-                let lexeme = &self.text[token.span.range()];
-                let value: f64 = lexeme
-                    .parse()
-                    .expect("Numeric literals are guaranteed to be parseable into f64.");
-                format!("NUMBER {lexeme} {value:?}")
-            }
-            TokenKind::StringLiteral => {
-                let lexeme = &self.text[token.span.range()];
-                let value = &lexeme[1..lexeme.len() - 1];
-                format!("STRING {lexeme} {value}")
-            }
-            TokenKind::Ident => {
-                let lexeme = &self.text[token.span.range()];
-                format!("IDENTIFIER {lexeme} null")
-            }
-            TokenKind::KeywordAnd => "AND and null".into(),
-            TokenKind::KeywordClass => "CLASS class null".into(),
-            TokenKind::KeywordElse => "ELSE else null".into(),
-            TokenKind::KeywordFalse => "FALSE false null".into(),
-            TokenKind::KeywordFor => "FOR for null".into(),
-            TokenKind::KeywordFun => "FUN fun null".into(),
-            TokenKind::KeywordIf => "IF if null".into(),
-            TokenKind::KeywordNil => "NIL nil null".into(),
-            TokenKind::KeywordOr => "OR or null".into(),
-            TokenKind::KeywordPrint => "PRINT print null".into(),
-            TokenKind::KeywordReturn => "RETURN return null".into(),
-            TokenKind::KeywordSuper => "SUPER super null".into(),
-            TokenKind::KeywordThis => "THIS this null".into(),
-            TokenKind::KeywordTrue => "TRUE true null".into(),
-            TokenKind::KeywordVar => "VAR var null".into(),
-            TokenKind::KeywordWhile => "WHILE while null".into(),
-        };
-        format!("({line}) {value}")
+    fn format_in_place(&self, buffer: &mut String, token: &Token) {
+        format_token_in_place_basic(&self.text, buffer, token);
     }
 
-    fn format_lexical_error(&self, error: &LexicalError) -> String {
+    fn format_error_in_place(&self, buffer: &mut String, error: &LexicalError) {
         let path = self
             .path
             .to_str()
@@ -308,12 +228,9 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
                     )
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
-                    .expect("Write into buffer should not fail.");
-                String::from_utf8(output.into_inner())
-                    .expect("Ariadne produces valid utf-8 strings.")
+                    .expect(&ARIADNE_WRITE_MSG);
             }
             LexicalErrorKind::UnclosedString => {
-                let mut output = std::io::Cursor::new(Vec::new());
                 Report::build(ReportKind::Error, (path, error.span.range()))
                     .with_code(error.code())
                     .with_message("Encountered non-terminated string during lexing")
@@ -329,10 +246,9 @@ impl<'src> TokenFormatter for PrettyFormatter<'src> {
                     )
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
-                    .expect("Write into buffer should not fail.");
-                String::from_utf8(output.into_inner())
-                    .expect("Ariadne produces valid utf-8 strings.")
+                    .expect(&ARIADNE_WRITE_MSG);
             }
         }
+        buffer.push_str(&String::from_utf8(output.into_inner()).expect(&ARIADNE_MSG));
     }
 }

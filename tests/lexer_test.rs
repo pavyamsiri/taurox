@@ -23,7 +23,7 @@ fn check(input: &str, expected: &str, test_name: &str) {
                 }
             }
             Err(error) => {
-                buffer.push_str(&formatter.format_lexical_error(&error));
+                buffer.push_str(&formatter.format_error(&error));
             }
         }
         buffer.push('\n');
