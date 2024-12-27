@@ -7,6 +7,7 @@ use super::{
         Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
+    statement::{Declaration, NonDeclaration, Statement},
     ParserError,
 };
 use crate::lexer::{
@@ -354,11 +355,12 @@ impl<'src> BasicParserFormatter<'src> {
 
     fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
         match error {
-            StatementParserError::NonBlock(statement) => {
+            StatementParserError::NonBlock(stmt) => {
                 let line = 0;
                 buffer
-                    .write_fmt(format_args!("({line}) Non-Block: {statement:?}"))
+                    .write_fmt(format_args!("({line}) Non-Block: "))
                     .expect(&WRITE_FMT_MSG);
+                self.format_statement(buffer, stmt);
             }
             StatementParserError::InvalidStatement(Token { kind, span }) => {
                 let line = self
@@ -372,8 +374,59 @@ impl<'src> BasicParserFormatter<'src> {
             StatementParserError::InvalidNonDeclaration(decl) => {
                 let line = 0;
                 buffer
-                    .write_fmt(format_args!("({line}) Invalid non declaration: {decl:?}"))
+                    .write_fmt(format_args!("({line}) Invalid non declaration: "))
                     .expect(&WRITE_FMT_MSG);
+                self.format_declaration(buffer, decl);
+            }
+        }
+    }
+
+    fn format_statement(&self, buffer: &mut String, stmt: &Statement) {
+        match stmt {
+            Statement::Declaration(decl) => self.format_declaration(buffer, decl),
+            Statement::NonDeclaration(stmt) => match stmt {
+                NonDeclaration::Expression(expr) => {
+                    buffer.push_str("EXPR ");
+                    self.expr_formatter.format_in_place(buffer, expr);
+                }
+                NonDeclaration::Print(expr) => {
+                    buffer.push_str("PRINT ");
+                    self.expr_formatter.format_in_place(buffer, expr);
+                }
+                NonDeclaration::Return { value } => {
+                    buffer.push_str("RETURN ");
+                    if let Some(expr) = value {
+                        buffer.push(' ');
+                        self.expr_formatter.format_in_place(buffer, expr);
+                    }
+                }
+                NonDeclaration::Block(_) => {
+                    write!(buffer, "BLOCK {{..}}").expect(&WRITE_FMT_MSG);
+                }
+                NonDeclaration::If { condition, .. } => {
+                    buffer.push_str("IF (");
+                    self.expr_formatter.format_in_place(buffer, condition);
+                    buffer.push_str(") ..");
+                }
+                NonDeclaration::While { condition, .. } => {
+                    buffer.push_str("WHILE (");
+                    self.expr_formatter.format_in_place(buffer, condition);
+                    buffer.push_str(") ..");
+                }
+                NonDeclaration::For { .. } => {
+                    buffer.push_str("FOR ..");
+                }
+            },
+        }
+    }
+
+    fn format_declaration(&self, buffer: &mut String, decl: &Declaration) {
+        match decl {
+            Declaration::Variable { name, .. } => {
+                write!(buffer, "VARDECL {name}").expect(&WRITE_FMT_MSG);
+            }
+            Declaration::Function { name, .. } => {
+                write!(buffer, "FUNDECL {name}").expect(&WRITE_FMT_MSG);
             }
         }
     }
