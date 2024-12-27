@@ -1,20 +1,26 @@
 use super::{
-    error::{ExpressionParserError, GeneralExpressionParserError, GeneralParserError},
+    error::{
+        ExpressionParserError, GeneralExpressionParserError, GeneralParserError,
+        StatementParserError,
+    },
     expression::{
         Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
+    ParserError,
 };
 use crate::lexer::{
     formatter::{
         LineFormatter as LineTokenFormatter, PrettyFormatter as PrettyTokenFormatter,
         TokenFormatter,
     },
-    Token,
+    LineBreaks, Token,
 };
 use ariadne::{Color, Label, Report, ReportKind, Source};
-use std::path::Path;
+use std::{fmt::Write, path::Path};
 
+const WRITE_FMT_MSG: &'static str =
+    "Encountered an error while attempting to write format string to buffer.";
 const ARIADNE_MSG: &'static str = "Ariadne produces valid utf-8 strings";
 const ARIADNE_WRITE_MSG: &'static str = "Write into buffer should not fail.";
 
@@ -23,9 +29,9 @@ pub trait ExpressionFormatter {
     fn format_error(&self, error: &GeneralExpressionParserError) -> String;
 }
 
-pub struct DebugFormatter;
+pub struct DebugExpressionFormatter;
 
-impl ExpressionFormatter for DebugFormatter {
+impl ExpressionFormatter for DebugExpressionFormatter {
     fn format(&self, tree: &Expression) -> String {
         format!("{tree:?}")
     }
@@ -44,6 +50,10 @@ impl<'src> SExpressionFormatter<'src> {
         Self {
             token_formatter: LineTokenFormatter::new(text),
         }
+    }
+
+    pub fn get_line_breaks(&self) -> &LineBreaks {
+        self.token_formatter.get_line_breaks()
     }
 }
 
@@ -199,11 +209,11 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
     }
 }
 
-pub struct PrettyFormatter<'src> {
+pub struct PrettyExpressionFormatter<'src> {
     token_formatter: PrettyTokenFormatter<'src>,
 }
 
-impl<'src> PrettyFormatter<'src> {
+impl<'src> PrettyExpressionFormatter<'src> {
     pub fn new(text: &'src str, path: &'src Path) -> Self {
         Self {
             token_formatter: PrettyTokenFormatter::new(text, path),
@@ -211,7 +221,7 @@ impl<'src> PrettyFormatter<'src> {
     }
 }
 
-impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
+impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
     fn format(&self, tree: &Expression) -> String {
         SExpressionFormatter::format_node(tree, &tree.get_root_ref())
     }
@@ -288,5 +298,77 @@ impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
                 }
             },
         }
+    }
+}
+
+pub trait ParserFormatter {
+    fn format_error(&self, error: &ParserError) -> String;
+}
+
+pub struct DebugParserFormatter;
+
+impl ParserFormatter for DebugParserFormatter {
+    fn format_error(&self, error: &ParserError) -> String {
+        format!("{error}")
+    }
+}
+
+pub struct BasicParserFormatter<'src> {
+    expr_formatter: SExpressionFormatter<'src>,
+}
+
+impl<'src> BasicParserFormatter<'src> {
+    pub fn new(text: &'src str) -> Self {
+        Self {
+            expr_formatter: SExpressionFormatter::new(text),
+        }
+    }
+
+    fn format_expression_parser_error(&self, buffer: &mut String, error: &ExpressionParserError) {
+        let error: GeneralExpressionParserError = (error.clone()).into();
+        buffer.push_str(&self.expr_formatter.format_error(&error));
+    }
+
+    fn format_general_parser_error(&self, buffer: &mut String, error: &GeneralParserError) {
+        let error: GeneralExpressionParserError = (error.clone()).into();
+        buffer.push_str(&self.expr_formatter.format_error(&error));
+    }
+
+    fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
+        match error {
+            StatementParserError::NonBlock(statement) => {
+                let line = 0;
+                buffer
+                    .write_fmt(format_args!("({line}) Non-Block: {statement:?}"))
+                    .expect(&WRITE_FMT_MSG);
+            }
+            StatementParserError::InvalidStatement(Token { kind, span }) => {
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(*span);
+                buffer
+                    .write_fmt(format_args!("({line}) Invalid statement token: {kind:?}"))
+                    .expect(&WRITE_FMT_MSG);
+            }
+            StatementParserError::InvalidNonDeclaration(decl) => {
+                let line = 0;
+                buffer
+                    .write_fmt(format_args!("({line}) Invalid non declaration: {decl:?}"))
+                    .expect(&WRITE_FMT_MSG);
+            }
+        }
+    }
+}
+
+impl<'src> ParserFormatter for BasicParserFormatter<'src> {
+    fn format_error(&self, error: &ParserError) -> String {
+        let mut buffer = String::new();
+        match error {
+            ParserError::Expression(e) => self.format_expression_parser_error(&mut buffer, e),
+            ParserError::General(e) => self.format_general_parser_error(&mut buffer, e),
+            ParserError::Statement(e) => self.format_statement_parser_error(&mut buffer, e),
+        }
+        buffer
     }
 }

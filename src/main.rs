@@ -2,7 +2,6 @@ use clap::{Parser, Subcommand, ValueEnum};
 use color_eyre::eyre::Result;
 use std::path::{Path, PathBuf};
 use std::{fs::read_to_string, process::ExitCode};
-use taurox::parser::ParserError;
 use taurox::resolver::ResolutionError;
 use taurox::value::error::RuntimeError;
 
@@ -32,6 +31,8 @@ pub enum TauroxCommand {
     },
     Run {
         path: PathBuf,
+        #[clap(long = "format", value_enum, default_value = "basic")]
+        format: ProgramFormat,
     },
 }
 
@@ -53,6 +54,13 @@ pub enum ExpressionFormat {
 
 #[derive(Debug, Clone, ValueEnum)]
 pub enum ValueFormat {
+    Debug,
+    Basic,
+    Pretty,
+}
+
+#[derive(Debug, Clone, ValueEnum)]
+pub enum ProgramFormat {
     Debug,
     Basic,
     Pretty,
@@ -86,7 +94,7 @@ fn taurox_main() -> Result<ExitCode> {
             let res = evaluate(&src, &path, &format);
             match res {
                 Ok(_) => {}
-                Err(ProgramError::CompileError(_)) => {
+                Err(ProgramError::CompileError) => {
                     return Ok(ExitCode::from(65));
                 }
                 Err(ProgramError::AnalysisError(_)) => {
@@ -97,14 +105,13 @@ fn taurox_main() -> Result<ExitCode> {
                 }
             }
         }
-        TauroxCommand::Run { path } => {
+        TauroxCommand::Run { path, format } => {
             eprintln!("Running {:?}...", path);
             let src = read_to_string(&path)?;
-            let res = run(&src, &path);
+            let res = run(&src, &path, &format);
             match res {
                 Ok(_) => {}
-                Err(ProgramError::CompileError(e)) => {
-                    eprintln!("{e}");
+                Err(ProgramError::CompileError) => {
                     return Ok(ExitCode::from(65));
                 }
                 Err(ProgramError::AnalysisError(e)) => {
@@ -138,7 +145,6 @@ fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
     loop {
         match scanner.next_token() {
             Ok(token) => {
-                // println!("{}", formatter.format(&token));
                 if matches!(token.kind, TokenKind::Eof) {
                     return succeeded;
                 }
@@ -153,15 +159,16 @@ fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
 
 fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
     use taurox::parser::formatter::{
-        DebugFormatter, ExpressionFormatter, PrettyFormatter, SExpressionFormatter,
+        DebugExpressionFormatter, ExpressionFormatter, PrettyExpressionFormatter,
+        SExpressionFormatter,
     };
     use taurox::parser::Parser;
 
     let mut parser = Parser::new(src, path);
     let formatter: Box<dyn ExpressionFormatter> = match format {
-        ExpressionFormat::Debug => Box::new(DebugFormatter {}),
+        ExpressionFormat::Debug => Box::new(DebugExpressionFormatter {}),
         ExpressionFormat::SExpr => Box::new(SExpressionFormatter::new(src)),
-        ExpressionFormat::Pretty => Box::new(PrettyFormatter::new(src, path)),
+        ExpressionFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
     match parser.parse_expression() {
         Ok(expression) => {
@@ -176,7 +183,7 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
 }
 
 enum ProgramError {
-    CompileError(ParserError),
+    CompileError,
     AnalysisError(ResolutionError),
     RuntimeError(RuntimeError),
 }
@@ -187,8 +194,8 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
     use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
     use taurox::parser::{
         formatter::{
-            DebugFormatter as DebugExpressionFormatter, ExpressionFormatter,
-            PrettyFormatter as PrettyExpressionFormatter, SExpressionFormatter,
+            DebugExpressionFormatter, ExpressionFormatter, PrettyExpressionFormatter,
+            SExpressionFormatter,
         },
         Parser,
     };
@@ -208,7 +215,7 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
         Ok(expr) => expr,
         Err(e) => {
             eprintln!("{}", expression_formatter.format_error(&e));
-            return Err(ProgramError::CompileError(e.into()));
+            return Err(ProgramError::CompileError);
         }
     };
 
@@ -243,16 +250,31 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
     Ok(())
 }
 
-fn run(src: &str, path: &Path) -> std::result::Result<(), ProgramError> {
+fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<(), ProgramError> {
     use taurox::interpreter::ProgramState;
     use taurox::interpreter::{
         context::StdioContext, Interpreter, TreeWalkInterpreter, TreeWalkStatementInterpreter,
     };
-    use taurox::parser::Parser;
+    use taurox::parser::{
+        formatter::{BasicParserFormatter, DebugParserFormatter, ParserFormatter},
+        Parser,
+    };
     use taurox::resolver::Resolver;
 
+    let program_formatter: Box<dyn ParserFormatter> = match format {
+        ProgramFormat::Debug => Box::new(DebugParserFormatter {}),
+        ProgramFormat::Basic => Box::new(BasicParserFormatter::new(src)),
+        ProgramFormat::Pretty => todo!(),
+    };
+
     let mut parser = Parser::new(src, path);
-    let program = parser.parse().map_err(|e| ProgramError::CompileError(e))?;
+    let program = match parser.parse() {
+        Ok(program) => program,
+        Err(e) => {
+            eprintln!("{}", program_formatter.format_error(&e));
+            return Err(ProgramError::CompileError);
+        }
+    };
 
     // Static analysis
     let resolver = Resolver::new();

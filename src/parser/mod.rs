@@ -29,6 +29,10 @@ impl Program {
         self.statements.get(index)
     }
 
+    pub fn as_slice(&self) -> &[Statement] {
+        &self.statements
+    }
+
     pub fn len(&self) -> usize {
         self.statements.len()
     }
