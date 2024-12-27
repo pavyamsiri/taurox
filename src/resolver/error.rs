@@ -1,4 +1,4 @@
-use crate::lexer::Span;
+use crate::{lexer::Span, string::Ident};
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
@@ -6,7 +6,7 @@ pub enum ResolutionErrorKind {
     #[error("Reading a local variable in its own initializer.")]
     SelfReferentialInitializer,
     #[error("Shadowing a local.")]
-    ShadowLocal,
+    ShadowLocal { old: Ident, new: Ident },
     #[error("Returning in a non-function scope.")]
     NonFunctionReturn,
 }
@@ -22,7 +22,7 @@ impl ResolutionError {
     pub fn code(&self) -> &'static str {
         match self.kind {
             ResolutionErrorKind::SelfReferentialInitializer => "RA001",
-            ResolutionErrorKind::ShadowLocal => "RA002",
+            ResolutionErrorKind::ShadowLocal { .. } => "RA002",
             ResolutionErrorKind::NonFunctionReturn => "RA003",
         }
     }

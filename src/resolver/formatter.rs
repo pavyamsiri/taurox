@@ -41,11 +41,14 @@ impl ResolverFormatter for BasicResolverFormatter {
     fn format_error_in_place(&self, buffer: &mut String, error: &ResolutionError) {
         let line = self.line_breaks.get_line_from_span(error.span);
         write!(buffer, "({line}) ").expect(&WRITE_FMT_MSG);
-        match error.kind {
+        match &error.kind {
             ResolutionErrorKind::SelfReferentialInitializer => {
                 buffer.push_str("Self referential initializer")
             }
-            ResolutionErrorKind::ShadowLocal => buffer.push_str("Shadowing a local"),
+            ResolutionErrorKind::ShadowLocal { old, new } => {
+                write!(buffer, "Shadowing the local {} with {}", old.name, new.name)
+                    .expect(&WRITE_FMT_MSG)
+            }
             ResolutionErrorKind::NonFunctionReturn => {
                 buffer.push_str("Returning in a non-function context")
             }
@@ -70,7 +73,7 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
         let path = &self.path.to_string_lossy();
         let mut output = std::io::Cursor::new(Vec::new());
         let span = error.span;
-        match error.kind {
+        match &error.kind {
             ResolutionErrorKind::SelfReferentialInitializer => {
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
@@ -84,13 +87,20 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
                     .write((path, Source::from(text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
             }
-            ResolutionErrorKind::ShadowLocal => {
+            ResolutionErrorKind::ShadowLocal { old, new } => {
+                let old_span = old.span;
+                let new_span = new.span;
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
                     .with_message("Shadowed a local variable in a scope")
                     .with_label(
-                        Label::new((path, span.range()))
-                            .with_message("Shadowing occurs here...")
+                        Label::new((path, old_span.range()))
+                            .with_message("Variable is first declared here...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .with_label(
+                        Label::new((path, new_span.range()))
+                            .with_message("but is declared again over here")
                             .with_color(Color::BrightRed),
                     )
                     .finish()

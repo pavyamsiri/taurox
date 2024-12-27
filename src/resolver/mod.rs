@@ -21,8 +21,8 @@ use std::collections::HashMap;
 pub type ResolutionMap = HashMap<Ident, usize>;
 
 enum Resolution {
-    Declared,
-    Defined,
+    Declared(Ident),
+    Defined(Ident),
 }
 
 #[derive(Clone, Copy)]
@@ -89,21 +89,31 @@ impl Resolver {
 
     fn declare(&mut self, ident: &Ident) -> Result<(), ResolutionError> {
         if let Some(inner_scope) = self.scopes.last_mut() {
-            if inner_scope.contains_key(&ident.name) {
-                return Err(ResolutionError {
-                    kind: ResolutionErrorKind::ShadowLocal,
-                    span: ident.span,
-                });
+            if let Some(resolution) = inner_scope.get(&ident.name) {
+                let old_ident = match resolution {
+                    Resolution::Declared(ident) => ident,
+                    Resolution::Defined(ident) => ident,
+                };
+                if inner_scope.contains_key(&ident.name) {
+                    let encompassing = old_ident.span.merge(&ident.span);
+                    return Err(ResolutionError {
+                        kind: ResolutionErrorKind::ShadowLocal {
+                            old: old_ident.clone(),
+                            new: ident.clone(),
+                        },
+                        span: encompassing,
+                    });
+                }
             }
 
-            inner_scope.insert(ident.name.clone(), Resolution::Declared);
+            inner_scope.insert(ident.name.clone(), Resolution::Declared(ident.clone()));
         }
         Ok(())
     }
 
     fn define(&mut self, ident: &Ident) {
         if let Some(inner_scope) = self.scopes.last_mut() {
-            inner_scope.insert(ident.name.clone(), Resolution::Defined);
+            inner_scope.insert(ident.name.clone(), Resolution::Defined(ident.clone()));
         }
     }
 
@@ -118,7 +128,7 @@ impl Resolver {
     fn resolve_variable(&mut self, ident: &Ident) {
         let total_depth = self.scopes.len();
         for (depth, scope) in self.scopes.iter_mut().enumerate().rev() {
-            if let Some(Resolution::Defined) = scope.get(&ident.name) {
+            if let Some(Resolution::Defined(_)) = scope.get(&ident.name) {
                 self.resolution
                     .insert(ident.clone(), total_depth - 1 - depth);
             }
@@ -366,7 +376,7 @@ impl Resolver {
 
     fn resolve_variable_expression(&mut self, ident: &Ident) -> Result<(), ResolutionError> {
         // Can't access variable when it is declared but not defined
-        if let Some(Resolution::Declared) = self.get_resolution(ident) {
+        if let Some(Resolution::Declared(_)) = self.get_resolution(ident) {
             Err(ResolutionError {
                 kind: ResolutionErrorKind::SelfReferentialInitializer,
                 span: ident.span,
