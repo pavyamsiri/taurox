@@ -4,7 +4,7 @@ pub mod formatter;
 pub mod statement;
 
 use crate::{
-    lexer::{Lexer, LexicalError, LineBreaks, Token, TokenKind},
+    lexer::{Lexer, LexicalError, LineBreaks, Span, Token, TokenKind},
     string::IdentifierString,
 };
 pub use error::ParserError;
@@ -20,6 +20,9 @@ use statement::{
     Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind, Statement,
 };
 use std::path::Path;
+
+/// Only allow up to 255 parameters
+const MAX_PARAMETERS: usize = 255;
 
 #[derive(Debug)]
 pub struct Program {
@@ -121,7 +124,7 @@ impl<'src> Parser<'src> {
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordVar)?;
-        let place = self.expect_ident()?;
+        let (name, name_span) = self.expect_ident()?;
         let mut initial = None;
         // Assignment
         if let Some(_) = self.eat_if(TokenKind::Equal)? {
@@ -133,8 +136,9 @@ impl<'src> Parser<'src> {
         let span = leftmost.span.merge(&rightmost.span);
         let statement = Statement::Declaration(Declaration {
             kind: DeclarationKind::Variable {
-                name: place.into(),
+                name: name.into(),
                 initial,
+                span: name_span,
             },
             span,
         });
@@ -144,7 +148,7 @@ impl<'src> Parser<'src> {
 
     fn parse_function_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordFun)?;
-        let name = self.expect_ident()?;
+        let (name, name_span) = self.expect_ident()?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
         // No parameters
@@ -152,9 +156,8 @@ impl<'src> Parser<'src> {
             Vec::new()
         } else {
             let mut parameters = Vec::new();
-            // NOTE(pavyamsiri): Only allow up to 255 parameters
-            for _ in 0..255 {
-                let parameter = self.expect_ident()?;
+            for _ in 0..MAX_PARAMETERS {
+                let (parameter, _) = self.expect_ident()?;
                 parameters.push(parameter);
 
                 if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
@@ -182,6 +185,7 @@ impl<'src> Parser<'src> {
                 name,
                 parameters,
                 body,
+                span: name_span,
             },
             span,
         });
@@ -271,9 +275,18 @@ impl<'src> Parser<'src> {
                 let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
                 let initializer = match statement {
                     Statement::Declaration(Declaration {
-                        kind: DeclarationKind::Variable { name, initial },
+                        kind:
+                            DeclarationKind::Variable {
+                                name,
+                                initial,
+                                span,
+                            },
                         ..
-                    }) => Some(Initializer::VarDecl { name, initial }),
+                    }) => Some(Initializer::VarDecl {
+                        name,
+                        initial,
+                        span,
+                    }),
                     Statement::NonDeclaration(NonDeclaration {
                         kind: NonDeclarationKind::Expression(expr),
                         ..
@@ -715,7 +728,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn expect_ident(&mut self) -> Result<IdentifierString, GeneralParserError> {
+    fn expect_ident(&mut self) -> Result<(IdentifierString, Span), GeneralParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != TokenKind::Ident {
             return Err(GeneralParserError::UnexpectedToken {
@@ -729,7 +742,7 @@ impl<'src> Parser<'src> {
             .get_lexeme(&next_token.span)
             .expect("Token came from lexer so it is valid.");
 
-        Ok(name.into())
+        Ok((name.into(), next_token.span))
     }
 
     fn expect(&mut self, expected: TokenKind) -> Result<Token, GeneralParserError> {

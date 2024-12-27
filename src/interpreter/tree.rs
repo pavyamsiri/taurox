@@ -87,7 +87,7 @@ where
     ) -> Result<ProgramState, RuntimeError> {
         let state = match statement {
             Statement::Declaration(Declaration {
-                kind: DeclarationKind::Variable { name, initial },
+                kind: DeclarationKind::Variable { name, initial, .. },
                 ..
             }) => self.interpret_variable_declaration(
                 environment,
@@ -102,6 +102,7 @@ where
                         name,
                         parameters,
                         body,
+                        ..
                     },
                 ..
             }) => self.interpret_function_declaration(
@@ -343,7 +344,9 @@ impl TreeWalkStatementInterpreter {
         // Run the initializer
         let mut environment = environment.new_scope();
         match initializer {
-            Some(Initializer::VarDecl { ref name, initial }) => {
+            Some(Initializer::VarDecl {
+                ref name, initial, ..
+            }) => {
                 self.interpret_variable_declaration(
                     &mut environment,
                     context,

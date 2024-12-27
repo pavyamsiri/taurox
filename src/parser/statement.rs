@@ -26,10 +26,12 @@ pub struct Declaration {
 pub enum DeclarationKind {
     Variable {
         name: IdentifierString,
+        span: Span,
         initial: Option<Expression>,
     },
     Function {
         name: IdentifierString,
+        span: Span,
         parameters: Vec<IdentifierString>,
         body: Vec<Statement>,
     },
@@ -49,6 +51,7 @@ pub enum Initializer {
     VarDecl {
         name: IdentifierString,
         initial: Option<Expression>,
+        span: Span,
     },
     Expression(Expression),
 }

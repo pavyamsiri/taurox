@@ -130,15 +130,20 @@ impl Resolver {
 impl Resolver {
     fn resolve_declaration(&mut self, declaration: &Declaration) -> Result<(), ResolutionError> {
         match &declaration.kind {
-            DeclarationKind::Variable { name, initial } => {
-                self.resolve_variable_declaration(name, initial.as_ref())?;
+            DeclarationKind::Variable {
+                name,
+                initial,
+                span,
+            } => {
+                self.resolve_variable_declaration(name, initial.as_ref(), span)?;
             }
             DeclarationKind::Function {
                 name,
                 parameters,
                 body,
+                span,
             } => {
-                self.resolve_function_declaration(name, parameters, body)?;
+                self.resolve_function_declaration(name, parameters, body, span)?;
             }
         }
         Ok(())
@@ -148,15 +153,9 @@ impl Resolver {
         &mut self,
         name: &IdentifierString,
         initializer: Option<&Expression>,
+        span: &Span,
     ) -> Result<(), ResolutionError> {
-        // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
-        self.declare(
-            &name,
-            &Span {
-                start: 0.into(),
-                length: 0.into(),
-            },
-        )?;
+        self.declare(&name, span)?;
         if let Some(initializer) = initializer {
             self.resolve_expression(initializer)?;
         }
@@ -169,15 +168,9 @@ impl Resolver {
         name: &IdentifierString,
         parameters: &[IdentifierString],
         body: &[Statement],
+        span: &Span,
     ) -> Result<(), ResolutionError> {
-        // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
-        self.declare(
-            &name,
-            &Span {
-                start: 0.into(),
-                length: 0.into(),
-            },
-        )?;
+        self.declare(&name, span)?;
         self.define(name);
         self.resolve_function(parameters, body, FunctionEnvironment::Function)?;
 
@@ -289,8 +282,12 @@ impl Resolver {
     ) -> Result<(), ResolutionError> {
         if let Some(initializer) = initializer {
             match initializer {
-                Initializer::VarDecl { name, initial } => {
-                    self.resolve_variable_declaration(name, initial.as_ref())?;
+                Initializer::VarDecl {
+                    name,
+                    initial,
+                    span,
+                } => {
+                    self.resolve_variable_declaration(name, initial.as_ref(), span)?;
                 }
                 Initializer::Expression(expression) => {
                     self.resolve_expression(expression)?;
