@@ -247,7 +247,6 @@ impl<'src> ExpressionFormatter for PrettyFormatter<'src> {
                     String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
                 ExpressionParserError::InvalidLValue(Token { kind, span }) => {
-                    // TODO(pavyamsiri): L-value spans are not correct
                     Report::build(ReportKind::Error, (path, span.range()))
                         .with_code(error.code())
                         .with_message("Expected an l-value")

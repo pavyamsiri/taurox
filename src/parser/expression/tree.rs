@@ -64,12 +64,12 @@ pub enum ExpressionNode {
 }
 
 impl ExpressionNode {
-    pub fn get_l_value(&self) -> Option<(&str, Span)> {
+    pub fn get_l_value(&self) -> Option<&str> {
         match self {
             ExpressionNode::Atom(ExpressionAtom {
                 kind: ExpressionAtomKind::Identifier(name),
-                span,
-            }) => Some((&name, *span)),
+                ..
+            }) => Some(&name),
             _ => None,
         }
     }
@@ -96,7 +96,7 @@ impl IncompleteExpression {
         ExpressionNodeRef(self.nodes.len() as u32 - 1)
     }
 
-    pub fn get_l_value(&self, index: ExpressionNodeRef) -> Option<(&str, Span)> {
+    pub fn get_l_value(&self, index: ExpressionNodeRef) -> Option<&str> {
         self.get_node(index).and_then(|n| n.get_l_value())
     }
 

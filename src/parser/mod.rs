@@ -514,15 +514,13 @@ impl<'src> Parser<'src> {
     ) -> Result<PrattParseOutcome, GeneralExpressionParserError> {
         const MSG: &'static str = "Caller must make sure `lhs` is a valid expression node ref.";
         if let Some(operator) = self.peek_infix_assignment_operator()? {
-            let (place, span) =
-                tree.get_l_value(lhs)
-                    .ok_or(ExpressionParserError::InvalidLValue(Token {
-                        kind: tree.get_kind(lhs).expect(MSG),
-                        span: Span {
-                            start: SpanIndex::new(0),
-                            length: SpanLength::new(0),
-                        },
-                    }))?;
+            let span = tree.get_span(lhs).expect(MSG);
+            let place = tree
+                .get_l_value(lhs)
+                .ok_or(ExpressionParserError::InvalidLValue(Token {
+                    kind: tree.get_kind(lhs).expect(MSG),
+                    span,
+                }))?;
             let place: IdentifierString = place.into();
 
             let (lbp, rbp) = operator.get_binding_power();
