@@ -1,7 +1,7 @@
 mod native;
 
 use super::value::{LoxValue, NativeFunction};
-use crate::string::IdentifierString;
+use crate::string::IdentName;
 use native::NativeClock;
 use std::{
     collections::HashMap,
@@ -15,7 +15,7 @@ pub struct SharedEnvironment {
 
 #[derive(Debug, Clone)]
 struct Environment {
-    values: HashMap<IdentifierString, LoxValue>,
+    values: HashMap<IdentName, LoxValue>,
     parent: Option<SharedEnvironment>,
 }
 

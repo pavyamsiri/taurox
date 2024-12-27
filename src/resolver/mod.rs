@@ -12,10 +12,12 @@ use crate::{
         },
         Program,
     },
-    string::IdentifierString,
+    string::Ident,
 };
 pub use error::{ResolutionError, ResolutionErrorKind};
 use std::collections::HashMap;
+
+pub type ResolutionMap = HashMap<Ident, usize>;
 
 enum Resolution {
     Declared,
@@ -29,9 +31,9 @@ enum FunctionEnvironment {
 }
 
 pub struct Resolver {
-    resolution: HashMap<Span, usize>,
+    resolution: ResolutionMap,
     function: FunctionEnvironment,
-    scopes: Vec<HashMap<IdentifierString, Resolution>>,
+    scopes: Vec<HashMap<Ident, Resolution>>,
 }
 
 impl Resolver {
@@ -43,10 +45,7 @@ impl Resolver {
         }
     }
 
-    pub fn resolve_program(
-        mut self,
-        program: &Program,
-    ) -> Result<HashMap<Span, usize>, ResolutionError> {
+    pub fn resolve_program(mut self, program: &Program) -> Result<ResolutionMap, ResolutionError> {
         for index in 0..program.len() {
             let statement = program
                 .get_statement(index)
@@ -59,7 +58,7 @@ impl Resolver {
     pub fn resolve_expression_and_consume(
         mut self,
         expr: &Expression,
-    ) -> Result<HashMap<Span, usize>, ResolutionError> {
+    ) -> Result<ResolutionMap, ResolutionError> {
         self.resolve_expression(expr)?;
         Ok(self.resolution)
     }
@@ -87,12 +86,12 @@ impl Resolver {
         self.scopes.pop();
     }
 
-    fn declare(&mut self, name: &IdentifierString, span: &Span) -> Result<(), ResolutionError> {
+    fn declare(&mut self, name: &Ident) -> Result<(), ResolutionError> {
         if let Some(inner_scope) = self.scopes.last_mut() {
             if inner_scope.contains_key(name) {
                 return Err(ResolutionError {
                     kind: ResolutionErrorKind::ShadowLocal,
-                    span: span.clone(),
+                    span: name.span,
                 });
             }
 
@@ -101,13 +100,13 @@ impl Resolver {
         Ok(())
     }
 
-    fn define(&mut self, name: &IdentifierString) {
+    fn define(&mut self, name: &Ident) {
         if let Some(inner_scope) = self.scopes.last_mut() {
             inner_scope.insert(name.clone(), Resolution::Defined);
         }
     }
 
-    fn get_resolution(&self, name: &IdentifierString) -> Option<&Resolution> {
+    fn get_resolution(&self, name: &Ident) -> Option<&Resolution> {
         if let Some(inner_scope) = self.scopes.last() {
             inner_scope.get(name)
         } else {
@@ -115,12 +114,12 @@ impl Resolver {
         }
     }
 
-    fn resolve_variable(&mut self, name: &IdentifierString, span: &Span) {
+    fn resolve_variable(&mut self, ident: &Ident) {
         let total_depth = self.scopes.len();
         for (depth, scope) in self.scopes.iter_mut().enumerate().rev() {
-            if let Some(Resolution::Defined) = scope.get(name) {
+            if let Some(Resolution::Defined) = scope.get(ident) {
                 self.resolution
-                    .insert(span.clone(), total_depth - 1 - depth);
+                    .insert(ident.clone(), total_depth - 1 - depth);
             }
         }
     }
@@ -130,20 +129,15 @@ impl Resolver {
 impl Resolver {
     fn resolve_declaration(&mut self, declaration: &Declaration) -> Result<(), ResolutionError> {
         match &declaration.kind {
-            DeclarationKind::Variable {
-                name,
-                initial,
-                span,
-            } => {
-                self.resolve_variable_declaration(name, initial.as_ref(), span)?;
+            DeclarationKind::Variable { name, initial } => {
+                self.resolve_variable_declaration(name, initial.as_ref())?;
             }
             DeclarationKind::Function {
                 name,
                 parameters,
                 body,
-                span,
             } => {
-                self.resolve_function_declaration(name, parameters, body, span)?;
+                self.resolve_function_declaration(name, parameters, body)?;
             }
         }
         Ok(())
@@ -151,11 +145,10 @@ impl Resolver {
 
     fn resolve_variable_declaration(
         &mut self,
-        name: &IdentifierString,
+        name: &Ident,
         initializer: Option<&Expression>,
-        span: &Span,
     ) -> Result<(), ResolutionError> {
-        self.declare(&name, span)?;
+        self.declare(&name)?;
         if let Some(initializer) = initializer {
             self.resolve_expression(initializer)?;
         }
@@ -165,12 +158,11 @@ impl Resolver {
 
     fn resolve_function_declaration(
         &mut self,
-        name: &IdentifierString,
-        parameters: &[IdentifierString],
+        name: &Ident,
+        parameters: &[Ident],
         body: &[Statement],
-        span: &Span,
     ) -> Result<(), ResolutionError> {
-        self.declare(&name, span)?;
+        self.declare(&name)?;
         self.define(name);
         self.resolve_function(parameters, body, FunctionEnvironment::Function)?;
 
@@ -179,7 +171,7 @@ impl Resolver {
 
     fn resolve_function(
         &mut self,
-        parameters: &[IdentifierString],
+        parameters: &[Ident],
         body: &[Statement],
         environment: FunctionEnvironment,
     ) -> Result<(), ResolutionError> {
@@ -187,14 +179,7 @@ impl Resolver {
         self.function = environment;
         self.enter_scope();
         for param in parameters {
-            // TODO(pavyamsiri): Fix the incorrect span. Blocked on statements not having spans.
-            self.declare(
-                &param,
-                &Span {
-                    start: 0.into(),
-                    length: 0.into(),
-                },
-            )?;
+            self.declare(&param)?;
             self.define(param);
         }
         for statement in body {
@@ -282,12 +267,8 @@ impl Resolver {
     ) -> Result<(), ResolutionError> {
         if let Some(initializer) = initializer {
             match initializer {
-                Initializer::VarDecl {
-                    name,
-                    initial,
-                    span,
-                } => {
-                    self.resolve_variable_declaration(name, initial.as_ref(), span)?;
+                Initializer::VarDecl { name, initial } => {
+                    self.resolve_variable_declaration(name, initial.as_ref())?;
                 }
                 Initializer::Expression(expression) => {
                     self.resolve_expression(expression)?;
@@ -356,7 +337,7 @@ impl Resolver {
             }
             ExpressionNode::InfixAssignment { lhs, rhs } => {
                 self.resolve_expression_node(expr, rhs.clone())?;
-                self.resolve_variable(&lhs.name, &lhs.span);
+                self.resolve_variable(&lhs);
             }
             ExpressionNode::InfixShortCircuit { lhs, rhs, .. } => {
                 self.resolve_expression_node(expr, lhs.clone())?;
@@ -375,26 +356,25 @@ impl Resolver {
     fn resolve_atom(&mut self, atom: &ExpressionAtom) -> Result<(), ResolutionError> {
         match &atom.kind {
             ExpressionAtomKind::Identifier(name) => {
-                self.resolve_variable_expression(name, &atom.span)?;
+                self.resolve_variable_expression(&Ident {
+                    name: name.clone(),
+                    span: atom.span,
+                })?;
             }
             _ => {}
         }
         Ok(())
     }
 
-    fn resolve_variable_expression(
-        &mut self,
-        name: &IdentifierString,
-        span: &Span,
-    ) -> Result<(), ResolutionError> {
+    fn resolve_variable_expression(&mut self, ident: &Ident) -> Result<(), ResolutionError> {
         // Can't access variable when it is declared but not defined
-        if let Some(Resolution::Declared) = self.get_resolution(name) {
+        if let Some(Resolution::Declared) = self.get_resolution(ident) {
             Err(ResolutionError {
                 kind: ResolutionErrorKind::SelfReferentialInitializer,
-                span: span.clone(),
+                span: ident.span,
             })
         } else {
-            self.resolve_variable(name, span);
+            self.resolve_variable(ident);
             Ok(())
         }
     }

@@ -4,17 +4,17 @@ pub mod formatter;
 pub mod statement;
 
 use crate::{
-    lexer::{Lexer, LexicalError, LineBreaks, Span, Token, TokenKind},
-    string::IdentifierString,
+    lexer::{Lexer, LexicalError, LineBreaks, Token, TokenKind},
+    string::Ident,
 };
 pub use error::ParserError;
 use error::{
     ExpressionParserError, GeneralExpressionParserError, GeneralParserError, StatementParserError,
 };
 use expression::{
-    AssignmentDestination, Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode,
-    ExpressionNodeRef, IncompleteExpression, InfixAssignmentOperator, InfixOperator,
-    InfixShortCircuitOperator, PostfixOperator, PrefixOperator,
+    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+    IncompleteExpression, InfixAssignmentOperator, InfixOperator, InfixShortCircuitOperator,
+    PostfixOperator, PrefixOperator,
 };
 use statement::{
     Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind, Statement,
@@ -124,7 +124,7 @@ impl<'src> Parser<'src> {
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordVar)?;
-        let (name, name_span) = self.expect_ident()?;
+        let name = self.expect_ident()?;
         let mut initial = None;
         // Assignment
         if let Some(_) = self.eat_if(TokenKind::Equal)? {
@@ -135,11 +135,7 @@ impl<'src> Parser<'src> {
 
         let span = leftmost.span.merge(&rightmost.span);
         let statement = Statement::Declaration(Declaration {
-            kind: DeclarationKind::Variable {
-                name: name.into(),
-                initial,
-                span: name_span,
-            },
+            kind: DeclarationKind::Variable { name, initial },
             span,
         });
 
@@ -148,7 +144,7 @@ impl<'src> Parser<'src> {
 
     fn parse_function_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordFun)?;
-        let (name, name_span) = self.expect_ident()?;
+        let name = self.expect_ident()?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
         // No parameters
@@ -157,7 +153,7 @@ impl<'src> Parser<'src> {
         } else {
             let mut parameters = Vec::new();
             for _ in 0..MAX_PARAMETERS {
-                let (parameter, _) = self.expect_ident()?;
+                let parameter = self.expect_ident()?;
                 parameters.push(parameter);
 
                 if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
@@ -185,7 +181,6 @@ impl<'src> Parser<'src> {
                 name,
                 parameters,
                 body,
-                span: name_span,
             },
             span,
         });
@@ -275,18 +270,9 @@ impl<'src> Parser<'src> {
                 let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
                 let initializer = match statement {
                     Statement::Declaration(Declaration {
-                        kind:
-                            DeclarationKind::Variable {
-                                name,
-                                initial,
-                                span,
-                            },
+                        kind: DeclarationKind::Variable { name, initial },
                         ..
-                    }) => Some(Initializer::VarDecl {
-                        name,
-                        initial,
-                        span,
-                    }),
+                    }) => Some(Initializer::VarDecl { name, initial }),
                     Statement::NonDeclaration(NonDeclaration {
                         kind: NonDeclarationKind::Expression(expr),
                         ..
@@ -584,7 +570,10 @@ impl<'src> Parser<'src> {
                     kind: tree.get_kind(lhs).expect(MSG),
                     span,
                 }))?;
-            let place: IdentifierString = place.into();
+            let name = Ident {
+                name: place.into(),
+                span,
+            };
 
             let (lbp, rbp) = operator.get_binding_power();
             if lbp < min_bp {
@@ -593,12 +582,9 @@ impl<'src> Parser<'src> {
             let _ = self.next_token()?;
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
-            return Ok(PrattParseOutcome::NewLHS(tree.push(
-                ExpressionNode::InfixAssignment {
-                    lhs: AssignmentDestination { name: place, span },
-                    rhs,
-                },
-            )));
+            return Ok(PrattParseOutcome::NewLHS(
+                tree.push(ExpressionNode::InfixAssignment { lhs: name, rhs }),
+            ));
         }
         Ok(PrattParseOutcome::NoOperator)
     }
@@ -728,7 +714,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn expect_ident(&mut self) -> Result<(IdentifierString, Span), GeneralParserError> {
+    fn expect_ident(&mut self) -> Result<Ident, GeneralParserError> {
         let next_token = self.next_token()?;
         if next_token.kind != TokenKind::Ident {
             return Err(GeneralParserError::UnexpectedToken {
@@ -742,7 +728,10 @@ impl<'src> Parser<'src> {
             .get_lexeme(&next_token.span)
             .expect("Token came from lexer so it is valid.");
 
-        Ok((name.into(), next_token.span))
+        Ok(Ident {
+            name: name.into(),
+            span: next_token.span,
+        })
     }
 
     fn expect(&mut self, expected: TokenKind) -> Result<Token, GeneralParserError> {

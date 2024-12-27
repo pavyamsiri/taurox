@@ -1,7 +1,7 @@
 use super::{InfixOperator, InfixShortCircuitOperator, PrefixOperator};
 use crate::{
     lexer::{Span, TokenKind},
-    string::IdentifierString,
+    string::{Ident, IdentName},
 };
 
 #[derive(Debug, Clone)]
@@ -9,26 +9,14 @@ pub enum ExpressionAtomKind {
     Number(f64),
     Bool(bool),
     Nil,
-    Identifier(IdentifierString),
-    StringLiteral(IdentifierString),
+    Identifier(IdentName),
+    StringLiteral(IdentName),
 }
 
 #[derive(Debug, Clone)]
 pub struct ExpressionAtom {
     pub kind: ExpressionAtomKind,
     pub span: Span,
-}
-
-#[derive(Debug, Clone)]
-pub struct AssignmentDestination {
-    pub name: IdentifierString,
-    pub span: Span,
-}
-
-impl AssignmentDestination {
-    pub fn get_name(&self) -> IdentifierString {
-        self.name.clone()
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -49,7 +37,7 @@ pub enum ExpressionNode {
         rhs: ExpressionNodeRef,
     },
     InfixAssignment {
-        lhs: AssignmentDestination,
+        lhs: Ident,
         rhs: ExpressionNodeRef,
     },
     InfixShortCircuit {
@@ -116,7 +104,7 @@ impl IncompleteExpression {
                 Some(left.merge(&right))
             }
             ExpressionNode::InfixAssignment {
-                lhs: AssignmentDestination { span, .. },
+                lhs: Ident { span, .. },
                 rhs,
                 ..
             } => {

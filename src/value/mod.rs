@@ -2,7 +2,7 @@ pub mod error;
 pub mod formatter;
 
 use super::environment::SharedEnvironment;
-use crate::{parser::statement::Statement, string::IdentifierString};
+use crate::{parser::statement::Statement, string::Ident};
 use compact_str::{CompactString, CompactStringExt};
 use error::{RuntimeError, RuntimeErrorKind};
 use std::sync::Arc;
@@ -21,8 +21,8 @@ pub enum LoxValue {
     Bool(bool),
     NativeFunction(Arc<dyn NativeFunction>),
     Function {
-        name: IdentifierString,
-        parameters: Vec<IdentifierString>,
+        name: Ident,
+        parameters: Vec<Ident>,
         body: Vec<Statement>,
         closure: SharedEnvironment,
     },

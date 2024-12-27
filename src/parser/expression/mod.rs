@@ -6,6 +6,6 @@ pub use operator::{
     PrefixOperator,
 };
 pub use tree::{
-    AssignmentDestination, Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode,
-    ExpressionNodeRef, IncompleteExpression,
+    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+    IncompleteExpression,
 };

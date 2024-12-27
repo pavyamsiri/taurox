@@ -1,5 +1,5 @@
 use super::expression::Expression;
-use crate::{lexer::Span, string::IdentifierString};
+use crate::{lexer::Span, string::Ident};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -25,14 +25,12 @@ pub struct Declaration {
 #[derive(Debug, Clone)]
 pub enum DeclarationKind {
     Variable {
-        name: IdentifierString,
-        span: Span,
+        name: Ident,
         initial: Option<Expression>,
     },
     Function {
-        name: IdentifierString,
-        span: Span,
-        parameters: Vec<IdentifierString>,
+        name: Ident,
+        parameters: Vec<Ident>,
         body: Vec<Statement>,
     },
 }
@@ -49,9 +47,8 @@ impl std::fmt::Display for DeclarationKind {
 #[derive(Debug, Clone)]
 pub enum Initializer {
     VarDecl {
-        name: IdentifierString,
+        name: Ident,
         initial: Option<Expression>,
-        span: Span,
     },
     Expression(Expression),
 }

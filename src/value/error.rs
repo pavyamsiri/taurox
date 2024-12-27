@@ -1,6 +1,6 @@
 use super::LoxValue;
 use crate::lexer::Span;
-use crate::string::IdentifierString;
+use crate::string::IdentName;
 use thiserror::Error;
 
 #[derive(Debug, Error, Clone)]
@@ -12,7 +12,7 @@ pub enum RuntimeErrorKind {
     #[error("Non-Numbers/Non-Strings {{Binary}}: [{0} , {1}]")]
     NonAddable(LoxValue, LoxValue),
     #[error("Invalid Access: {0}")]
-    InvalidAccess(IdentifierString),
+    InvalidAccess(IdentName),
     #[error("Invalid Callee: {0}")]
     InvalidCallee(LoxValue),
     #[error("Invalid Argument Count: {actual} of {expected}")]

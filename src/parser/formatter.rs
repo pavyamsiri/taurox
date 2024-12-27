@@ -111,7 +111,7 @@ impl<'src> SExpressionFormatter<'src> {
                 buffer.push(')');
             }
             ExpressionNode::InfixAssignment { lhs, ref rhs } => {
-                write!(buffer, "(= {} ", lhs.get_name()).expect(&WRITE_FMT_MSG);
+                write!(buffer, "(= {} ", lhs.name).expect(&WRITE_FMT_MSG);
                 SExpressionFormatter::format_node(buffer, tree, rhs);
                 buffer.push(')');
             }
