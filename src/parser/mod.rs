@@ -4,7 +4,7 @@ pub mod formatter;
 pub mod statement;
 
 use crate::{
-    lexer::{Lexer, LexicalError, LineBreaks, Span, SpanIndex, SpanLength, Token, TokenKind},
+    lexer::{Lexer, LexicalError, LineBreaks, Token, TokenKind},
     string::IdentifierString,
 };
 pub use error::ParserError;

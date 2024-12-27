@@ -123,16 +123,16 @@ fn taurox_main() -> Result<ExitCode> {
 
 fn tokenize(src: &str, file_path: &Path, format: &TokenFormat) -> bool {
     use taurox::lexer::formatter::{
-        BasicFormatter, DebugFormatter, LineFormatter, PrettyFormatter, ToFormatter, TokenFormatter,
+        BasicFormatter, DebugFormatter, LineFormatter, PrettyFormatter, TokenFormatter,
     };
     use taurox::lexer::{Lexer, TokenKind};
 
     let mut scanner = Lexer::new(src, file_path);
     let formatter: Box<dyn TokenFormatter> = match format {
-        TokenFormat::Debug => Box::new(ToFormatter::<DebugFormatter>::create_formatter(&scanner)),
-        TokenFormat::Basic => Box::new(ToFormatter::<BasicFormatter>::create_formatter(&scanner)),
-        TokenFormat::Line => Box::new(ToFormatter::<LineFormatter>::create_formatter(&scanner)),
-        TokenFormat::Pretty => Box::new(ToFormatter::<PrettyFormatter>::create_formatter(&scanner)),
+        TokenFormat::Debug => Box::new(DebugFormatter {}),
+        TokenFormat::Basic => Box::new(BasicFormatter::new(src)),
+        TokenFormat::Line => Box::new(LineFormatter::new(src)),
+        TokenFormat::Pretty => Box::new(PrettyFormatter::new(src, file_path)),
     };
     let mut succeeded = true;
     loop {

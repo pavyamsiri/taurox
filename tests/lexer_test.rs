@@ -6,13 +6,13 @@ use std::{
 };
 
 use taurox::lexer::{
-    formatter::{LineFormatter, ToFormatter, TokenFormatter},
+    formatter::{LineFormatter, TokenFormatter},
     Lexer, Token, TokenKind,
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut scanner = Lexer::new(input, test_name.as_ref());
-    let formatter: LineFormatter = scanner.create_formatter();
+    let formatter = LineFormatter::new(input);
     let mut buffer = String::new();
     loop {
         match scanner.next_token() {

@@ -2,7 +2,7 @@ use super::{
     token::{SpanIndex, Token, TokenKind},
     LineBreaks,
 };
-use crate::lexer::{Lexer, LexicalError, LexicalErrorKind};
+use crate::lexer::{LexicalError, LexicalErrorKind};
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 use std::path::Path;
 
@@ -14,24 +14,15 @@ pub trait TokenFormatter {
     fn format_lexical_error(&self, error: &LexicalError) -> String;
 }
 
-pub trait ToFormatter<F>
-where
-    F: TokenFormatter,
-{
-    fn create_formatter(&self) -> F;
-}
-
 pub struct BasicFormatter<'src> {
     text: &'src str,
     line_breaks: LineBreaks,
 }
 
-impl<'src> ToFormatter<BasicFormatter<'src>> for Lexer<'src> {
-    fn create_formatter(&self) -> BasicFormatter<'src> {
-        BasicFormatter {
-            text: self.get_source(),
-            line_breaks: self.get_line_breaks(),
-        }
+impl<'src> BasicFormatter<'src> {
+    pub fn new(text: &'src str) -> Self {
+        let line_breaks = LineBreaks::new(text);
+        Self { text, line_breaks }
     }
 }
 
@@ -108,12 +99,6 @@ impl<'src> TokenFormatter for BasicFormatter<'src> {
 
 pub struct DebugFormatter;
 
-impl<'src> ToFormatter<DebugFormatter> for Lexer<'src> {
-    fn create_formatter(&self) -> DebugFormatter {
-        DebugFormatter {}
-    }
-}
-
 impl TokenFormatter for DebugFormatter {
     fn format(&self, token: &Token) -> String {
         format!("{token:?}")
@@ -129,12 +114,10 @@ pub struct LineFormatter<'src> {
     line_breaks: LineBreaks,
 }
 
-impl<'src> ToFormatter<LineFormatter<'src>> for Lexer<'src> {
-    fn create_formatter(&self) -> LineFormatter<'src> {
-        LineFormatter {
-            text: self.get_source(),
-            line_breaks: self.get_line_breaks(),
-        }
+impl<'src> LineFormatter<'src> {
+    pub fn new(text: &'src str) -> Self {
+        let line_breaks = LineBreaks::new(text);
+        Self { text, line_breaks }
     }
 }
 
@@ -217,12 +200,13 @@ pub struct PrettyFormatter<'src> {
     path: &'src Path,
 }
 
-impl<'src> ToFormatter<PrettyFormatter<'src>> for Lexer<'src> {
-    fn create_formatter(&self) -> PrettyFormatter<'src> {
-        PrettyFormatter {
-            text: self.get_source(),
-            path: self.path,
-            line_breaks: self.get_line_breaks(),
+impl<'src> PrettyFormatter<'src> {
+    pub fn new(text: &'src str, path: &'src Path) -> Self {
+        let line_breaks = LineBreaks::new(text);
+        Self {
+            text,
+            line_breaks,
+            path,
         }
     }
 }

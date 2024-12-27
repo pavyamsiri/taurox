@@ -9,7 +9,7 @@ use super::{
 use crate::lexer::{
     formatter::{
         LineFormatter as LineTokenFormatter, PrettyFormatter as PrettyTokenFormatter,
-        ToFormatter as ToTokenFormatter, TokenFormatter,
+        TokenFormatter,
     },
     LineBreaks, Token,
 };
@@ -58,7 +58,7 @@ impl<'src> ToFormatter<SExpressionFormatter<'src>> for Parser<'src> {
     fn create_formatter(&self) -> SExpressionFormatter<'src> {
         SExpressionFormatter {
             line_breaks: self.lexer.get_line_breaks(),
-            lexer_formatter: self.lexer.create_formatter(),
+            lexer_formatter: LineTokenFormatter::new(&self.get_source()),
         }
     }
 }
@@ -212,7 +212,7 @@ pub struct PrettyFormatter<'src> {
 impl<'src> ToFormatter<PrettyFormatter<'src>> for Parser<'src> {
     fn create_formatter(&self) -> PrettyFormatter<'src> {
         PrettyFormatter {
-            lexer_formatter: self.lexer.create_formatter(),
+            lexer_formatter: PrettyTokenFormatter::new(&self.get_source(), &self.get_path()),
             path: &self.lexer.get_path(),
             text: &self.lexer.get_source(),
         }
