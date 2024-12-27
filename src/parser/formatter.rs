@@ -7,7 +7,7 @@ use super::{
         Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
-    statement::{Declaration, NonDeclaration, Statement},
+    statement::{Declaration, DeclarationKind, NonDeclaration, NonDeclarationKind, Statement},
     ParserError,
 };
 use crate::lexer::{
@@ -388,36 +388,36 @@ impl<'src> BasicParserFormatter<'src> {
     fn format_statement(&self, buffer: &mut String, stmt: &Statement) {
         match stmt {
             Statement::Declaration(decl) => self.format_declaration(buffer, decl),
-            Statement::NonDeclaration(stmt) => match stmt {
-                NonDeclaration::Expression(expr) => {
+            Statement::NonDeclaration(NonDeclaration { kind, .. }) => match kind {
+                NonDeclarationKind::Expression(expr) => {
                     buffer.push_str("EXPR ");
                     self.expr_formatter.format_in_place(buffer, expr);
                 }
-                NonDeclaration::Print(expr) => {
+                NonDeclarationKind::Print(expr) => {
                     buffer.push_str("PRINT ");
                     self.expr_formatter.format_in_place(buffer, expr);
                 }
-                NonDeclaration::Return { value } => {
+                NonDeclarationKind::Return { value } => {
                     buffer.push_str("RETURN ");
                     if let Some(expr) = value {
                         buffer.push(' ');
                         self.expr_formatter.format_in_place(buffer, expr);
                     }
                 }
-                NonDeclaration::Block(_) => {
+                NonDeclarationKind::Block(_) => {
                     write!(buffer, "BLOCK {{..}}").expect(&WRITE_FMT_MSG);
                 }
-                NonDeclaration::If { condition, .. } => {
+                NonDeclarationKind::If { condition, .. } => {
                     buffer.push_str("IF (");
                     self.expr_formatter.format_in_place(buffer, condition);
                     buffer.push_str(") ..");
                 }
-                NonDeclaration::While { condition, .. } => {
+                NonDeclarationKind::While { condition, .. } => {
                     buffer.push_str("WHILE (");
                     self.expr_formatter.format_in_place(buffer, condition);
                     buffer.push_str(") ..");
                 }
-                NonDeclaration::For { .. } => {
+                NonDeclarationKind::For { .. } => {
                     buffer.push_str("FOR ..");
                 }
             },
@@ -425,11 +425,12 @@ impl<'src> BasicParserFormatter<'src> {
     }
 
     fn format_declaration(&self, buffer: &mut String, decl: &Declaration) {
-        match decl {
-            Declaration::Variable { name, .. } => {
+        let kind = &decl.kind;
+        match kind {
+            DeclarationKind::Variable { name, .. } => {
                 write!(buffer, "VARDECL {name}").expect(&WRITE_FMT_MSG);
             }
-            Declaration::Function { name, .. } => {
+            DeclarationKind::Function { name, .. } => {
                 write!(buffer, "FUNDECL {name}").expect(&WRITE_FMT_MSG);
             }
         }

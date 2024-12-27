@@ -9,7 +9,10 @@ use crate::{
             Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
             InfixOperator, InfixShortCircuitOperator, PrefixOperator,
         },
-        statement::{Declaration, Initializer, NonDeclaration, Statement},
+        statement::{
+            Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind,
+            Statement,
+        },
         Program,
     },
     string::IdentifierString,
@@ -83,18 +86,24 @@ where
         resolution: &HashMap<Span, usize>,
     ) -> Result<ProgramState, RuntimeError> {
         let state = match statement {
-            Statement::Declaration(Declaration::Variable { name, initial }) => self
-                .interpret_variable_declaration(
-                    environment,
-                    context,
-                    name,
-                    initial.as_ref(),
-                    resolution,
-                )?,
-            Statement::Declaration(Declaration::Function {
+            Statement::Declaration(Declaration {
+                kind: DeclarationKind::Variable { name, initial },
+                ..
+            }) => self.interpret_variable_declaration(
+                environment,
+                context,
                 name,
-                parameters,
-                body,
+                initial.as_ref(),
+                resolution,
+            )?,
+            Statement::Declaration(Declaration {
+                kind:
+                    DeclarationKind::Function {
+                        name,
+                        parameters,
+                        body,
+                    },
+                ..
             }) => self.interpret_function_declaration(
                 environment,
                 name,
@@ -128,17 +137,18 @@ impl TreeWalkStatementInterpreter {
         context: &mut C,
         resolution: &HashMap<Span, usize>,
     ) -> Result<ProgramState, RuntimeError> {
-        let state = match statement {
-            NonDeclaration::Expression(expr) => {
+        let kind = &statement.kind;
+        let state = match kind {
+            NonDeclarationKind::Expression(expr) => {
                 self.interpret_expression_statement(environment, context, expr, resolution)?
             }
-            NonDeclaration::Print(expr) => {
+            NonDeclarationKind::Print(expr) => {
                 self.interpret_print_statement(environment, context, expr, resolution)?
             }
-            NonDeclaration::Block(statements) => {
+            NonDeclarationKind::Block(statements) => {
                 self.interpret_block_statement(environment, context, statements, resolution)?
             }
-            NonDeclaration::If {
+            NonDeclarationKind::If {
                 condition,
                 success,
                 failure,
@@ -150,14 +160,14 @@ impl TreeWalkStatementInterpreter {
                 failure.as_ref().as_ref(),
                 resolution,
             )?,
-            NonDeclaration::While { condition, body } => self.interpret_while_statement(
+            NonDeclarationKind::While { condition, body } => self.interpret_while_statement(
                 environment,
                 context,
                 condition,
                 body.as_ref(),
                 resolution,
             )?,
-            NonDeclaration::For {
+            NonDeclarationKind::For {
                 initializer,
                 condition,
                 increment,
@@ -171,7 +181,7 @@ impl TreeWalkStatementInterpreter {
                 body,
                 resolution,
             )?,
-            NonDeclaration::Return { value } => {
+            NonDeclarationKind::Return { value } => {
                 self.interpret_return_statement(environment, context, value.as_ref(), resolution)?
             }
         };

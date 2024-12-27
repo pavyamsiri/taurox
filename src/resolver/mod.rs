@@ -6,7 +6,10 @@ use crate::{
         expression::{
             Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         },
-        statement::{Declaration, Initializer, NonDeclaration, Statement},
+        statement::{
+            Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind,
+            Statement,
+        },
         Program,
     },
     string::IdentifierString,
@@ -126,11 +129,11 @@ impl Resolver {
 // Implementation
 impl Resolver {
     fn resolve_declaration(&mut self, declaration: &Declaration) -> Result<(), ResolutionError> {
-        match declaration {
-            Declaration::Variable { name, initial } => {
+        match &declaration.kind {
+            DeclarationKind::Variable { name, initial } => {
                 self.resolve_variable_declaration(name, initial.as_ref())?;
             }
-            Declaration::Function {
+            DeclarationKind::Function {
                 name,
                 parameters,
                 body,
@@ -212,31 +215,28 @@ impl Resolver {
 
 // Non-declarations
 impl Resolver {
-    fn resolve_non_declaration(
-        &mut self,
-        statement: &NonDeclaration,
-    ) -> Result<(), ResolutionError> {
-        match statement {
-            NonDeclaration::Expression(expression) => self.resolve_expression(expression)?,
-            NonDeclaration::Print(expression) => self.resolve_expression(expression)?,
-            NonDeclaration::Block(statements) => {
+    fn resolve_non_declaration(&mut self, stmt: &NonDeclaration) -> Result<(), ResolutionError> {
+        match &stmt.kind {
+            NonDeclarationKind::Expression(expression) => self.resolve_expression(expression)?,
+            NonDeclarationKind::Print(expression) => self.resolve_expression(expression)?,
+            NonDeclarationKind::Block(statements) => {
                 self.enter_scope();
                 for statement in statements {
                     self.resolve_statement(statement)?;
                 }
                 self.exit_scope();
             }
-            NonDeclaration::If {
+            NonDeclarationKind::If {
                 condition,
                 success,
                 failure,
             } => {
                 self.resolve_if_statement(condition, success, failure.as_ref().as_ref())?;
             }
-            NonDeclaration::While { condition, body } => {
+            NonDeclarationKind::While { condition, body } => {
                 self.resolve_while_statement(condition, body)?;
             }
-            NonDeclaration::For {
+            NonDeclarationKind::For {
                 initializer,
                 condition,
                 increment,
@@ -249,7 +249,7 @@ impl Resolver {
                     body,
                 )?;
             }
-            NonDeclaration::Return { value } => {
+            NonDeclarationKind::Return { value } => {
                 self.resolve_return_statement(value.as_ref())?;
             }
         }

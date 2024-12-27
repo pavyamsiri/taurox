@@ -1,5 +1,5 @@
 use super::expression::Expression;
-use crate::string::IdentifierString;
+use crate::{lexer::Span, string::IdentifierString};
 
 #[derive(Debug, Clone)]
 pub enum Statement {
@@ -7,8 +7,23 @@ pub enum Statement {
     NonDeclaration(NonDeclaration),
 }
 
+impl Statement {
+    pub fn get_span(&self) -> Span {
+        match self {
+            Statement::Declaration(decl) => decl.span,
+            Statement::NonDeclaration(stmt) => stmt.span,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
-pub enum Declaration {
+pub struct Declaration {
+    pub kind: DeclarationKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum DeclarationKind {
     Variable {
         name: IdentifierString,
         initial: Option<Expression>,
@@ -30,7 +45,13 @@ pub enum Initializer {
 }
 
 #[derive(Debug, Clone)]
-pub enum NonDeclaration {
+pub struct NonDeclaration {
+    pub kind: NonDeclarationKind,
+    pub span: Span,
+}
+
+#[derive(Debug, Clone)]
+pub enum NonDeclarationKind {
     Expression(Expression),
     Print(Expression),
     Block(Vec<Statement>),

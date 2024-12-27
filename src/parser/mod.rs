@@ -16,7 +16,9 @@ use expression::{
     ExpressionNodeRef, IncompleteExpression, InfixAssignmentOperator, InfixOperator,
     InfixShortCircuitOperator, PostfixOperator, PrefixOperator,
 };
-use statement::{Declaration, Initializer, NonDeclaration, Statement};
+use statement::{
+    Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind, Statement,
+};
 use std::path::Path;
 
 #[derive(Debug)]
@@ -93,43 +95,55 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 let expr = self.parse_expression()?;
-                let _ = self.expect(TokenKind::Semicolon)?;
-                Statement::NonDeclaration(NonDeclaration::Expression(expr))
+                let rightmost = self.expect(TokenKind::Semicolon)?;
+                let span = expr.get_span().merge(&rightmost.span);
+                Statement::NonDeclaration(NonDeclaration {
+                    kind: NonDeclarationKind::Expression(expr),
+                    span,
+                })
             }
         };
         Ok(Some(statement))
     }
 
     fn parse_print_statement(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordPrint)?;
+        let leftmost = self.expect(TokenKind::KeywordPrint)?;
         let rhs = self.parse_expression()?;
-        let statement = Statement::NonDeclaration(NonDeclaration::Print(rhs));
-        let _ = self.expect(TokenKind::Semicolon)?;
+        let rightmost = self.expect(TokenKind::Semicolon)?;
+
+        let span = leftmost.span.merge(&rightmost.span);
+        let statement = Statement::NonDeclaration(NonDeclaration {
+            kind: NonDeclarationKind::Print(rhs),
+            span,
+        });
         Ok(statement)
     }
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordVar)?;
+        let leftmost = self.expect(TokenKind::KeywordVar)?;
         let place = self.expect_ident()?;
-
         let mut initial = None;
-
         // Assignment
         if let Some(_) = self.eat_if(TokenKind::Equal)? {
             let rhs = self.parse_expression()?;
             initial = Some(rhs);
         }
+        let rightmost = self.expect(TokenKind::Semicolon)?;
 
-        let statement = Statement::Declaration(Declaration::Variable {
-            name: place.into(),
-            initial,
+        let span = leftmost.span.merge(&rightmost.span);
+        let statement = Statement::Declaration(Declaration {
+            kind: DeclarationKind::Variable {
+                name: place.into(),
+                initial,
+            },
+            span,
         });
-        let _ = self.expect(TokenKind::Semicolon)?;
+
         Ok(statement)
     }
 
     fn parse_function_declaration(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordFun)?;
+        let leftmost = self.expect(TokenKind::KeywordFun)?;
         let name = self.expect_ident()?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
@@ -151,75 +165,100 @@ impl<'src> Parser<'src> {
             parameters
         };
 
-        let body = {
+        let (body, rightmost) = {
             let body_statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
             match body_statement {
-                Statement::NonDeclaration(NonDeclaration::Block(body)) => body,
+                Statement::NonDeclaration(NonDeclaration {
+                    kind: NonDeclarationKind::Block(body),
+                    span,
+                }) => (body, span),
                 s => Err(StatementParserError::NonBlock(s))?,
             }
         };
 
-        Ok(Statement::Declaration(Declaration::Function {
-            name,
-            parameters,
-            body,
-        }))
+        let span = leftmost.span.merge(&rightmost);
+        let decl = Statement::Declaration(Declaration {
+            kind: DeclarationKind::Function {
+                name,
+                parameters,
+                body,
+            },
+            span,
+        });
+
+        Ok(decl)
     }
 
     fn parse_block_statement(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::LeftBrace)?;
+        let leftmost = self.expect(TokenKind::LeftBrace)?;
         let mut statements = Vec::new();
 
         // Check if we are empty
-        if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
-            Ok(Statement::NonDeclaration(NonDeclaration::Block(statements)))
+        let rightmost = if let Some(rightmost) = self.eat_if(TokenKind::RightBrace)? {
+            rightmost
         } else {
-            loop {
+            let rightmost = 'stmts: loop {
                 let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
                 statements.push(statement);
-                if let Some(_) = self.eat_if(TokenKind::RightBrace)? {
-                    break;
+                if let Some(rightmost) = self.eat_if(TokenKind::RightBrace)? {
+                    break 'stmts rightmost;
                 }
-            }
-            Ok(Statement::NonDeclaration(NonDeclaration::Block(statements)))
-        }
+            };
+            rightmost
+        };
+        let span = leftmost.span.merge(&rightmost.span);
+        Ok(Statement::NonDeclaration(NonDeclaration {
+            kind: NonDeclarationKind::Block(statements),
+            span,
+        }))
     }
 
     fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordIf)?;
+        let leftmost = self.expect(TokenKind::KeywordIf)?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
         let success = self.parse_statement()?.ok_or(self.create_eof_error())?;
+        let mut rightmost = success.get_span();
 
         let failure = if let Some(_) = self.eat_if(TokenKind::KeywordElse)? {
-            Some(self.parse_statement()?.ok_or(self.create_eof_error())?)
+            let stmt = self.parse_statement()?.ok_or(self.create_eof_error())?;
+            rightmost = stmt.get_span();
+            Some(stmt)
         } else {
             None
         };
 
-        Ok(Statement::NonDeclaration(NonDeclaration::If {
-            condition,
-            success: Box::new(success),
-            failure: Box::new(failure),
+        let span = leftmost.span.merge(&rightmost);
+        Ok(Statement::NonDeclaration(NonDeclaration {
+            kind: NonDeclarationKind::If {
+                condition,
+                success: Box::new(success),
+                failure: Box::new(failure),
+            },
+            span,
         }))
     }
 
     fn parse_while_statement(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordWhile)?;
+        let leftmost = self.expect(TokenKind::KeywordWhile)?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
         let body = self.parse_statement()?.ok_or(self.create_eof_error())?;
 
-        Ok(Statement::NonDeclaration(NonDeclaration::While {
-            condition,
-            body: Box::new(body),
+        let span = leftmost.span.merge(&body.get_span());
+        Ok(Statement::NonDeclaration(NonDeclaration {
+            kind: NonDeclarationKind::While {
+                condition,
+                body: Box::new(body),
+            },
+            span,
         }))
     }
 
     fn parse_for_statement(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordFor)?;
+        let leftmost = self.expect(TokenKind::KeywordFor)?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
         // Parse initializer
@@ -231,12 +270,14 @@ impl<'src> Parser<'src> {
             else {
                 let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
                 let initializer = match statement {
-                    Statement::Declaration(Declaration::Variable { name, initial }) => {
-                        Some(Initializer::VarDecl { name, initial })
-                    }
-                    Statement::NonDeclaration(NonDeclaration::Expression(expr)) => {
-                        Some(Initializer::Expression(expr))
-                    }
+                    Statement::Declaration(Declaration {
+                        kind: DeclarationKind::Variable { name, initial },
+                        ..
+                    }) => Some(Initializer::VarDecl { name, initial }),
+                    Statement::NonDeclaration(NonDeclaration {
+                        kind: NonDeclarationKind::Expression(expr),
+                        ..
+                    }) => Some(Initializer::Expression(expr)),
                     _ => None,
                 };
                 initializer
@@ -278,11 +319,16 @@ impl<'src> Parser<'src> {
             Statement::NonDeclaration(non_declaration) => Ok(non_declaration),
         }?;
 
-        Ok(Statement::NonDeclaration(NonDeclaration::For {
-            initializer,
-            condition,
-            increment,
-            body: Box::new(body),
+        let span = leftmost.span.merge(&body.span);
+
+        Ok(Statement::NonDeclaration(NonDeclaration {
+            kind: NonDeclarationKind::For {
+                initializer,
+                condition,
+                increment,
+                body: Box::new(body),
+            },
+            span,
         }))
     }
 }
@@ -709,16 +755,20 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_return_statement(&mut self) -> Result<Statement, ParserError> {
-        let _ = self.expect(TokenKind::KeywordReturn)?;
+        let leftmost = self.expect(TokenKind::KeywordReturn)?;
 
-        let value = if let Some(_) = self.eat_if(TokenKind::Semicolon)? {
-            None
+        let (value, rightmost) = if let Some(rightmost) = self.eat_if(TokenKind::Semicolon)? {
+            (None, rightmost)
         } else {
             let value = Some(self.parse_expression()?);
-            let _ = self.expect(TokenKind::Semicolon)?;
-            value
+            let rightmost = self.expect(TokenKind::Semicolon)?;
+            (value, rightmost)
         };
 
-        Ok(Statement::NonDeclaration(NonDeclaration::Return { value }))
+        let span = leftmost.span.merge(&rightmost.span);
+        Ok(Statement::NonDeclaration(NonDeclaration {
+            kind: NonDeclarationKind::Return { value },
+            span,
+        }))
     }
 }
