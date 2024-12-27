@@ -25,19 +25,29 @@ const ARIADNE_MSG: &'static str = "Ariadne produces valid utf-8 strings";
 const ARIADNE_WRITE_MSG: &'static str = "Write into buffer should not fail.";
 
 pub trait ExpressionFormatter {
-    fn format(&self, tree: &Expression) -> String;
-    fn format_error(&self, error: &GeneralExpressionParserError) -> String;
+    fn format(&self, tree: &Expression) -> String {
+        let mut buffer = String::new();
+        self.format_in_place(&mut buffer, tree);
+        buffer
+    }
+    fn format_error(&self, error: &GeneralExpressionParserError) -> String {
+        let mut buffer = String::new();
+        self.format_error_in_place(&mut buffer, error);
+        buffer
+    }
+    fn format_in_place(&self, buffer: &mut String, tree: &Expression);
+    fn format_error_in_place(&self, buffer: &mut String, error: &GeneralExpressionParserError);
 }
 
 pub struct DebugExpressionFormatter;
 
 impl ExpressionFormatter for DebugExpressionFormatter {
-    fn format(&self, tree: &Expression) -> String {
-        format!("{tree:?}")
+    fn format_in_place(&self, buffer: &mut String, tree: &Expression) {
+        write!(buffer, "{tree:?}").expect(&WRITE_FMT_MSG);
     }
 
-    fn format_error(&self, error: &GeneralExpressionParserError) -> String {
-        format!("{error:?}")
+    fn format_error_in_place(&self, buffer: &mut String, error: &GeneralExpressionParserError) {
+        write!(buffer, "{error:?}").expect(&WRITE_FMT_MSG);
     }
 }
 
@@ -58,114 +68,124 @@ impl<'src> SExpressionFormatter<'src> {
 }
 
 impl<'src> SExpressionFormatter<'src> {
-    fn format_atom(atom: &ExpressionAtom) -> String {
+    fn format_atom(buffer: &mut String, atom: &ExpressionAtom) {
         match atom.kind {
-            ExpressionAtomKind::Number(v) => format!("{v:?}"),
-            ExpressionAtomKind::Bool(v) => format!("{v}"),
-            ExpressionAtomKind::Nil => "nil".into(),
-            ExpressionAtomKind::Identifier(ref name) => format!("{name}"),
-            ExpressionAtomKind::StringLiteral(ref v) => format!("{v}"),
+            ExpressionAtomKind::Number(v) => write!(buffer, "{v:?}").expect(&WRITE_FMT_MSG),
+            ExpressionAtomKind::Bool(v) => write!(buffer, "{v}").expect(&WRITE_FMT_MSG),
+            ExpressionAtomKind::Nil => buffer.push_str("nil"),
+            ExpressionAtomKind::Identifier(ref name) => {
+                write!(buffer, "{name}").expect(&WRITE_FMT_MSG)
+            }
+            ExpressionAtomKind::StringLiteral(ref v) => {
+                write!(buffer, "{v}").expect(&WRITE_FMT_MSG)
+            }
         }
     }
 
-    fn format_node(tree: &Expression, node: &ExpressionNodeRef) -> String {
+    fn format_node(buffer: &mut String, tree: &Expression, node: &ExpressionNodeRef) {
         let current_node = &tree
             .get_node(*node)
             .expect("Caller should make sure the ref is valid.");
 
         match current_node {
-            ExpressionNode::Atom(atom) => Self::format_atom(atom),
+            ExpressionNode::Atom(atom) => Self::format_atom(buffer, atom),
             ExpressionNode::Prefix { operator, rhs } => {
-                format!(
-                    "({} {})",
-                    SExpressionFormatter::format_unary_operator(operator),
-                    SExpressionFormatter::format_node(tree, &rhs),
-                )
+                buffer.push('(');
+                SExpressionFormatter::format_unary_operator(buffer, operator);
+                buffer.push(' ');
+                SExpressionFormatter::format_node(buffer, tree, &rhs);
+                buffer.push(')');
             }
-            ExpressionNode::Infix { operator, lhs, rhs } => {
-                format!(
-                    "({} {} {})",
-                    SExpressionFormatter::format_binary_operator(operator),
-                    SExpressionFormatter::format_node(tree, &lhs),
-                    SExpressionFormatter::format_node(tree, &rhs),
-                )
+            ExpressionNode::Infix {
+                operator,
+                ref lhs,
+                ref rhs,
+            } => {
+                buffer.push('(');
+                SExpressionFormatter::format_binary_operator(buffer, operator);
+                buffer.push(' ');
+                SExpressionFormatter::format_node(buffer, tree, lhs);
+                buffer.push(' ');
+                SExpressionFormatter::format_node(buffer, tree, rhs);
+                buffer.push(')');
             }
-            ExpressionNode::InfixAssignment { lhs, rhs } => {
-                format!(
-                    "(= {} {})",
-                    lhs.get_name(),
-                    SExpressionFormatter::format_node(tree, &rhs)
-                )
+            ExpressionNode::InfixAssignment { lhs, ref rhs } => {
+                write!(buffer, "(= {} ", lhs.get_name()).expect(&WRITE_FMT_MSG);
+                SExpressionFormatter::format_node(buffer, tree, rhs);
+                buffer.push(')');
             }
-            ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
-                format!(
-                    "({} {} {})",
-                    SExpressionFormatter::format_binary_short_circuit_operator(operator),
-                    SExpressionFormatter::format_node(tree, &lhs),
-                    SExpressionFormatter::format_node(tree, &rhs),
-                )
+            ExpressionNode::InfixShortCircuit {
+                operator,
+                ref lhs,
+                ref rhs,
+            } => {
+                buffer.push('(');
+                SExpressionFormatter::format_binary_short_circuit_operator(buffer, operator);
+                buffer.push(' ');
+                SExpressionFormatter::format_node(buffer, tree, lhs);
+                buffer.push(' ');
+                SExpressionFormatter::format_node(buffer, tree, rhs);
+                buffer.push(')');
             }
-            ExpressionNode::Group { inner } => {
-                format!(
-                    "(group {})",
-                    SExpressionFormatter::format_node(tree, &inner)
-                )
+            ExpressionNode::Group { ref inner } => {
+                buffer.push_str("(group ");
+                SExpressionFormatter::format_node(buffer, tree, inner);
+                buffer.push(')');
             }
-            ExpressionNode::Call { callee, arguments } => {
-                let mut buffer =
-                    format!("(call {}", SExpressionFormatter::format_node(tree, callee));
+            ExpressionNode::Call {
+                ref callee,
+                arguments,
+            } => {
+                buffer.push_str("(call ");
+                SExpressionFormatter::format_node(buffer, tree, callee);
 
                 for argument in arguments.iter() {
-                    buffer.push_str(&format!(
-                        " {}",
-                        SExpressionFormatter::format_node(tree, argument)
-                    ));
+                    buffer.push(' ');
+                    SExpressionFormatter::format_node(buffer, tree, argument);
                 }
                 buffer.push(')');
-
-                buffer
             }
         }
     }
 
-    fn format_unary_operator(operator: &PrefixOperator) -> String {
+    fn format_unary_operator(buffer: &mut String, operator: &PrefixOperator) {
         match operator {
-            PrefixOperator::Bang => "!",
-            PrefixOperator::Minus => "-",
+            PrefixOperator::Bang => buffer.push('!'),
+            PrefixOperator::Minus => buffer.push('-'),
         }
-        .into()
     }
-    fn format_binary_operator(operator: &InfixOperator) -> String {
+    fn format_binary_operator(buffer: &mut String, operator: &InfixOperator) {
         match operator {
-            InfixOperator::Add => "+",
-            InfixOperator::Subtract => "-",
-            InfixOperator::Multiply => "*",
-            InfixOperator::Divide => "/",
-            InfixOperator::LessThan => "<",
-            InfixOperator::LessThanEqual => "<=",
-            InfixOperator::GreaterThan => ">",
-            InfixOperator::GreaterThanEqual => ">=",
-            InfixOperator::EqualEqual => "==",
-            InfixOperator::BangEqual => "!=",
+            InfixOperator::Add => buffer.push('+'),
+            InfixOperator::Subtract => buffer.push('-'),
+            InfixOperator::Multiply => buffer.push('*'),
+            InfixOperator::Divide => buffer.push('/'),
+            InfixOperator::LessThan => buffer.push('<'),
+            InfixOperator::LessThanEqual => buffer.push_str("<="),
+            InfixOperator::GreaterThan => buffer.push('>'),
+            InfixOperator::GreaterThanEqual => buffer.push_str(">="),
+            InfixOperator::EqualEqual => buffer.push_str("=="),
+            InfixOperator::BangEqual => buffer.push_str("!="),
         }
-        .into()
     }
 
-    fn format_binary_short_circuit_operator(operator: &InfixShortCircuitOperator) -> String {
+    fn format_binary_short_circuit_operator(
+        buffer: &mut String,
+        operator: &InfixShortCircuitOperator,
+    ) {
         match operator {
-            InfixShortCircuitOperator::And => "and",
-            InfixShortCircuitOperator::Or => "or",
+            InfixShortCircuitOperator::And => buffer.push_str("and"),
+            InfixShortCircuitOperator::Or => buffer.push_str("or"),
         }
-        .into()
     }
 }
 
 impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
-    fn format(&self, tree: &Expression) -> String {
-        SExpressionFormatter::format_node(tree, &tree.get_root_ref())
+    fn format_in_place(&self, buffer: &mut String, tree: &Expression) {
+        SExpressionFormatter::format_node(buffer, tree, &tree.get_root_ref())
     }
 
-    fn format_error(&self, error: &GeneralExpressionParserError) -> String {
+    fn format_error_in_place(&self, buffer: &mut String, error: &GeneralExpressionParserError) {
         match error {
             GeneralExpressionParserError::Inner(expr) => match expr {
                 ExpressionParserError::NonExpression(Token { kind, span }) => {
@@ -173,14 +193,14 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                         .token_formatter
                         .get_line_breaks()
                         .get_line_from_span(*span);
-                    format!("({line}) Non-Expression: {kind}")
+                    write!(buffer, "({line}) Non-Expression: {kind}").expect(&WRITE_FMT_MSG);
                 }
                 ExpressionParserError::InvalidLValue(Token { kind, span }) => {
                     let line = self
                         .token_formatter
                         .get_line_breaks()
                         .get_line_from_span(*span);
-                    format!("({line}) Invalid l-value: {kind}")
+                    write!(buffer, "({line}) Invalid l-value: {kind}").expect(&WRITE_FMT_MSG);
                 }
             },
             GeneralExpressionParserError::General(gen) => match gen {
@@ -192,16 +212,19 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                         .token_formatter
                         .get_line_breaks()
                         .get_line_from_span(*span);
-                    format!("({line}) Unexpected: A = {kind} E = {expected}")
+                    write!(buffer, "({line}) Unexpected: A = {kind} E = {expected}")
+                        .expect(&WRITE_FMT_MSG);
                 }
                 GeneralParserError::UnexpectedEof(span) => {
                     let line = self
                         .token_formatter
                         .get_line_breaks()
                         .get_line_from_span(*span);
-                    format!("({line}) Unexpected EOF")
+                    write!(buffer, "({line}) Unexpected EOF").expect(&WRITE_FMT_MSG);
                 }
-                GeneralParserError::LexicalError(err) => self.token_formatter.format_error(err),
+                GeneralParserError::LexicalError(err) => {
+                    self.token_formatter.format_error_in_place(buffer, err)
+                }
             },
         }
     }
@@ -220,11 +243,11 @@ impl<'src> PrettyExpressionFormatter<'src> {
 }
 
 impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
-    fn format(&self, tree: &Expression) -> String {
-        SExpressionFormatter::format_node(tree, &tree.get_root_ref())
+    fn format_in_place(&self, buffer: &mut String, tree: &Expression) {
+        SExpressionFormatter::format_node(buffer, tree, &tree.get_root_ref())
     }
 
-    fn format_error(&self, error: &GeneralExpressionParserError) -> String {
+    fn format_error_in_place(&self, buffer: &mut String, error: &GeneralExpressionParserError) {
         let text = self.token_formatter.get_text();
         let path = &self.token_formatter.get_path().to_string_lossy();
         let mut output = std::io::Cursor::new(Vec::new());
@@ -242,7 +265,6 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .finish()
                         .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
-                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
                 ExpressionParserError::InvalidLValue(Token { kind, span }) => {
                     Report::build(ReportKind::Error, (path, span.range()))
@@ -256,7 +278,6 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .finish()
                         .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
-                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
             },
             GeneralExpressionParserError::General(gen) => match gen {
@@ -275,7 +296,6 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .finish()
                         .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
-                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
                 GeneralParserError::UnexpectedEof(span) => {
                     Report::build(ReportKind::Error, (path, span.range()))
@@ -289,11 +309,13 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .finish()
                         .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
-                    String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
                 }
-                GeneralParserError::LexicalError(err) => self.token_formatter.format_error(err),
+                GeneralParserError::LexicalError(err) => {
+                    self.token_formatter.format_error_in_place(buffer, err)
+                }
             },
         }
+        buffer.push_str(&String::from_utf8(output.into_inner()).expect(ARIADNE_MSG));
     }
 }
 
@@ -322,12 +344,12 @@ impl<'src> BasicParserFormatter<'src> {
 
     fn format_expression_parser_error(&self, buffer: &mut String, error: &ExpressionParserError) {
         let error: GeneralExpressionParserError = (error.clone()).into();
-        buffer.push_str(&self.expr_formatter.format_error(&error));
+        self.expr_formatter.format_error_in_place(buffer, &error);
     }
 
     fn format_general_parser_error(&self, buffer: &mut String, error: &GeneralParserError) {
         let error: GeneralExpressionParserError = (error.clone()).into();
-        buffer.push_str(&self.expr_formatter.format_error(&error));
+        self.expr_formatter.format_error_in_place(buffer, &error);
     }
 
     fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
