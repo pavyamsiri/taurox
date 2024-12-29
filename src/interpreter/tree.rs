@@ -4,6 +4,7 @@ use compact_str::ToCompactString;
 
 use super::{Interpreter, ProgramState, StatementInterpreter, SystemContext};
 use crate::environment::SharedEnvironment;
+use crate::lexer::Span;
 use crate::parser::statement::FunctionDecl;
 use crate::resolver::ResolutionMap;
 use crate::value::error::{RuntimeError, RuntimeErrorKind};
@@ -100,17 +101,9 @@ where
                 resolution,
             )?,
             Statement::Declaration(Declaration {
-                kind:
-                    DeclarationKind::Function(FunctionDecl {
-                        name,
-                        parameters,
-                        body,
-                        ..
-                    }),
+                kind: DeclarationKind::Function(decl @ FunctionDecl { .. }),
                 ..
-            }) => {
-                self.interpret_function_declaration(environment, name, &parameters, body.as_ref())?
-            }
+            }) => self.interpret_function_declaration(environment, decl)?,
             Statement::Declaration(Declaration {
                 kind: DeclarationKind::Class { name, methods },
                 ..
@@ -213,17 +206,16 @@ impl TreeWalkStatementInterpreter {
     fn interpret_function_declaration(
         &self,
         environment: &mut SharedEnvironment,
-        ident: &Ident,
-        parameters: &[Ident],
-        body: &[Statement],
+        decl: &FunctionDecl,
     ) -> Result<ProgramState, RuntimeError> {
         environment.declare(
-            &ident.name,
+            &decl.name.name,
             LoxValue::Function(Function {
-                name: ident.clone(),
-                parameters: parameters.to_vec(),
-                body: body.to_vec(),
+                name: decl.name.clone(),
+                parameters: decl.parameters.to_vec(),
+                body: decl.body.to_vec(),
                 closure: environment.new_scope(),
+                is_constructor: false,
             }),
         );
         Ok(ProgramState::Run)
@@ -241,11 +233,13 @@ impl TreeWalkStatementInterpreter {
         // Create methods
         let mut methods = Vec::new();
         for decl in method_decls {
+            let is_constructor = &(*decl.name.name) == "init";
             let method = Function {
                 name: decl.name.clone(),
                 parameters: decl.parameters.clone(),
                 body: decl.body.clone(),
                 closure: environment.new_scope(),
+                is_constructor,
             };
             methods.push(method);
         }
@@ -698,66 +692,37 @@ impl TreeWalkStatementInterpreter {
 
                 result
             }
-            LoxValue::Function(Function {
-                name,
-                parameters,
-                body,
-                closure,
-            }) => {
-                let _ = name;
-                // Set up scope
-                let mut inner_scope = closure.new_scope();
-
-                // Check that the argument list is the same length as the parameter list.
-                if arguments.len() != parameters.len() {
-                    return Err(RuntimeError {
-                        kind: RuntimeErrorKind::InvalidArgumentCount {
-                            actual: arguments.len(),
-                            expected: parameters.len(),
-                        },
-                        span,
-                    });
-                }
-
-                // Define the arguments in the function scope
-                for (ident, argument) in parameters.iter().zip(arguments.iter()) {
-                    let argument = self.evaluate_expression_node(
-                        expr,
-                        *argument,
-                        environment,
-                        context,
-                        resolution,
-                    )?;
-                    inner_scope.declare(&ident.name, argument);
-                }
-
-                let mut result = LoxValue::Nil;
-                for statement in body {
-                    match self.interpret_statement(
-                        &statement,
-                        &mut inner_scope,
-                        context,
-                        resolution,
-                    )? {
-                        ProgramState::Run => {}
-                        ProgramState::Return(v) => {
-                            result = v;
-                            break;
-                        }
-                        ProgramState::Terminate => {
-                            panic!("Terminating during function?");
-                        }
-                    }
-                }
-                // Exit scope
-                result
-            }
-            LoxValue::Class { name, .. } => {
-                // TODO(pavyamsiri): Handle user-defined constructors
+            LoxValue::Function(function @ Function { .. }) => self.evaluate_function(
+                &function,
+                arguments,
+                &span,
+                expr,
+                environment,
+                context,
+                resolution,
+            )?,
+            LoxValue::Class { name, methods } => {
                 let value = LoxValue::Instance {
                     class: name,
                     fields: HashMap::new(),
                 };
+
+                if let Some(constructor) = methods.iter().find(|m| &(*m.name.name) == "init") {
+                    let mut bound_method = constructor.clone();
+                    let mut new_closure = bound_method.closure.new_scope();
+                    new_closure.declare("this", value.clone());
+                    bound_method.closure = new_closure;
+                    self.evaluate_function(
+                        &bound_method,
+                        arguments,
+                        &span,
+                        expr,
+                        environment,
+                        context,
+                        resolution,
+                    )?;
+                }
+
                 value
             }
             v => {
@@ -768,6 +733,62 @@ impl TreeWalkStatementInterpreter {
             }
         };
         Ok(result)
+    }
+
+    fn evaluate_function<C: SystemContext>(
+        &self,
+        function: &Function,
+        arguments: &[ExpressionNodeRef],
+        span: &Span,
+        expr: &Expression,
+        environment: &mut SharedEnvironment,
+        context: &mut C,
+        resolution: &ResolutionMap,
+    ) -> Result<LoxValue, RuntimeError> {
+        let _ = function.name;
+        // Set up scope
+        let mut inner_scope = function.closure.new_scope();
+
+        // Check that the argument list is the same length as the parameter list.
+        if arguments.len() != function.parameters.len() {
+            return Err(RuntimeError {
+                kind: RuntimeErrorKind::InvalidArgumentCount {
+                    actual: arguments.len(),
+                    expected: function.parameters.len(),
+                },
+                span: span.clone(),
+            });
+        }
+
+        // Define the arguments in the function scope
+        for (ident, argument) in function.parameters.iter().zip(arguments.iter()) {
+            let argument =
+                self.evaluate_expression_node(expr, *argument, environment, context, resolution)?;
+            inner_scope.declare(&ident.name, argument);
+        }
+
+        let mut result = LoxValue::Nil;
+        for statement in function.body.iter() {
+            match self.interpret_statement(&statement, &mut inner_scope, context, resolution)? {
+                ProgramState::Run => {}
+                ProgramState::Return(v) => {
+                    result = v;
+                    break;
+                }
+                ProgramState::Terminate => {
+                    panic!("Terminating during function?");
+                }
+            }
+        }
+        // Exit scope
+        if function.is_constructor {
+            Ok(function
+                .closure
+                .access_at("this", 0)
+                .expect("`this` should be bound to the method."))
+        } else {
+            Ok(result)
+        }
     }
 }
 

@@ -19,6 +19,7 @@ pub struct Function {
     pub parameters: Vec<Ident>,
     pub body: Vec<Statement>,
     pub closure: SharedEnvironment,
+    pub is_constructor: bool,
 }
 
 #[derive(Debug, Clone)]
