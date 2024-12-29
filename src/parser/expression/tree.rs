@@ -53,6 +53,11 @@ pub enum ExpressionNode {
         object: ExpressionNodeRef,
         name: Ident,
     },
+    Set {
+        object: ExpressionNodeRef,
+        name: Ident,
+        value: ExpressionNodeRef,
+    },
 }
 
 impl ExpressionNode {
@@ -140,6 +145,11 @@ impl IncompleteExpression {
                 let span = self.get_span(*object).expect(MSG).merge(&name.span);
                 Some(span)
             }
+            ExpressionNode::Set { object, value, .. } => {
+                let leftmost = self.get_span(*object).expect(MSG);
+                let rightmost = self.get_span(*value).expect(MSG);
+                Some(leftmost.merge(&rightmost))
+            }
         }
     }
 
@@ -161,6 +171,7 @@ impl IncompleteExpression {
             ExpressionNode::Group { inner } => self.get_kind(*inner),
             ExpressionNode::Call { callee, .. } => self.get_kind(*callee),
             ExpressionNode::Get { object, .. } => self.get_kind(*object),
+            ExpressionNode::Set { object, .. } => self.get_kind(*object),
         }
     }
 }

@@ -748,10 +748,20 @@ impl<'src> Parser<'src> {
                 PostfixOperator::Access => {
                     let _ = self.expect(TokenKind::Dot)?;
                     let ident = self.expect_ident()?;
-                    return Ok(PrattParseOutcome::NewLHS(tree.push(ExpressionNode::Get {
-                        object: lhs,
-                        name: ident,
-                    })));
+
+                    if let Some(_) = self.eat_if(TokenKind::Equal)? {
+                        let rhs = self.parse_expression_pratt(0, tree)?;
+                        return Ok(PrattParseOutcome::NewLHS(tree.push(ExpressionNode::Set {
+                            object: lhs,
+                            name: ident,
+                            value: rhs,
+                        })));
+                    } else {
+                        return Ok(PrattParseOutcome::NewLHS(tree.push(ExpressionNode::Get {
+                            object: lhs,
+                            name: ident,
+                        })));
+                    }
                 }
             }
         }

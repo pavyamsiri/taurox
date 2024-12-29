@@ -478,6 +478,24 @@ impl TreeWalkStatementInterpreter {
                     })?;
                 value.clone()
             }
+            ExpressionNode::Set {
+                object,
+                name,
+                value,
+            } => {
+                let mut lhs =
+                    self.evaluate_expression_node(expr, *object, environment, context, resolution)?;
+                let LoxValue::Instance { ref mut fields, .. } = lhs else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::InvalidInstance(lhs),
+                        span,
+                    });
+                };
+                let rhs =
+                    self.evaluate_expression_node(expr, *value, environment, context, resolution)?;
+                fields.insert(name.name.to_compact_string(), rhs.clone());
+                rhs
+            }
         };
         Ok(result)
     }

@@ -153,6 +153,17 @@ impl<'src> SExpressionFormatter<'src> {
                 SExpressionFormatter::format_node(buffer, tree, object);
                 write!(buffer, " {name})").expect(&WRITE_FMT_MSG);
             }
+            ExpressionNode::Set {
+                object,
+                name,
+                value,
+            } => {
+                buffer.push_str("(set ");
+                SExpressionFormatter::format_node(buffer, tree, object);
+                write!(buffer, " {name} ").expect(&WRITE_FMT_MSG);
+                SExpressionFormatter::format_node(buffer, tree, value);
+                buffer.push(')');
+            }
         }
     }
 
