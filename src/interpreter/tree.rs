@@ -109,6 +109,10 @@ where
             }) => {
                 self.interpret_function_declaration(environment, name, &parameters, body.as_ref())?
             }
+            Statement::Declaration(Declaration {
+                kind: DeclarationKind::Class { .. },
+                ..
+            }) => todo!(),
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment, context, resolution)?
             }

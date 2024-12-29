@@ -88,6 +88,7 @@ impl<'src> Parser<'src> {
         let statement = match first.kind {
             TokenKind::KeywordFun => self.parse_function_declaration()?,
             TokenKind::KeywordVar => self.parse_variable_declaration()?,
+            TokenKind::KeywordClass => self.parse_class_declaration()?,
             TokenKind::KeywordPrint => self.parse_print_statement()?,
             TokenKind::LeftBrace => self.parse_block_statement()?,
             TokenKind::KeywordIf => self.parse_if_statement()?,
@@ -189,6 +190,71 @@ impl<'src> Parser<'src> {
         Ok(decl)
     }
 
+    fn try_parse_function(&mut self) -> Result<FunctionDecl, ParserError> {
+        let name = self.expect_ident()?;
+        let _ = self.expect(TokenKind::LeftParenthesis)?;
+
+        // No parameters
+        let parameters = if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+            Vec::new()
+        } else {
+            let mut parameters = Vec::new();
+            for _ in 0..MAX_PARAMETERS {
+                let parameter = self.expect_ident()?;
+                parameters.push(parameter);
+
+                if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
+                    break;
+                }
+                let _ = self.expect(TokenKind::Comma)?;
+            }
+            parameters
+        };
+
+        let (body, _) = {
+            let body_statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
+            match body_statement {
+                Statement::NonDeclaration(NonDeclaration {
+                    kind: NonDeclarationKind::Block(body),
+                    span,
+                }) => (body, span),
+                s => Err(StatementParserError::NonBlock(s))?,
+            }
+        };
+
+        let decl = FunctionDecl {
+            name,
+            parameters,
+            body,
+        };
+        Ok(decl)
+    }
+
+    fn parse_class_declaration(&mut self) -> Result<Statement, ParserError> {
+        let leftmost = self.expect(TokenKind::KeywordClass)?;
+        let name = self.expect_ident()?;
+        let mut methods = Vec::new();
+        let _ = self.expect(TokenKind::LeftBrace)?;
+        let rightmost = 'block: loop {
+            match self.eat_if(TokenKind::RightBrace)? {
+                Some(rightmost) => {
+                    break 'block rightmost;
+                }
+                None => {
+                    let func = self.try_parse_function()?;
+                    methods.push(func);
+                }
+            }
+        };
+
+        let span = leftmost.span.merge(&rightmost.span);
+        let statement = Statement::Declaration(Declaration {
+            kind: DeclarationKind::Class { name, methods },
+            span,
+        });
+
+        Ok(statement)
+    }
     fn parse_block_statement(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::LeftBrace)?;
         let mut statements = Vec::new();

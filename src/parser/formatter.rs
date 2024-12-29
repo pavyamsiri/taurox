@@ -441,6 +441,9 @@ impl<'src> BasicParserFormatter<'src> {
             DeclarationKind::Function(FunctionDecl { name, .. }) => {
                 write!(buffer, "FUNDECL {name}").expect(&WRITE_FMT_MSG);
             }
+            DeclarationKind::Class { name, .. } => {
+                write!(buffer, "CLADECL {name}").expect(&WRITE_FMT_MSG);
+            }
         }
     }
 }

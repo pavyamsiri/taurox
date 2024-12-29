@@ -36,13 +36,18 @@ pub enum DeclarationKind {
         initial: Option<Expression>,
     },
     Function(FunctionDecl),
+    Class {
+        name: Ident,
+        methods: Vec<FunctionDecl>,
+    },
 }
 
 impl std::fmt::Display for DeclarationKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             DeclarationKind::Variable { .. } => write!(f, "VARDECL"),
-            DeclarationKind::Function { .. } => write!(f, "FUNDECL"),
+            DeclarationKind::Function(_) => write!(f, "FUNDECL"),
+            DeclarationKind::Class { .. } => write!(f, "CLADECL"),
         }
     }
 }

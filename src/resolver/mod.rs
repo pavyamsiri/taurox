@@ -103,6 +103,7 @@ impl Resolver {
         self.scopes.pop();
     }
 
+    /// Takes another span separate to ident that is the span of the declaration statement itself.
     fn declare(&mut self, ident: &Ident, span: &Span) -> Result<(), ResolutionError> {
         if let Some(inner_scope) = self.scopes.last_mut() {
             if let Some(resolution) = inner_scope.get(&ident.name) {
@@ -176,6 +177,9 @@ impl Resolver {
             }) => {
                 self.resolve_function_declaration(name, &decl.span, parameters, body)?;
             }
+            DeclarationKind::Class { name, .. } => {
+                self.resolve_class_declaration(name, &decl.span)?;
+            }
         }
         Ok(())
     }
@@ -204,6 +208,17 @@ impl Resolver {
         self.declare(ident, span)?;
         self.define(ident, span);
         self.resolve_function(parameters, body, FunctionEnvironment::Function)?;
+
+        Ok(())
+    }
+
+    fn resolve_class_declaration(
+        &mut self,
+        ident: &Ident,
+        span: &Span,
+    ) -> Result<(), ResolutionError> {
+        self.declare(ident, span)?;
+        self.define(ident, span);
 
         Ok(())
     }
