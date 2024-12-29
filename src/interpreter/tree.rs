@@ -497,7 +497,7 @@ impl TreeWalkStatementInterpreter {
                 // Field is a method
                 else {
                     let class = self.read_variable(class, environment, resolution).expect("Classes bound to instances should always exist as long as the instance does.");
-                    let LoxValue::Class { name, methods } = class else {
+                    let LoxValue::Class { methods, .. } = class else {
                         panic!("Values bound as the `class` of an instance is always a class.");
                     };
 

@@ -223,6 +223,12 @@ impl Resolver {
         self.define(ident, span);
 
         self.enter_scope();
+        let this_ident = Ident {
+            name: "this".into(),
+            span: span.clone(),
+        };
+        self.declare(&this_ident, span)?;
+        self.define(&this_ident, span);
         for decl in methods {
             self.resolve_function(&decl.parameters, &decl.body, FunctionEnvironment::Method)?
         }
