@@ -26,6 +26,7 @@ pub enum LoxValue {
         body: Vec<Statement>,
         closure: SharedEnvironment,
     },
+    Class(CompactString),
 }
 
 impl std::fmt::Display for LoxValue {
@@ -40,6 +41,9 @@ impl std::fmt::Display for LoxValue {
             }
             Self::Function { name, .. } => {
                 write!(f, "<fn {name}>")
+            }
+            Self::Class(name) => {
+                write!(f, "<class {name}>")
             }
         }
     }
