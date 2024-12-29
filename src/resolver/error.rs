@@ -14,6 +14,8 @@ pub enum ResolutionErrorKind {
     NonFunctionReturn,
     #[error("Can't access `this` outside of a class.")]
     NonClassThis,
+    #[error("Constructors are not allowed to explicitly return values.")]
+    ReturnInConstructor,
 }
 
 #[derive(Debug, Error, Clone)]
@@ -30,6 +32,7 @@ impl ResolutionError {
             ResolutionErrorKind::ShadowLocal { .. } => "RA002",
             ResolutionErrorKind::NonFunctionReturn => "RA003",
             ResolutionErrorKind::NonClassThis => "RA004",
+            ResolutionErrorKind::ReturnInConstructor => "RA005",
         }
     }
 }

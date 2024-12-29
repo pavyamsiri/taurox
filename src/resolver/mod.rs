@@ -46,6 +46,7 @@ enum FunctionEnvironment {
     None,
     Function,
     Method,
+    Constructor,
 }
 
 #[derive(Clone, Copy)]
@@ -241,7 +242,12 @@ impl Resolver {
         self.declare(&this_ident, span)?;
         self.define(&this_ident, span);
         for decl in methods {
-            self.resolve_function(&decl.parameters, &decl.body, FunctionEnvironment::Method)?
+            let function_type = if &(*decl.name.name) == "init" {
+                FunctionEnvironment::Constructor
+            } else {
+                FunctionEnvironment::Method
+            };
+            self.resolve_function(&decl.parameters, &decl.body, function_type)?
         }
         self.exit_scope();
 
@@ -377,11 +383,22 @@ impl Resolver {
                 span: span.clone(),
             });
         }
-
-        if let Some(expr) = expr {
-            self.resolve_expression(expr)?;
+        match self.function {
+            FunctionEnvironment::None => Err(ResolutionError {
+                kind: ResolutionErrorKind::NonFunctionReturn,
+                span: span.clone(),
+            }),
+            FunctionEnvironment::Constructor if expr.is_some() => Err(ResolutionError {
+                kind: ResolutionErrorKind::ReturnInConstructor,
+                span: span.clone(),
+            }),
+            _ => {
+                if let Some(expr) = expr {
+                    self.resolve_expression(expr)?;
+                }
+                Ok(())
+            }
         }
-        Ok(())
     }
 }
 

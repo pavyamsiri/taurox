@@ -57,6 +57,9 @@ impl ResolverFormatter for BasicResolverFormatter {
             ResolutionErrorKind::NonClassThis => {
                 buffer.push_str("Accessing `this` in a non-class context")
             }
+            ResolutionErrorKind::ReturnInConstructor => {
+                buffer.push_str("Constructors can not have explicit returns")
+            }
         }
     }
 }
@@ -144,6 +147,19 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
                     .with_label(
                         Label::new((path, span.range()))
                             .with_message("`this` can't be used here")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            ResolutionErrorKind::ReturnInConstructor => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Returning in a constructor")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("Returning values are not allowed in constructors")
                             .with_color(Color::BrightRed),
                     )
                     .finish()
