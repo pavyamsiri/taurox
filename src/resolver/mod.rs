@@ -253,6 +253,17 @@ impl Resolver {
             self.resolve_variable(super_class);
         }
 
+        // Handle super class scoping
+        if super_class.is_some() {
+            let super_ident = Ident {
+                name: "super".into(),
+                span: span.clone(),
+            };
+            self.enter_scope();
+            self.declare(&super_ident, span)?;
+            self.define(&super_ident, span);
+        }
+
         self.enter_scope();
         let this_ident = Ident {
             name: "this".into(),
@@ -269,6 +280,11 @@ impl Resolver {
             self.resolve_function(&decl.parameters, &decl.body, function_type)?
         }
         self.exit_scope();
+
+        // Pop off extra super class scope
+        if super_class.is_some() {
+            self.exit_scope();
+        }
 
         self.class = enclosing;
         Ok(())
@@ -492,6 +508,21 @@ impl Resolver {
                 ClassEnvironment::Class => {
                     self.resolve_variable_expression(&Ident {
                         name: "this".into(),
+                        span: atom.span,
+                    })?;
+                }
+            },
+            ExpressionAtomKind::Super(_) => match self.class {
+                ClassEnvironment::None => {
+                    return Err(ResolutionError {
+                        // TODO(pavyamsiri): Need a new error type
+                        kind: ResolutionErrorKind::NonClassThis,
+                        span: atom.span,
+                    });
+                }
+                ClassEnvironment::Class => {
+                    self.resolve_variable_expression(&Ident {
+                        name: "super".into(),
                         span: atom.span,
                     })?;
                 }

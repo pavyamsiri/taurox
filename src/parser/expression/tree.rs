@@ -12,6 +12,7 @@ pub enum ExpressionAtomKind {
     Identifier(IdentName),
     StringLiteral(IdentName),
     This,
+    Super(IdentName),
 }
 
 #[derive(Debug, Clone)]
@@ -165,6 +166,7 @@ impl IncompleteExpression {
                 ExpressionAtomKind::Identifier(_) => Some(TokenKind::Ident),
                 ExpressionAtomKind::StringLiteral(_) => Some(TokenKind::StringLiteral),
                 ExpressionAtomKind::This => Some(TokenKind::KeywordThis),
+                ExpressionAtomKind::Super(_) => Some(TokenKind::KeywordSuper),
             },
             ExpressionNode::Prefix { rhs, .. } => self.get_kind(*rhs),
             ExpressionNode::Infix { lhs, .. } => self.get_kind(*lhs),

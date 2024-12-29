@@ -83,6 +83,9 @@ impl<'src> SExpressionFormatter<'src> {
                 write!(buffer, "{v}").expect(&WRITE_FMT_MSG)
             }
             ExpressionAtomKind::This => write!(buffer, "this").expect(&WRITE_FMT_MSG),
+            ExpressionAtomKind::Super(ref method) => {
+                write!(buffer, "super.{method}").expect(&WRITE_FMT_MSG)
+            }
         }
     }
 

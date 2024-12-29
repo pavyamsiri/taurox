@@ -241,6 +241,21 @@ impl TreeWalkStatementInterpreter {
         super_class: Option<&Ident>,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
+        // Either enum
+        enum BorrowedOrOwned<'a> {
+            Borrowed(&'a mut SharedEnvironment),
+            Owned(SharedEnvironment),
+        }
+
+        impl<'a> BorrowedOrOwned<'a> {
+            pub fn new_scope(&self) -> SharedEnvironment {
+                match self {
+                    BorrowedOrOwned::Borrowed(environment) => environment.new_scope(),
+                    BorrowedOrOwned::Owned(environment) => environment.new_scope(),
+                }
+            }
+        }
+
         // Handle subclassing
         let super_class = if let Some(super_class) = super_class {
             let super_class_value = self
@@ -265,6 +280,15 @@ impl TreeWalkStatementInterpreter {
         let name = &ident.name;
         environment.declare(name, LoxValue::Nil);
 
+        let inner_environment = match super_class {
+            Some(ref super_class) => {
+                let mut new_environment = environment.new_scope();
+                new_environment.declare("super", LoxValue::Class(super_class.clone()));
+                BorrowedOrOwned::Owned(new_environment)
+            }
+            None => BorrowedOrOwned::Borrowed(environment),
+        };
+
         // Create methods
         let mut methods = Vec::new();
         for decl in method_decls {
@@ -273,7 +297,7 @@ impl TreeWalkStatementInterpreter {
                 name: decl.name.clone(),
                 parameters: decl.parameters.clone(),
                 body: decl.body.clone(),
-                closure: environment.new_scope(),
+                closure: inner_environment.new_scope(),
                 is_constructor,
             };
             methods.push(method);
@@ -284,6 +308,8 @@ impl TreeWalkStatementInterpreter {
             methods,
             super_class: super_class.map(|v| Arc::new(v)),
         });
+
+        // NOTE(pavyamsiri): We use the given environment as a way to exit the scope where we defined `super`.
         environment
             .assign(name, value)
             .expect("Just declared the class to exist so assignment can't fail.");
@@ -533,10 +559,7 @@ impl TreeWalkStatementInterpreter {
 
                     if let Some(value) = class.find_method(&field_name.name) {
                         // Bind the instance to the method
-                        let mut bound_method = value.clone();
-                        let mut new_closure = bound_method.closure.new_scope();
-                        new_closure.declare("this", object_value);
-                        bound_method.closure = new_closure;
+                        let bound_method = value.bind(object_value);
                         LoxValue::Function(bound_method)
                     } else {
                         let undefined_access = RuntimeError {
@@ -610,6 +633,41 @@ impl TreeWalkStatementInterpreter {
                     span,
                 })?
                 .clone(),
+            ExpressionAtomKind::Super(method) => {
+                let super_ident = Ident {
+                    name: "super".into(),
+                    span,
+                };
+                let (super_class, depth) = self
+                    .read_local(&super_ident, environment, resolution)
+                    .ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::InvalidAccess("super".into()),
+                    span,
+                })?;
+
+                // Check that this is a class
+                let LoxValue::Class(super_class) = super_class else {
+                    panic!("`super` should not be able to be not a class because it is a reserved word!");
+                };
+
+                let object = environment
+                    .access_at("this", depth - 1)
+                    .ok_or(RuntimeError {
+                        kind: RuntimeErrorKind::InvalidAccess("super".into()),
+                        span,
+                    })?;
+                let LoxValue::Instance { .. } = object else {
+                    panic!("`this` should not be able to be not an instance because it is a reserved word!");
+                };
+                let method = super_class.find_method(&method).ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::UndefinedProperty {
+                        object: object.clone(),
+                        name: method.clone(),
+                    },
+                    span,
+                })?;
+                LoxValue::Function(method.bind(object))
+            }
         };
         Ok(result)
     }
@@ -744,10 +802,7 @@ impl TreeWalkStatementInterpreter {
                 };
 
                 if let Some(constructor) = class.find_method("init") {
-                    let mut bound_method = constructor.clone();
-                    let mut new_closure = bound_method.closure.new_scope();
-                    new_closure.declare("this", value.clone());
-                    bound_method.closure = new_closure;
+                    let bound_method = constructor.bind(value.clone());
                     self.evaluate_function(
                         &bound_method,
                         arguments,
@@ -838,6 +893,20 @@ impl TreeWalkStatementInterpreter {
         match resolution.get(ident) {
             Some(depth) => environment.access_at(&ident.name, *depth),
             None => environment.access_global(&ident.name),
+        }
+    }
+
+    fn read_local(
+        &self,
+        ident: &Ident,
+        environment: &SharedEnvironment,
+        resolution: &ResolutionMap,
+    ) -> Option<(LoxValue, usize)> {
+        match resolution.get(ident) {
+            Some(depth) => environment
+                .access_at(&ident.name, *depth)
+                .map(|v| (v, *depth)),
+            None => None,
         }
     }
 

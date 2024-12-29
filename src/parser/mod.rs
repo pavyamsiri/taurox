@@ -633,6 +633,17 @@ impl<'src> Parser<'src> {
                 });
                 tree.push(node)
             }
+            // This
+            TokenKind::KeywordSuper => {
+                let _ = self.expect(TokenKind::Dot)?;
+                let method = self.expect_ident()?;
+
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::Super(method.name),
+                    span: token.span,
+                });
+                tree.push(node)
+            }
             _ => {
                 return Err(ExpressionParserError::NonExpression(token).into());
             }

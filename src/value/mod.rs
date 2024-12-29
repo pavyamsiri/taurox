@@ -22,6 +22,17 @@ pub struct Function {
     pub is_constructor: bool,
 }
 
+impl Function {
+    // TODO(pavyamsiri): Give the instance variant a struct so we don't have this enum
+    pub fn bind(&self, value: LoxValue) -> Function {
+        let mut bound_function = self.clone();
+        let mut new_closure = bound_function.closure.new_scope();
+        new_closure.declare("this", value);
+        bound_function.closure = new_closure;
+        bound_function
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: Ident,
