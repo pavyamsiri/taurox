@@ -187,8 +187,12 @@ impl Resolver {
             }) => {
                 self.resolve_function_declaration(name, &decl.span, parameters, body)?;
             }
-            DeclarationKind::Class { name, methods, .. } => {
-                self.resolve_class_declaration(name, &decl.span, methods)?;
+            DeclarationKind::Class {
+                name,
+                methods,
+                super_class,
+            } => {
+                self.resolve_class_declaration(name, &decl.span, methods, super_class.as_ref())?;
             }
         }
         Ok(())
@@ -227,12 +231,27 @@ impl Resolver {
         ident: &Ident,
         span: &Span,
         methods: &[FunctionDecl],
+        super_class: Option<&Ident>,
     ) -> Result<(), ResolutionError> {
         let enclosing = self.class;
         self.class = ClassEnvironment::Class;
 
         self.declare(ident, span)?;
         self.define(ident, span);
+
+        if let Some(super_class) = super_class {
+            if super_class.name == ident.name {
+                return Err(ResolutionError {
+                    kind: ResolutionErrorKind::SelfReferentialInheritance {
+                        destination: ident.clone(),
+                        reference: super_class.clone(),
+                    },
+                    span: span.clone(),
+                });
+            }
+
+            self.resolve_variable(super_class);
+        }
 
         self.enter_scope();
         let this_ident = Ident {

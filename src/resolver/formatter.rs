@@ -60,6 +60,12 @@ impl ResolverFormatter for BasicResolverFormatter {
             ResolutionErrorKind::ReturnInConstructor => {
                 buffer.push_str("Constructors can not have explicit returns")
             }
+            ResolutionErrorKind::SelfReferentialInheritance { destination, .. } => write!(
+                buffer,
+                "The class {} can not inherit from itself.",
+                destination.name
+            )
+            .expect(&WRITE_FMT_MSG),
         }
     }
 }
@@ -99,6 +105,30 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
                     .with_label(
                         Label::new((path, reference_span.range()))
                             .with_message("is used its own initializer, creating a self-reference")
+                            .with_color(Color::BrightRed),
+                    )
+                    .with_label(Label::new((path, span.range())).with_color(Color::BrightYellow))
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            ResolutionErrorKind::SelfReferentialInheritance {
+                destination,
+                reference,
+            } => {
+                let dest_span = destination.span;
+                let reference_span = reference.span;
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Attempted to inherit a class from itself")
+                    .with_label(
+                        Label::new((path, dest_span.range()))
+                            .with_message("The class here...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .with_label(
+                        Label::new((path, reference_span.range()))
+                            .with_message("can not inherit from itself")
                             .with_color(Color::BrightRed),
                     )
                     .with_label(Label::new((path, span.range())).with_color(Color::BrightYellow))

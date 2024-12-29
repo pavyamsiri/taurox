@@ -8,6 +8,11 @@ pub enum ResolutionErrorKind {
         destination: Ident,
         reference: Ident,
     },
+    #[error("Classes can not self-inherit.")]
+    SelfReferentialInheritance {
+        destination: Ident,
+        reference: Ident,
+    },
     #[error("Shadowing a local.")]
     ShadowLocal { old: Ident, new: Ident },
     #[error("Returning in a non-function scope.")]
@@ -33,6 +38,7 @@ impl ResolutionError {
             ResolutionErrorKind::NonFunctionReturn => "RA003",
             ResolutionErrorKind::NonClassThis => "RA004",
             ResolutionErrorKind::ReturnInConstructor => "RA005",
+            ResolutionErrorKind::SelfReferentialInheritance { .. } => "RA006",
         }
     }
 }
