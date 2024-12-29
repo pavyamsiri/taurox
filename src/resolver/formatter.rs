@@ -66,6 +66,9 @@ impl ResolverFormatter for BasicResolverFormatter {
                 destination.name
             )
             .expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::NonClassSuper => {
+                buffer.push_str("Accessing `super` in a non-class context")
+            }
         }
     }
 }
@@ -190,6 +193,19 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
                     .with_label(
                         Label::new((path, span.range()))
                             .with_message("Returning values are not allowed in constructors")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            ResolutionErrorKind::NonClassSuper => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Accessing `super` in a non-class context")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("`super` can't be used here")
                             .with_color(Color::BrightRed),
                     )
                     .finish()

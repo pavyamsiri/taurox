@@ -637,10 +637,11 @@ impl<'src> Parser<'src> {
             TokenKind::KeywordSuper => {
                 let _ = self.expect(TokenKind::Dot)?;
                 let method = self.expect_ident()?;
+                let span = token.span.merge(&method.span);
 
                 let node = ExpressionNode::Atom(ExpressionAtom {
                     kind: ExpressionAtomKind::Super(method.name),
-                    span: token.span,
+                    span,
                 });
                 tree.push(node)
             }

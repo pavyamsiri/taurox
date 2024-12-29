@@ -19,6 +19,8 @@ pub enum ResolutionErrorKind {
     NonFunctionReturn,
     #[error("Can't access `this` outside of a class.")]
     NonClassThis,
+    #[error("Can't access `super` outside of a class.")]
+    NonClassSuper,
     #[error("Constructors are not allowed to explicitly return values.")]
     ReturnInConstructor,
 }
@@ -39,6 +41,7 @@ impl ResolutionError {
             ResolutionErrorKind::NonClassThis => "RA004",
             ResolutionErrorKind::ReturnInConstructor => "RA005",
             ResolutionErrorKind::SelfReferentialInheritance { .. } => "RA006",
+            ResolutionErrorKind::NonClassSuper => "RA007",
         }
     }
 }

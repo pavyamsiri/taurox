@@ -12,6 +12,7 @@ pub enum ExpressionAtomKind {
     Identifier(IdentName),
     StringLiteral(IdentName),
     This,
+    // TODO(pavyamsiri): Separate super and method idents for better errors
     Super(IdentName),
 }
 

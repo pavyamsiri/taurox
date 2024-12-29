@@ -515,8 +515,7 @@ impl Resolver {
             ExpressionAtomKind::Super(_) => match self.class {
                 ClassEnvironment::None => {
                     return Err(ResolutionError {
-                        // TODO(pavyamsiri): Need a new error type
-                        kind: ResolutionErrorKind::NonClassThis,
+                        kind: ResolutionErrorKind::NonClassSuper,
                         span: atom.span,
                     });
                 }
