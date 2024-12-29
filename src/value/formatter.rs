@@ -1,5 +1,5 @@
 use super::error::{RuntimeError, RuntimeErrorKind};
-use super::LoxValue;
+use super::{Function, LoxValue};
 use crate::lexer::LineBreaks;
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 use std::path::Path;
@@ -43,8 +43,8 @@ impl BasicFormatter {
             LoxValue::Nil => format!("Nil"),
             LoxValue::Bool(v) => format!("Bool({v})"),
             LoxValue::NativeFunction(fun) => format!("NativeFunction({})", fun.get_name()),
-            LoxValue::Function { name, .. } => format!("Function({name})"),
-            LoxValue::Class(name) => format!("Class({name})"),
+            LoxValue::Function(Function { name, .. }) => format!("Function({name})"),
+            LoxValue::Class { name, .. } => format!("Class({name})"),
             LoxValue::Instance { class, .. } => format!("Instance({class})"),
         }
     }

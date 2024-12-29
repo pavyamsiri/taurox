@@ -45,6 +45,7 @@ impl Resolution {
 enum FunctionEnvironment {
     None,
     Function,
+    Method,
 }
 
 pub struct Resolver {
@@ -177,8 +178,8 @@ impl Resolver {
             }) => {
                 self.resolve_function_declaration(name, &decl.span, parameters, body)?;
             }
-            DeclarationKind::Class { name, .. } => {
-                self.resolve_class_declaration(name, &decl.span)?;
+            DeclarationKind::Class { name, methods } => {
+                self.resolve_class_declaration(name, &decl.span, methods)?;
             }
         }
         Ok(())
@@ -216,9 +217,14 @@ impl Resolver {
         &mut self,
         ident: &Ident,
         span: &Span,
+        methods: &[FunctionDecl],
     ) -> Result<(), ResolutionError> {
         self.declare(ident, span)?;
         self.define(ident, span);
+
+        for decl in methods {
+            self.resolve_function(&decl.parameters, &decl.body, FunctionEnvironment::Method)?
+        }
 
         Ok(())
     }

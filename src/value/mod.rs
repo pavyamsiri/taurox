@@ -14,21 +14,27 @@ pub trait NativeFunction: std::fmt::Debug + Send + Sync {
 }
 
 #[derive(Debug, Clone)]
+pub struct Function {
+    pub name: Ident,
+    pub parameters: Vec<Ident>,
+    pub body: Vec<Statement>,
+    pub closure: SharedEnvironment,
+}
+
+#[derive(Debug, Clone)]
 pub enum LoxValue {
     Number(f64),
     String(CompactString),
     Nil,
     Bool(bool),
     NativeFunction(Arc<dyn NativeFunction>),
-    Function {
+    Function(Function),
+    Class {
         name: Ident,
-        parameters: Vec<Ident>,
-        body: Vec<Statement>,
-        closure: SharedEnvironment,
+        methods: Vec<Function>,
     },
-    Class(CompactString),
     Instance {
-        class: CompactString,
+        class: Ident,
         fields: HashMap<CompactString, LoxValue>,
     },
 }
@@ -43,10 +49,10 @@ impl std::fmt::Display for LoxValue {
             Self::NativeFunction(fun) => {
                 write!(f, "<native fn `{}`>", fun.get_name())
             }
-            Self::Function { name, .. } => {
+            Self::Function(Function { name, .. }) => {
                 write!(f, "<fn {name}>")
             }
-            Self::Class(name) => {
+            Self::Class { name, .. } => {
                 write!(f, "{name}")
             }
             Self::Instance { class, .. } => {

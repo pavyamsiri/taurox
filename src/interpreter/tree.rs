@@ -7,7 +7,7 @@ use crate::environment::SharedEnvironment;
 use crate::parser::statement::FunctionDecl;
 use crate::resolver::ResolutionMap;
 use crate::value::error::{RuntimeError, RuntimeErrorKind};
-use crate::value::LoxValue;
+use crate::value::{Function, LoxValue};
 use crate::{
     parser::{
         expression::{
@@ -112,9 +112,9 @@ where
                 self.interpret_function_declaration(environment, name, &parameters, body.as_ref())?
             }
             Statement::Declaration(Declaration {
-                kind: DeclarationKind::Class { name, .. },
+                kind: DeclarationKind::Class { name, methods },
                 ..
-            }) => self.interpret_class_declaration(environment, name)?,
+            }) => self.interpret_class_declaration(environment, name, methods)?,
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment, context, resolution)?
             }
@@ -219,12 +219,12 @@ impl TreeWalkStatementInterpreter {
     ) -> Result<ProgramState, RuntimeError> {
         environment.declare(
             &ident.name,
-            LoxValue::Function {
+            LoxValue::Function(Function {
                 name: ident.clone(),
                 parameters: parameters.to_vec(),
                 body: body.to_vec(),
                 closure: environment.new_scope(),
-            },
+            }),
         );
         Ok(ProgramState::Run)
     }
@@ -233,10 +233,27 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         ident: &Ident,
+        method_decls: &[FunctionDecl],
     ) -> Result<ProgramState, RuntimeError> {
         let name = &ident.name;
         environment.declare(name, LoxValue::Nil);
-        let value = LoxValue::Class(name.to_compact_string());
+
+        // Create methods
+        let mut methods = Vec::new();
+        for decl in method_decls {
+            let method = Function {
+                name: decl.name.clone(),
+                parameters: decl.parameters.clone(),
+                body: decl.body.clone(),
+                closure: environment.new_scope(),
+            };
+            methods.push(method);
+        }
+
+        let value = LoxValue::Class {
+            name: ident.clone(),
+            methods,
+        };
         environment
             .assign(name, value)
             .expect("Just declared the class to exist so assignment can't fail.");
@@ -461,22 +478,41 @@ impl TreeWalkStatementInterpreter {
             ExpressionNode::Get { object, name } => {
                 let object_value =
                     self.evaluate_expression_node(expr, *object, environment, context, resolution)?;
-                let LoxValue::Instance { ref fields, .. } = object_value else {
+                let LoxValue::Instance {
+                    ref fields,
+                    ref class,
+                } = object_value
+                else {
                     return Err(RuntimeError {
                         kind: RuntimeErrorKind::InvalidInstance(object_value),
                         span,
                     });
                 };
-                let value = fields
-                    .get(&name.to_compact_string())
-                    .ok_or_else(|| RuntimeError {
-                        kind: RuntimeErrorKind::UndefinedProperty {
-                            object: object_value.clone(),
-                            name: name.name.clone(),
-                        },
-                        span,
-                    })?;
-                value.clone()
+
+                // Field is a property (value)
+                if let Some(value) = fields.get(&name.to_compact_string()) {
+                    value.clone()
+                }
+                // Field is a method
+                else {
+                    let class = self.read_variable(class, environment, resolution).expect("Classes bound to instances should always exist as long as the instance does.");
+                    let LoxValue::Class { name, methods } = class else {
+                        panic!("Values bound as the `class` of an instance is always a class.");
+                    };
+
+                    if let Some(value) = methods.iter().find(|m| m.name == name) {
+                        LoxValue::Function(value.clone())
+                    } else {
+                        let undefined_access = RuntimeError {
+                            kind: RuntimeErrorKind::UndefinedProperty {
+                                object: object_value.clone(),
+                                name: name.name.clone(),
+                            },
+                            span,
+                        };
+                        return Err(undefined_access);
+                    }
+                }
             }
             ExpressionNode::Set {
                 object,
@@ -642,12 +678,12 @@ impl TreeWalkStatementInterpreter {
 
                 result
             }
-            LoxValue::Function {
+            LoxValue::Function(Function {
                 name,
                 parameters,
                 body,
                 closure,
-            } => {
+            }) => {
                 let _ = name;
                 // Set up scope
                 let mut inner_scope = closure.new_scope();
@@ -696,7 +732,7 @@ impl TreeWalkStatementInterpreter {
                 // Exit scope
                 result
             }
-            LoxValue::Class(name) => {
+            LoxValue::Class { name, .. } => {
                 // TODO(pavyamsiri): Handle user-defined constructors
                 let value = LoxValue::Instance {
                     class: name,
