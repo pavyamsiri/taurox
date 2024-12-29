@@ -489,8 +489,9 @@ impl TreeWalkStatementInterpreter {
                     });
                 };
 
+                let field_name = name;
                 // Field is a property (value)
-                if let Some(value) = fields.get(&name.to_compact_string()) {
+                if let Some(value) = fields.get(&field_name.to_compact_string()) {
                     value.clone()
                 }
                 // Field is a method
@@ -500,7 +501,7 @@ impl TreeWalkStatementInterpreter {
                         panic!("Values bound as the `class` of an instance is always a class.");
                     };
 
-                    if let Some(value) = methods.iter().find(|m| m.name == name) {
+                    if let Some(value) = methods.iter().find(|m| m.name.name == field_name.name) {
                         // Bind the instance to the method
                         let mut bound_method = value.clone();
                         let mut new_closure = bound_method.closure.new_scope();
@@ -511,7 +512,7 @@ impl TreeWalkStatementInterpreter {
                         let undefined_access = RuntimeError {
                             kind: RuntimeErrorKind::UndefinedProperty {
                                 object: object_value.clone(),
-                                name: name.name.clone(),
+                                name: field_name.name.clone(),
                             },
                             span,
                         };

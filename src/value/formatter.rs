@@ -230,13 +230,16 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
             }
-            RuntimeErrorKind::UndefinedProperty { .. } => {
+            RuntimeErrorKind::UndefinedProperty { name, .. } => {
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
                     .with_message("Attempted to access an undefined property of an instance")
                     .with_label(
                         Label::new((path, span.range()))
-                            .with_message("This property is not defined on the instance")
+                            .with_message(format!(
+                                "The `{}` property is not defined on the instance",
+                                name.fg(Color::BrightYellow)
+                            ))
                             .with_color(Color::BrightRed),
                     )
                     .finish()
