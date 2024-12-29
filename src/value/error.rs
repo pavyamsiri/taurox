@@ -21,6 +21,8 @@ pub enum RuntimeErrorKind {
     UndefinedProperty { object: LoxValue, name: IdentName },
     #[error("Invalid Argument Count: {actual} of {expected}")]
     InvalidArgumentCount { actual: usize, expected: usize },
+    #[error("Super class must be a class: {0}")]
+    InvalidSuperClass(IdentName),
 }
 
 #[derive(Debug, Error, Clone)]
@@ -41,6 +43,7 @@ impl RuntimeError {
             RuntimeErrorKind::InvalidArgumentCount { .. } => "RT006",
             RuntimeErrorKind::InvalidInstance(_) => "RT007",
             RuntimeErrorKind::UndefinedProperty { .. } => "RT008",
+            RuntimeErrorKind::InvalidSuperClass(_) => "RT009",
         }
     }
 }

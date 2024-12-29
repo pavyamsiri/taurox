@@ -23,6 +23,27 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
+pub struct Class {
+    pub name: Ident,
+    pub methods: Vec<Function>,
+    pub super_class: Option<Arc<Class>>,
+}
+
+impl Class {
+    pub fn find_method(&self, name: &str) -> Option<&Function> {
+        if let Some(method) = self.methods.iter().find(|m| &(*m.name.name) == name) {
+            return Some(method);
+        }
+
+        if let Some(ref super_class) = self.super_class {
+            super_class.find_method(name)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub enum LoxValue {
     Number(f64),
     String(CompactString),
@@ -30,10 +51,7 @@ pub enum LoxValue {
     Bool(bool),
     NativeFunction(Arc<dyn NativeFunction>),
     Function(Function),
-    Class {
-        name: Ident,
-        methods: Vec<Function>,
-    },
+    Class(Class),
     Instance {
         class: Ident,
         fields: HashMap<CompactString, LoxValue>,
@@ -53,7 +71,7 @@ impl std::fmt::Display for LoxValue {
             Self::Function(Function { name, .. }) => {
                 write!(f, "<fn {name}>")
             }
-            Self::Class { name, .. } => {
+            Self::Class(Class { name, .. }) => {
                 write!(f, "{name}")
             }
             Self::Instance { class, .. } => {

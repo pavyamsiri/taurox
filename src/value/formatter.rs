@@ -1,5 +1,5 @@
 use super::error::{RuntimeError, RuntimeErrorKind};
-use super::{Function, LoxValue};
+use super::{Class, Function, LoxValue};
 use crate::lexer::LineBreaks;
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
 use std::path::Path;
@@ -44,7 +44,7 @@ impl BasicFormatter {
             LoxValue::Bool(v) => format!("Bool({v})"),
             LoxValue::NativeFunction(fun) => format!("NativeFunction({})", fun.get_name()),
             LoxValue::Function(Function { name, .. }) => format!("Function({name})"),
-            LoxValue::Class { name, .. } => format!("Class({name})"),
+            LoxValue::Class(Class { name, .. }) => format!("Class({name})"),
             LoxValue::Instance { class, .. } => format!("Instance({class})"),
         }
     }
@@ -57,7 +57,7 @@ impl ValueFormatter for BasicFormatter {
 
     fn format_error(&self, error: &RuntimeError) -> String {
         let line = self.line_breaks.get_line_from_span(error.span);
-        match error.kind {
+        match &error.kind {
             RuntimeErrorKind::NonNumeric(ref v) => {
                 format!("({line}) Non-Number {{Unary}}: {}", Self::format_verbose(v))
             }
@@ -89,6 +89,9 @@ impl ValueFormatter for BasicFormatter {
             } => {
                 format!("({line}) Undefined Property Access: {name} of {object}")
             }
+            RuntimeErrorKind::InvalidSuperClass(name) => {
+                format!("({line}) Invalid Super Class: {name}")
+            }
         }
     }
 }
@@ -116,7 +119,7 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
             .expect("Non-UTF8 paths are not supported!");
         let mut output = std::io::Cursor::new(Vec::new());
         let span = error.span;
-        match &error.kind {
+        match &error.clone().kind {
             RuntimeErrorKind::NonNumeric(v) => {
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
@@ -238,6 +241,22 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                         Label::new((path, span.range()))
                             .with_message(format!(
                                 "The `{}` property is not defined on the instance",
+                                name.fg(Color::BrightYellow)
+                            ))
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(self.text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            RuntimeErrorKind::InvalidSuperClass(name) => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Attempted to subclass from a non-class value")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message(format!(
+                                "The `{}` variable is not a class",
                                 name.fg(Color::BrightYellow)
                             ))
                             .with_color(Color::BrightRed),

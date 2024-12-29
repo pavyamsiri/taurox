@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use compact_str::ToCompactString;
 
@@ -8,7 +9,7 @@ use crate::lexer::Span;
 use crate::parser::statement::FunctionDecl;
 use crate::resolver::ResolutionMap;
 use crate::value::error::{RuntimeError, RuntimeErrorKind};
-use crate::value::{Function, LoxValue};
+use crate::value::{Class, Function, LoxValue};
 use crate::{
     parser::{
         expression::{
@@ -105,9 +106,20 @@ where
                 ..
             }) => self.interpret_function_declaration(environment, decl)?,
             Statement::Declaration(Declaration {
-                kind: DeclarationKind::Class { name, methods, .. },
+                kind:
+                    DeclarationKind::Class {
+                        name,
+                        methods,
+                        super_class,
+                    },
                 ..
-            }) => self.interpret_class_declaration(environment, name, methods)?,
+            }) => self.interpret_class_declaration(
+                environment,
+                name,
+                methods,
+                super_class.as_ref(),
+                resolution,
+            )?,
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment, context, resolution)?
             }
@@ -226,7 +238,30 @@ impl TreeWalkStatementInterpreter {
         environment: &mut SharedEnvironment,
         ident: &Ident,
         method_decls: &[FunctionDecl],
+        super_class: Option<&Ident>,
+        resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
+        // Handle subclassing
+        let super_class = if let Some(super_class) = super_class {
+            let super_class_value = self
+                .read_variable(super_class, &environment, resolution)
+                .ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::InvalidAccess(super_class.name.clone()),
+                    span: super_class.span,
+                })?;
+            match super_class_value {
+                LoxValue::Class(super_class) => Some(super_class),
+                _ => {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::InvalidSuperClass(super_class.name.clone()),
+                        span: super_class.span,
+                    });
+                }
+            }
+        } else {
+            None
+        };
+
         let name = &ident.name;
         environment.declare(name, LoxValue::Nil);
 
@@ -244,10 +279,11 @@ impl TreeWalkStatementInterpreter {
             methods.push(method);
         }
 
-        let value = LoxValue::Class {
+        let value = LoxValue::Class(Class {
             name: ident.clone(),
             methods,
-        };
+            super_class: super_class.map(|v| Arc::new(v)),
+        });
         environment
             .assign(name, value)
             .expect("Just declared the class to exist so assignment can't fail.");
@@ -491,11 +527,11 @@ impl TreeWalkStatementInterpreter {
                 // Field is a method
                 else {
                     let class = self.read_variable(class, environment, resolution).expect("Classes bound to instances should always exist as long as the instance does.");
-                    let LoxValue::Class { methods, .. } = class else {
+                    let LoxValue::Class(class) = class else {
                         panic!("Values bound as the `class` of an instance is always a class.");
                     };
 
-                    if let Some(value) = methods.iter().find(|m| m.name.name == field_name.name) {
+                    if let Some(value) = class.find_method(&field_name.name) {
                         // Bind the instance to the method
                         let mut bound_method = value.clone();
                         let mut new_closure = bound_method.closure.new_scope();
@@ -701,13 +737,13 @@ impl TreeWalkStatementInterpreter {
                 context,
                 resolution,
             )?,
-            LoxValue::Class { name, methods } => {
+            LoxValue::Class(class) => {
                 let value = LoxValue::Instance {
-                    class: name,
+                    class: class.name.clone(),
                     fields: HashMap::new(),
                 };
 
-                if let Some(constructor) = methods.iter().find(|m| &(*m.name.name) == "init") {
+                if let Some(constructor) = class.find_method("init") {
                     let mut bound_method = constructor.clone();
                     let mut new_closure = bound_method.closure.new_scope();
                     new_closure.declare("this", value.clone());
