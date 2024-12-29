@@ -27,6 +27,9 @@ pub enum LoxValue {
         closure: SharedEnvironment,
     },
     Class(CompactString),
+    Instance {
+        class: CompactString,
+    },
 }
 
 impl std::fmt::Display for LoxValue {
@@ -44,6 +47,9 @@ impl std::fmt::Display for LoxValue {
             }
             Self::Class(name) => {
                 write!(f, "{name}")
+            }
+            Self::Instance { class, .. } => {
+                write!(f, "{class} instance")
             }
         }
     }

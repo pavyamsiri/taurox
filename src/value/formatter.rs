@@ -45,6 +45,7 @@ impl BasicFormatter {
             LoxValue::NativeFunction(fun) => format!("NativeFunction({})", fun.get_name()),
             LoxValue::Function { name, .. } => format!("Function({name})"),
             LoxValue::Class(name) => format!("Class({name})"),
+            LoxValue::Instance { class } => format!("Instance({class})"),
         }
     }
 }

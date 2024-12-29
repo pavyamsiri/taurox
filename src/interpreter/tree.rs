@@ -656,6 +656,11 @@ impl TreeWalkStatementInterpreter {
                 // Exit scope
                 result
             }
+            LoxValue::Class(name) => {
+                // TODO(pavyamsiri): Handle user-defined constructors
+                let value = LoxValue::Instance { class: name };
+                value
+            }
             v => {
                 return Err(RuntimeError {
                     kind: RuntimeErrorKind::InvalidCallee(v),
