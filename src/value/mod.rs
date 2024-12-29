@@ -43,7 +43,7 @@ impl std::fmt::Display for LoxValue {
                 write!(f, "<fn {name}>")
             }
             Self::Class(name) => {
-                write!(f, "<class {name}>")
+                write!(f, "{name}")
             }
         }
     }

@@ -110,9 +110,9 @@ where
                 self.interpret_function_declaration(environment, name, &parameters, body.as_ref())?
             }
             Statement::Declaration(Declaration {
-                kind: DeclarationKind::Class { .. },
+                kind: DeclarationKind::Class { name, .. },
                 ..
-            }) => todo!(),
+            }) => self.interpret_class_declaration(environment, name)?,
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment, context, resolution)?
             }
@@ -224,6 +224,20 @@ impl TreeWalkStatementInterpreter {
                 closure: environment.new_scope(),
             },
         );
+        Ok(ProgramState::Run)
+    }
+
+    fn interpret_class_declaration(
+        &self,
+        environment: &mut SharedEnvironment,
+        ident: &Ident,
+    ) -> Result<ProgramState, RuntimeError> {
+        let name = &ident.name;
+        environment.declare(name, LoxValue::Nil);
+        let value = LoxValue::Class(name.to_compact_string());
+        environment
+            .assign(name, value)
+            .expect("Just declared the class to exist so assignment can't fail.");
         Ok(ProgramState::Run)
     }
 
