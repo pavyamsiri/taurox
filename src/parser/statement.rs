@@ -17,6 +17,13 @@ impl Statement {
 }
 
 #[derive(Debug, Clone)]
+pub struct FunctionDecl {
+    pub name: Ident,
+    pub parameters: Vec<Ident>,
+    pub body: Vec<Statement>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Declaration {
     pub kind: DeclarationKind,
     pub span: Span,
@@ -28,11 +35,7 @@ pub enum DeclarationKind {
         name: Ident,
         initial: Option<Expression>,
     },
-    Function {
-        name: Ident,
-        parameters: Vec<Ident>,
-        body: Vec<Statement>,
-    },
+    Function(FunctionDecl),
 }
 
 impl std::fmt::Display for DeclarationKind {

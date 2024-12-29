@@ -17,7 +17,8 @@ use expression::{
     PostfixOperator, PrefixOperator,
 };
 use statement::{
-    Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind, Statement,
+    Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration, NonDeclarationKind,
+    Statement,
 };
 use std::path::Path;
 
@@ -177,11 +178,11 @@ impl<'src> Parser<'src> {
 
         let span = leftmost.span.merge(&rightmost);
         let decl = Statement::Declaration(Declaration {
-            kind: DeclarationKind::Function {
+            kind: DeclarationKind::Function(FunctionDecl {
                 name,
                 parameters,
                 body,
-            },
+            }),
             span,
         });
 

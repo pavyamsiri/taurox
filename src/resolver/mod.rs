@@ -8,8 +8,8 @@ use crate::{
             Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         },
         statement::{
-            Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind,
-            Statement,
+            Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration,
+            NonDeclarationKind, Statement,
         },
         Program,
     },
@@ -169,11 +169,11 @@ impl Resolver {
             DeclarationKind::Variable { name, initial } => {
                 self.resolve_variable_declaration(name, &decl.span, initial.as_ref())?;
             }
-            DeclarationKind::Function {
+            DeclarationKind::Function(FunctionDecl {
                 name,
                 parameters,
                 body,
-            } => {
+            }) => {
                 self.resolve_function_declaration(name, &decl.span, parameters, body)?;
             }
         }

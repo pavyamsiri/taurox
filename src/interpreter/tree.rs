@@ -2,6 +2,7 @@ use compact_str::ToCompactString;
 
 use super::{Interpreter, ProgramState, StatementInterpreter, SystemContext};
 use crate::environment::SharedEnvironment;
+use crate::parser::statement::FunctionDecl;
 use crate::resolver::ResolutionMap;
 use crate::value::error::{RuntimeError, RuntimeErrorKind};
 use crate::value::LoxValue;
@@ -98,12 +99,12 @@ where
             )?,
             Statement::Declaration(Declaration {
                 kind:
-                    DeclarationKind::Function {
+                    DeclarationKind::Function(FunctionDecl {
                         name,
                         parameters,
                         body,
                         ..
-                    },
+                    }),
                 ..
             }) => {
                 self.interpret_function_declaration(environment, name, &parameters, body.as_ref())?

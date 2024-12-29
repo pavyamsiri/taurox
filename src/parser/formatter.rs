@@ -7,7 +7,9 @@ use super::{
         Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
-    statement::{Declaration, DeclarationKind, NonDeclaration, NonDeclarationKind, Statement},
+    statement::{
+        Declaration, DeclarationKind, FunctionDecl, NonDeclaration, NonDeclarationKind, Statement,
+    },
     ParserError,
 };
 use crate::lexer::{
@@ -436,7 +438,7 @@ impl<'src> BasicParserFormatter<'src> {
             DeclarationKind::Variable { name, .. } => {
                 write!(buffer, "VARDECL {name}").expect(&WRITE_FMT_MSG);
             }
-            DeclarationKind::Function { name, .. } => {
+            DeclarationKind::Function(FunctionDecl { name, .. }) => {
                 write!(buffer, "FUNDECL {name}").expect(&WRITE_FMT_MSG);
             }
         }
