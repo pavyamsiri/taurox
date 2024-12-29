@@ -105,7 +105,7 @@ where
                 ..
             }) => self.interpret_function_declaration(environment, decl)?,
             Statement::Declaration(Declaration {
-                kind: DeclarationKind::Class { name, methods },
+                kind: DeclarationKind::Class { name, methods, .. },
                 ..
             }) => self.interpret_class_declaration(environment, name, methods)?,
             Statement::NonDeclaration(statement) => {

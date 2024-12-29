@@ -233,8 +233,16 @@ impl<'src> Parser<'src> {
     fn parse_class_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordClass)?;
         let name = self.expect_ident()?;
-        let mut methods = Vec::new();
+
+        // Optional super class
+        let super_class = if let Some(_) = self.eat_if(TokenKind::LessThan)? {
+            Some(self.expect_ident()?)
+        } else {
+            None
+        };
         let _ = self.expect(TokenKind::LeftBrace)?;
+
+        let mut methods = Vec::new();
         let rightmost = 'block: loop {
             match self.eat_if(TokenKind::RightBrace)? {
                 Some(rightmost) => {
@@ -249,7 +257,11 @@ impl<'src> Parser<'src> {
 
         let span = leftmost.span.merge(&rightmost.span);
         let statement = Statement::Declaration(Declaration {
-            kind: DeclarationKind::Class { name, methods },
+            kind: DeclarationKind::Class {
+                name,
+                methods,
+                super_class,
+            },
             span,
         });
 

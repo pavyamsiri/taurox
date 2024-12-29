@@ -39,6 +39,7 @@ pub enum DeclarationKind {
     Class {
         name: Ident,
         methods: Vec<FunctionDecl>,
+        super_class: Option<Ident>,
     },
 }
 

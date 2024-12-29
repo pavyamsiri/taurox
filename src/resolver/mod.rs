@@ -187,7 +187,7 @@ impl Resolver {
             }) => {
                 self.resolve_function_declaration(name, &decl.span, parameters, body)?;
             }
-            DeclarationKind::Class { name, methods } => {
+            DeclarationKind::Class { name, methods, .. } => {
                 self.resolve_class_declaration(name, &decl.span, methods)?;
             }
         }
