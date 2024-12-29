@@ -26,11 +26,10 @@ pub struct Function {
 }
 
 impl Function {
-    // TODO(pavyamsiri): Give the instance variant a struct so we don't have this enum
-    pub fn bind(&self, value: LoxValue) -> Function {
+    pub fn bind(&self, value: Arc<Instance>) -> Function {
         let mut bound_function = self.clone();
         let mut new_closure = bound_function.closure.new_scope();
-        new_closure.declare("this", value);
+        new_closure.declare("this", LoxValue::Instance(value));
         bound_function.closure = new_closure;
         bound_function
     }

@@ -556,7 +556,7 @@ impl TreeWalkStatementInterpreter {
 
                     if let Some(value) = class.find_method(&field_name.name) {
                         // Bind the instance to the method
-                        let bound_method = value.bind(object_value.clone());
+                        let bound_method = value.bind(instance.clone());
                         LoxValue::Function(Arc::new(bound_method))
                     } else {
                         let undefined_access = RuntimeError {
@@ -654,7 +654,7 @@ impl TreeWalkStatementInterpreter {
                         kind: RuntimeErrorKind::InvalidAccess("super".into()),
                         span,
                     })?;
-                let LoxValue::Instance { .. } = object else {
+                let LoxValue::Instance(ref instance) = object else {
                     panic!("`this` should not be able to be not an instance because it is a reserved word!");
                 };
                 let method = super_class.find_method(&method).ok_or(RuntimeError {
@@ -664,7 +664,7 @@ impl TreeWalkStatementInterpreter {
                     },
                     span,
                 })?;
-                LoxValue::Function(Arc::new(method.bind(object)))
+                LoxValue::Function(Arc::new(method.bind(instance.clone())))
             }
         };
         Ok(result)
@@ -794,13 +794,14 @@ impl TreeWalkStatementInterpreter {
                 resolution,
             )?,
             LoxValue::Class(class) => {
-                let value = LoxValue::Instance(Arc::new(Instance {
+                let instance = Arc::new(Instance {
                     class: class.clone(),
                     fields: Arc::new(Mutex::new(HashMap::new())),
-                }));
+                });
+                let value = LoxValue::Instance(instance.clone());
 
                 if let Some(constructor) = class.find_method("init") {
-                    let bound_method = constructor.bind(value.clone());
+                    let bound_method = constructor.bind(instance);
                     self.evaluate_function(
                         &bound_method,
                         arguments,
