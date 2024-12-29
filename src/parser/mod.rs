@@ -500,6 +500,7 @@ impl<'src> Parser<'src> {
 
         match token.kind {
             TokenKind::LeftParenthesis => Ok(Some(PostfixOperator::Call)),
+            TokenKind::Dot => Ok(Some(PostfixOperator::Access)),
             _ => Ok(None),
         }
     }
@@ -743,6 +744,14 @@ impl<'src> Parser<'src> {
                             arguments,
                         })));
                     }
+                }
+                PostfixOperator::Access => {
+                    let _ = self.expect(TokenKind::Dot)?;
+                    let ident = self.expect_ident()?;
+                    return Ok(PrattParseOutcome::NewLHS(tree.push(ExpressionNode::Get {
+                        object: lhs,
+                        name: ident,
+                    })));
                 }
             }
         }

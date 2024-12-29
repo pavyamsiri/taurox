@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use compact_str::ToCompactString;
 
 use super::{Interpreter, ProgramState, StatementInterpreter, SystemContext};
@@ -456,6 +458,26 @@ impl TreeWalkStatementInterpreter {
             ExpressionNode::Call { callee, arguments } => {
                 self.evaluate_call(*callee, arguments, expr, environment, context, resolution)?
             }
+            ExpressionNode::Get { object, name } => {
+                let object_value =
+                    self.evaluate_expression_node(expr, *object, environment, context, resolution)?;
+                let LoxValue::Instance { ref fields, .. } = object_value else {
+                    return Err(RuntimeError {
+                        kind: RuntimeErrorKind::InvalidInstance(object_value),
+                        span,
+                    });
+                };
+                let value = fields
+                    .get(&name.to_compact_string())
+                    .ok_or_else(|| RuntimeError {
+                        kind: RuntimeErrorKind::UndefinedProperty {
+                            object: object_value.clone(),
+                            name: name.name.clone(),
+                        },
+                        span,
+                    })?;
+                value.clone()
+            }
         };
         Ok(result)
     }
@@ -658,7 +680,10 @@ impl TreeWalkStatementInterpreter {
             }
             LoxValue::Class(name) => {
                 // TODO(pavyamsiri): Handle user-defined constructors
-                let value = LoxValue::Instance { class: name };
+                let value = LoxValue::Instance {
+                    class: name,
+                    fields: HashMap::new(),
+                };
                 value
             }
             v => {

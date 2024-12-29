@@ -5,7 +5,7 @@ use super::environment::SharedEnvironment;
 use crate::{parser::statement::Statement, string::Ident};
 use compact_str::{CompactString, CompactStringExt};
 use error::{RuntimeError, RuntimeErrorKind};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 pub trait NativeFunction: std::fmt::Debug + Send + Sync {
     fn get_name(&self) -> &'static str;
@@ -29,6 +29,7 @@ pub enum LoxValue {
     Class(CompactString),
     Instance {
         class: CompactString,
+        fields: HashMap<CompactString, LoxValue>,
     },
 }
 

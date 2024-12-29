@@ -401,6 +401,9 @@ impl Resolver {
                     self.resolve_expression_node(expr, argument.clone())?;
                 }
             }
+            ExpressionNode::Get { object, .. } => {
+                self.resolve_expression_node(expr, object.clone())?;
+            }
         }
         Ok(())
     }

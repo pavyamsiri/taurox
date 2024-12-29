@@ -49,6 +49,10 @@ pub enum ExpressionNode {
         callee: ExpressionNodeRef,
         arguments: Vec<ExpressionNodeRef>,
     },
+    Get {
+        object: ExpressionNodeRef,
+        name: Ident,
+    },
 }
 
 impl ExpressionNode {
@@ -132,6 +136,10 @@ impl IncompleteExpression {
                     Some(current.right_expand(1))
                 }
             }
+            ExpressionNode::Get { object, name } => {
+                let span = self.get_span(*object).expect(MSG).merge(&name.span);
+                Some(span)
+            }
         }
     }
 
@@ -152,6 +160,7 @@ impl IncompleteExpression {
             ExpressionNode::InfixShortCircuit { lhs, .. } => self.get_kind(*lhs),
             ExpressionNode::Group { inner } => self.get_kind(*inner),
             ExpressionNode::Call { callee, .. } => self.get_kind(*callee),
+            ExpressionNode::Get { object, .. } => self.get_kind(*object),
         }
     }
 }

@@ -45,7 +45,7 @@ impl BasicFormatter {
             LoxValue::NativeFunction(fun) => format!("NativeFunction({})", fun.get_name()),
             LoxValue::Function { name, .. } => format!("Function({name})"),
             LoxValue::Class(name) => format!("Class({name})"),
-            LoxValue::Instance { class } => format!("Instance({class})"),
+            LoxValue::Instance { class, .. } => format!("Instance({class})"),
         }
     }
 }
@@ -79,6 +79,15 @@ impl ValueFormatter for BasicFormatter {
             }
             RuntimeErrorKind::InvalidArgumentCount { actual, expected } => {
                 format!("({line}) Invalid Argument Count: {actual} of {expected}")
+            }
+            RuntimeErrorKind::InvalidInstance(ref object) => {
+                format!("({line}) Invalid Instance: {object}")
+            }
+            RuntimeErrorKind::UndefinedProperty {
+                ref object,
+                ref name,
+            } => {
+                format!("({line}) Undefined Property Access: {name} of {object}")
             }
         }
     }
@@ -123,7 +132,6 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
-                String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
             }
             RuntimeErrorKind::NonNumerics(lhs, rhs) => {
                 Report::build(ReportKind::Error, (path, span.range()))
@@ -141,7 +149,6 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
-                String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
             }
             RuntimeErrorKind::NonAddable(lhs, rhs) => {
                 let mut colors = ColorGenerator::new();
@@ -160,7 +167,6 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
-                String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
             }
             RuntimeErrorKind::InvalidAccess(name) => {
                 Report::build(ReportKind::Error, (path, span.range()))
@@ -177,7 +183,6 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
-                String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
             }
             RuntimeErrorKind::InvalidCallee(callee) => {
                 Report::build(ReportKind::Error, (path, span.range()))
@@ -194,7 +199,6 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
-                String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
             }
             RuntimeErrorKind::InvalidArgumentCount { actual, expected } => {
                 Report::build(ReportKind::Error, (path, span.range()))
@@ -212,8 +216,34 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .finish()
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
-                String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
+            }
+            RuntimeErrorKind::InvalidInstance(_) => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Attempted to access a property on a non-instance value")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("This is not a callable...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(self.text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            RuntimeErrorKind::UndefinedProperty { .. } => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Attempted to access an undefined property of an instance")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("This property is not defined on the instance")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(self.text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
             }
         }
+        String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
     }
 }

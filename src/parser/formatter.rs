@@ -148,6 +148,11 @@ impl<'src> SExpressionFormatter<'src> {
                 }
                 buffer.push(')');
             }
+            ExpressionNode::Get { object, name } => {
+                buffer.push_str("(get ");
+                SExpressionFormatter::format_node(buffer, tree, object);
+                write!(buffer, " {name})").expect(&WRITE_FMT_MSG);
+            }
         }
     }
 

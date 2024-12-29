@@ -78,11 +78,14 @@ impl InfixAssignmentOperator {
 #[derive(Debug, Clone, Copy)]
 pub enum PostfixOperator {
     Call,
+    Access,
 }
 
 impl PostfixOperator {
     pub fn get_binding_power(&self) -> u8 {
         match self {
+            // 0. Call operator
+            Self::Access => 19,
             // 1. Call operator
             Self::Call => 17,
         }
