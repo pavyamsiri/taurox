@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use compact_str::ToCompactString;
 
@@ -9,7 +9,7 @@ use crate::lexer::Span;
 use crate::parser::statement::FunctionDecl;
 use crate::resolver::ResolutionMap;
 use crate::value::error::{RuntimeError, RuntimeErrorKind};
-use crate::value::{Class, Function, LoxValue};
+use crate::value::{Class, Function, Instance, LoxValue};
 use crate::{
     parser::{
         expression::{
@@ -220,16 +220,14 @@ impl TreeWalkStatementInterpreter {
         environment: &mut SharedEnvironment,
         decl: &FunctionDecl,
     ) -> Result<ProgramState, RuntimeError> {
-        environment.declare(
-            &decl.name.name,
-            LoxValue::Function(Function {
-                name: decl.name.clone(),
-                parameters: decl.parameters.to_vec(),
-                body: decl.body.to_vec(),
-                closure: environment.new_scope(),
-                is_constructor: false,
-            }),
-        );
+        let function = Function {
+            name: decl.name.clone(),
+            parameters: decl.parameters.to_vec(),
+            body: decl.body.to_vec(),
+            closure: environment.new_scope(),
+            is_constructor: false,
+        };
+        environment.declare(&decl.name.name, LoxValue::Function(Arc::new(function)));
         Ok(ProgramState::Run)
     }
 
@@ -300,14 +298,15 @@ impl TreeWalkStatementInterpreter {
                 closure: inner_environment.new_scope(),
                 is_constructor,
             };
-            methods.push(method);
+            methods.push(Arc::new(method));
         }
 
-        let value = LoxValue::Class(Class {
+        let class = Class {
             name: ident.clone(),
             methods,
-            super_class: super_class.map(|v| Arc::new(v)),
-        });
+            super_class,
+        };
+        let value = LoxValue::Class(Arc::new(class));
 
         // NOTE(pavyamsiri): We use the given environment as a way to exit the scope where we defined `super`.
         environment
@@ -534,16 +533,14 @@ impl TreeWalkStatementInterpreter {
             ExpressionNode::Get { object, name } => {
                 let object_value =
                     self.evaluate_expression_node(expr, *object, environment, context, resolution)?;
-                let LoxValue::Instance {
-                    ref fields,
-                    ref class,
-                } = object_value
-                else {
+                let LoxValue::Instance(ref instance) = object_value else {
                     return Err(RuntimeError {
                         kind: RuntimeErrorKind::InvalidInstance(object_value),
                         span,
                     });
                 };
+                let fields = instance.fields.lock().unwrap();
+                let class = &instance.class.name;
 
                 let field_name = name;
                 // Field is a property (value)
@@ -559,8 +556,8 @@ impl TreeWalkStatementInterpreter {
 
                     if let Some(value) = class.find_method(&field_name.name) {
                         // Bind the instance to the method
-                        let bound_method = value.bind(object_value);
-                        LoxValue::Function(bound_method)
+                        let bound_method = value.bind(object_value.clone());
+                        LoxValue::Function(Arc::new(bound_method))
                     } else {
                         let undefined_access = RuntimeError {
                             kind: RuntimeErrorKind::UndefinedProperty {
@@ -578,14 +575,15 @@ impl TreeWalkStatementInterpreter {
                 name,
                 value,
             } => {
-                let mut lhs =
+                let lhs =
                     self.evaluate_expression_node(expr, *object, environment, context, resolution)?;
-                let LoxValue::Instance { ref mut fields, .. } = lhs else {
+                let LoxValue::Instance(instance) = lhs else {
                     return Err(RuntimeError {
                         kind: RuntimeErrorKind::InvalidInstance(lhs),
                         span,
                     });
                 };
+                let mut fields = instance.fields.lock().unwrap();
                 let rhs =
                     self.evaluate_expression_node(expr, *value, environment, context, resolution)?;
                 fields.insert(name.name.to_compact_string(), rhs.clone());
@@ -666,7 +664,7 @@ impl TreeWalkStatementInterpreter {
                     },
                     span,
                 })?;
-                LoxValue::Function(method.bind(object))
+                LoxValue::Function(Arc::new(method.bind(object)))
             }
         };
         Ok(result)
@@ -786,7 +784,7 @@ impl TreeWalkStatementInterpreter {
 
                 result
             }
-            LoxValue::Function(function @ Function { .. }) => self.evaluate_function(
+            LoxValue::Function(function) => self.evaluate_function(
                 &function,
                 arguments,
                 &span,
@@ -796,10 +794,10 @@ impl TreeWalkStatementInterpreter {
                 resolution,
             )?,
             LoxValue::Class(class) => {
-                let value = LoxValue::Instance {
-                    class: class.name.clone(),
-                    fields: HashMap::new(),
-                };
+                let value = LoxValue::Instance(Arc::new(Instance {
+                    class: class.clone(),
+                    fields: Arc::new(Mutex::new(HashMap::new())),
+                }));
 
                 if let Some(constructor) = class.find_method("init") {
                     let bound_method = constructor.bind(value.clone());

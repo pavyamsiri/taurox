@@ -5,7 +5,10 @@ use super::environment::SharedEnvironment;
 use crate::{parser::statement::Statement, string::Ident};
 use compact_str::{CompactString, CompactStringExt};
 use error::{RuntimeError, RuntimeErrorKind};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 pub trait NativeFunction: std::fmt::Debug + Send + Sync {
     fn get_name(&self) -> &'static str;
@@ -36,7 +39,7 @@ impl Function {
 #[derive(Debug, Clone)]
 pub struct Class {
     pub name: Ident,
-    pub methods: Vec<Function>,
+    pub methods: Vec<Arc<Function>>,
     pub super_class: Option<Arc<Class>>,
 }
 
@@ -55,18 +58,21 @@ impl Class {
 }
 
 #[derive(Debug, Clone)]
+pub struct Instance {
+    pub class: Arc<Class>,
+    pub fields: Arc<Mutex<HashMap<CompactString, LoxValue>>>,
+}
+
+#[derive(Debug, Clone)]
 pub enum LoxValue {
     Number(f64),
     String(CompactString),
     Nil,
     Bool(bool),
     NativeFunction(Arc<dyn NativeFunction>),
-    Function(Function),
-    Class(Class),
-    Instance {
-        class: Ident,
-        fields: HashMap<CompactString, LoxValue>,
-    },
+    Function(Arc<Function>),
+    Class(Arc<Class>),
+    Instance(Arc<Instance>),
 }
 
 impl std::fmt::Display for LoxValue {
@@ -79,13 +85,16 @@ impl std::fmt::Display for LoxValue {
             Self::NativeFunction(fun) => {
                 write!(f, "<native fn `{}`>", fun.get_name())
             }
-            Self::Function(Function { name, .. }) => {
+            Self::Function(func) => {
+                let name = &func.name;
                 write!(f, "<fn {name}>")
             }
-            Self::Class(Class { name, .. }) => {
+            Self::Class(class) => {
+                let name = &class.name;
                 write!(f, "{name}")
             }
-            Self::Instance { class, .. } => {
+            Self::Instance(instance) => {
+                let class = &instance.class.name;
                 write!(f, "{class} instance")
             }
         }
