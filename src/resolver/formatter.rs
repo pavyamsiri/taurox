@@ -54,6 +54,9 @@ impl ResolverFormatter for BasicResolverFormatter {
             ResolutionErrorKind::NonFunctionReturn => {
                 buffer.push_str("Returning in a non-function context")
             }
+            ResolutionErrorKind::NonClassThis => {
+                buffer.push_str("Accessing `this` in a non-class context")
+            }
         }
     }
 }
@@ -128,6 +131,19 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
                     .with_label(
                         Label::new((path, span.range()))
                             .with_message("Returning from here is an invalid operation")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            ResolutionErrorKind::NonClassThis => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Accessing `this` in a non-class context")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("`this` can't be used here")
                             .with_color(Color::BrightRed),
                     )
                     .finish()

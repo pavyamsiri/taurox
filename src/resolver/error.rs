@@ -12,6 +12,8 @@ pub enum ResolutionErrorKind {
     ShadowLocal { old: Ident, new: Ident },
     #[error("Returning in a non-function scope.")]
     NonFunctionReturn,
+    #[error("Can't access `this` outside of a class.")]
+    NonClassThis,
 }
 
 #[derive(Debug, Error, Clone)]
@@ -27,6 +29,7 @@ impl ResolutionError {
             ResolutionErrorKind::SelfReferentialInitializer { .. } => "RA001",
             ResolutionErrorKind::ShadowLocal { .. } => "RA002",
             ResolutionErrorKind::NonFunctionReturn => "RA003",
+            ResolutionErrorKind::NonClassThis => "RA004",
         }
     }
 }

@@ -48,9 +48,16 @@ enum FunctionEnvironment {
     Method,
 }
 
+#[derive(Clone, Copy)]
+enum ClassEnvironment {
+    None,
+    Class,
+}
+
 pub struct Resolver {
     resolution: ResolutionMap,
     function: FunctionEnvironment,
+    class: ClassEnvironment,
     scopes: Vec<HashMap<IdentName, Resolution>>,
 }
 
@@ -60,6 +67,7 @@ impl Resolver {
             resolution: HashMap::new(),
             scopes: Vec::new(),
             function: FunctionEnvironment::None,
+            class: ClassEnvironment::None,
         }
     }
 
@@ -219,6 +227,9 @@ impl Resolver {
         span: &Span,
         methods: &[FunctionDecl],
     ) -> Result<(), ResolutionError> {
+        let enclosing = self.class;
+        self.class = ClassEnvironment::Class;
+
         self.declare(ident, span)?;
         self.define(ident, span);
 
@@ -234,6 +245,7 @@ impl Resolver {
         }
         self.exit_scope();
 
+        self.class = enclosing;
         Ok(())
     }
 
@@ -434,12 +446,20 @@ impl Resolver {
                     span: atom.span,
                 })?;
             }
-            ExpressionAtomKind::This => {
-                self.resolve_variable_expression(&Ident {
-                    name: "this".into(),
-                    span: atom.span,
-                })?;
-            }
+            ExpressionAtomKind::This => match self.class {
+                ClassEnvironment::None => {
+                    return Err(ResolutionError {
+                        kind: ResolutionErrorKind::NonClassThis,
+                        span: atom.span,
+                    });
+                }
+                ClassEnvironment::Class => {
+                    self.resolve_variable_expression(&Ident {
+                        name: "this".into(),
+                        span: atom.span,
+                    })?;
+                }
+            },
             _ => {}
         }
         Ok(())
