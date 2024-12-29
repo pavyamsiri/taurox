@@ -69,6 +69,9 @@ impl ResolverFormatter for BasicResolverFormatter {
             ResolutionErrorKind::NonClassSuper => {
                 buffer.push_str("Accessing `super` in a non-class context")
             }
+            ResolutionErrorKind::NonSubClassSuper => {
+                buffer.push_str("Accessing `super` in a non-subclass context")
+            }
         }
     }
 }
@@ -203,6 +206,19 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
                     .with_message("Accessing `super` in a non-class context")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("`super` can't be used here")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            ResolutionErrorKind::NonSubClassSuper => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Accessing `super` in a non-subclass context")
                     .with_label(
                         Label::new((path, span.range()))
                             .with_message("`super` can't be used here")

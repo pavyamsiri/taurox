@@ -53,6 +53,7 @@ enum FunctionEnvironment {
 enum ClassEnvironment {
     None,
     Class,
+    SubClass,
 }
 
 pub struct Resolver {
@@ -250,6 +251,7 @@ impl Resolver {
                 });
             }
 
+            self.class = ClassEnvironment::SubClass;
             self.resolve_variable(super_class);
         }
 
@@ -505,7 +507,7 @@ impl Resolver {
                         span: atom.span,
                     });
                 }
-                ClassEnvironment::Class => {
+                ClassEnvironment::Class | ClassEnvironment::SubClass => {
                     self.resolve_variable_expression(&Ident {
                         name: "this".into(),
                         span: atom.span,
@@ -520,6 +522,12 @@ impl Resolver {
                     });
                 }
                 ClassEnvironment::Class => {
+                    return Err(ResolutionError {
+                        kind: ResolutionErrorKind::NonSubClassSuper,
+                        span: atom.span,
+                    });
+                }
+                ClassEnvironment::SubClass => {
                     self.resolve_variable_expression(&Ident {
                         name: "super".into(),
                         span: atom.span,
