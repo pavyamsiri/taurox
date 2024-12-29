@@ -58,6 +58,7 @@ pub enum Initializer {
     VarDecl {
         name: Ident,
         initial: Option<Expression>,
+        stmt_span: Span,
     },
     Expression(Expression),
 }

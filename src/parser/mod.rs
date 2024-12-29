@@ -350,8 +350,12 @@ impl<'src> Parser<'src> {
                 let initializer = match statement {
                     Statement::Declaration(Declaration {
                         kind: DeclarationKind::Variable { name, initial },
-                        ..
-                    }) => Some(Initializer::VarDecl { name, initial }),
+                        span,
+                    }) => Some(Initializer::VarDecl {
+                        name,
+                        initial,
+                        stmt_span: span,
+                    }),
                     Statement::NonDeclaration(NonDeclaration {
                         kind: NonDeclarationKind::Expression(expr),
                         ..

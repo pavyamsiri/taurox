@@ -390,9 +390,12 @@ impl Resolver {
     ) -> Result<(), ResolutionError> {
         if let Some(initializer) = initializer {
             match initializer {
-                Initializer::VarDecl { name, initial } => {
-                    // TODO(pavyamsiri): This span is wrong, it should be the span of decl.
-                    self.resolve_variable_declaration(name, &name.span, initial.as_ref())?;
+                Initializer::VarDecl {
+                    name,
+                    initial,
+                    stmt_span,
+                } => {
+                    self.resolve_variable_declaration(name, stmt_span, initial.as_ref())?;
                 }
                 Initializer::Expression(expression) => {
                     self.resolve_expression(expression)?;
