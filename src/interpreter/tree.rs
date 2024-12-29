@@ -501,7 +501,12 @@ impl TreeWalkStatementInterpreter {
                     };
 
                     if let Some(value) = methods.iter().find(|m| m.name == name) {
-                        LoxValue::Function(value.clone())
+                        // Bind the instance to the method
+                        let mut bound_method = value.clone();
+                        let mut new_closure = bound_method.closure.new_scope();
+                        new_closure.declare("this", object_value);
+                        bound_method.closure = new_closure;
+                        LoxValue::Function(bound_method)
                     } else {
                         let undefined_access = RuntimeError {
                             kind: RuntimeErrorKind::UndefinedProperty {
@@ -560,6 +565,20 @@ impl TreeWalkStatementInterpreter {
                     })?
                     .clone()
             }
+            ExpressionAtomKind::This => self
+                .read_variable(
+                    &Ident {
+                        name: "this".into(),
+                        span,
+                    },
+                    environment,
+                    resolution,
+                )
+                .ok_or(RuntimeError {
+                    kind: RuntimeErrorKind::InvalidAccess("this".into()),
+                    span,
+                })?
+                .clone(),
         };
         Ok(result)
     }

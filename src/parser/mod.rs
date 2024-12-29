@@ -613,6 +613,14 @@ impl<'src> Parser<'src> {
                 self.expect(TokenKind::RightParenthesis)?;
                 tree.push(ExpressionNode::Group { inner })
             }
+            // This
+            TokenKind::KeywordThis => {
+                let node = ExpressionNode::Atom(ExpressionAtom {
+                    kind: ExpressionAtomKind::This,
+                    span: token.span,
+                });
+                tree.push(node)
+            }
             _ => {
                 return Err(ExpressionParserError::NonExpression(token).into());
             }

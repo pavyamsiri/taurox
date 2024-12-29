@@ -222,9 +222,11 @@ impl Resolver {
         self.declare(ident, span)?;
         self.define(ident, span);
 
+        self.enter_scope();
         for decl in methods {
             self.resolve_function(&decl.parameters, &decl.body, FunctionEnvironment::Method)?
         }
+        self.exit_scope();
 
         Ok(())
     }
@@ -423,6 +425,12 @@ impl Resolver {
             ExpressionAtomKind::Identifier(name) => {
                 self.resolve_variable_expression(&Ident {
                     name: name.clone(),
+                    span: atom.span,
+                })?;
+            }
+            ExpressionAtomKind::This => {
+                self.resolve_variable_expression(&Ident {
+                    name: "this".into(),
                     span: atom.span,
                 })?;
             }
