@@ -63,6 +63,12 @@ fn test_closure() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_comments() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/comments");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
