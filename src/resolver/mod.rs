@@ -20,6 +20,7 @@ use std::collections::HashMap;
 
 pub type ResolutionMap = HashMap<Ident, usize>;
 
+#[derive(Debug)]
 enum Resolution {
     Declared { name: Ident, span: Span },
     Defined { name: Ident, span: Span },
@@ -169,6 +170,7 @@ impl Resolver {
             if let Some(Resolution::Defined { .. }) = scope.get(&ident.name) {
                 self.resolution
                     .insert(ident.clone(), total_depth - 1 - depth);
+                break;
             }
         }
     }
