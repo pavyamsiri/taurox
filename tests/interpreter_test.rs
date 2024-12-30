@@ -21,6 +21,18 @@ use taurox::{
     value::formatter::{NystromValueFormatter, ValueFormatter},
 };
 
+#[test]
+fn test_assignment() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/assignment");
+    test_engine(input_dir)
+}
+
+#[test]
+fn test_operator() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/operator");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
@@ -89,12 +101,6 @@ impl TestCase {
         let msg = context.into_data();
         assert_eq!(self.output, msg, "Failed test {} at print.", self.name);
     }
-}
-
-#[test]
-fn test_assignment() -> Result<()> {
-    let input_dir = Path::new("./test_data/interpreter/assignment");
-    test_engine(input_dir)
 }
 
 fn test_engine(input_dir: &Path) -> Result<()> {

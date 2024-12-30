@@ -333,18 +333,30 @@ impl ValueFormatter for NystromValueFormatter {
     fn format_error_in_place(&self, buffer: &mut String, error: &RuntimeError) {
         let line = self.line_breaks.get_line_from_span(error.span);
         match &error.kind {
-            RuntimeErrorKind::NonNumeric(_) => todo!(),
-            RuntimeErrorKind::NonNumerics(_, _) => todo!(),
-            RuntimeErrorKind::NonAddable(_, _) => todo!(),
+            RuntimeErrorKind::NonNumeric(_) => {
+                write!(buffer, "({line}) [Runtime] Operand must be a number.")
+                    .expect(&WRITE_FMT_MSG)
+            }
+            RuntimeErrorKind::NonNumerics(_, _) => {
+                write!(buffer, "({line}) [Runtime] Operands must be numbers.")
+                    .expect(&WRITE_FMT_MSG)
+            }
+            RuntimeErrorKind::NonAddable(_, _) => write!(
+                buffer,
+                "({line}) [Runtime] Operands must be two numbers or two strings."
+            )
+            .expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::InvalidAccess(name) => {
                 write!(buffer, "({line}) [Runtime] Undefined variable '{name}'.")
                     .expect(&WRITE_FMT_MSG)
             }
-            RuntimeErrorKind::InvalidCallee(_) => todo!(),
-            RuntimeErrorKind::InvalidInstance(_) => todo!(),
-            RuntimeErrorKind::UndefinedProperty { .. } => todo!(),
-            RuntimeErrorKind::InvalidArgumentCount { .. } => todo!(),
-            RuntimeErrorKind::InvalidSuperClass(_) => todo!(),
+            RuntimeErrorKind::InvalidCallee(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            RuntimeErrorKind::InvalidInstance(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            RuntimeErrorKind::UndefinedProperty { .. } => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            RuntimeErrorKind::InvalidArgumentCount { .. } => {
+                write!(buffer, "").expect(&WRITE_FMT_MSG)
+            }
+            RuntimeErrorKind::InvalidSuperClass(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
         }
     }
 }

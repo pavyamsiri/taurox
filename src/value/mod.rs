@@ -190,6 +190,9 @@ impl LoxValue {
             (LoxValue::String(lhs), LoxValue::String(rhs)) => lhs == rhs,
             (LoxValue::Nil, LoxValue::Nil) => true,
             (LoxValue::Bool(lhs), LoxValue::Bool(rhs)) => lhs == rhs,
+            (LoxValue::Class(lhs), LoxValue::Class(rhs)) => Arc::ptr_eq(lhs, rhs),
+            (LoxValue::Function(lhs), LoxValue::Function(rhs)) => Arc::ptr_eq(lhs, rhs),
+            (LoxValue::Instance(lhs), LoxValue::Instance(rhs)) => Arc::ptr_eq(lhs, rhs),
             _ => false,
         }
     }
