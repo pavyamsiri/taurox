@@ -232,3 +232,44 @@ impl<'src> ResolverFormatter for PrettyResolverFormatter<'src> {
         buffer.push_str(&String::from_utf8(output.into_inner()).expect(ARIADNE_MSG));
     }
 }
+
+pub struct NystromResolverFormatter {
+    line_breaks: LineBreaks,
+}
+
+impl NystromResolverFormatter {
+    pub fn new(text: &str) -> Self {
+        Self {
+            line_breaks: LineBreaks::new(text),
+        }
+    }
+}
+
+impl ResolverFormatter for NystromResolverFormatter {
+    fn format_error_in_place(&self, buffer: &mut String, error: &ResolutionError) {
+        let line = self.line_breaks.get_line_from_span(error.span);
+        match &error.kind {
+            ResolutionErrorKind::SelfReferentialInitializer {
+                destination,
+                reference,
+            } => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::SelfReferentialInheritance {
+                destination,
+                reference,
+            } => write!(
+                buffer,
+                "({line}) [Compiler] Error at '{}': A class can't inherit from itself.",
+                destination.name
+            )
+            .expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::ShadowLocal { old, new } => {
+                write!(buffer, "").expect(&WRITE_FMT_MSG)
+            }
+            ResolutionErrorKind::NonFunctionReturn => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::NonClassThis => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::NonClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::NonSubClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::ReturnInConstructor => write!(buffer, "").expect(&WRITE_FMT_MSG),
+        }
+    }
+}

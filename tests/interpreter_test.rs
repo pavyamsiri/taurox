@@ -15,7 +15,7 @@ use taurox::{
         Parser,
     },
     resolver::{
-        formatter::{BasicResolverFormatter, ResolverFormatter},
+        formatter::{NystromResolverFormatter, ResolverFormatter},
         Resolver,
     },
     value::formatter::{NystromValueFormatter, ValueFormatter},
@@ -51,6 +51,12 @@ fn test_bool() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_class() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/class");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
@@ -65,7 +71,7 @@ impl TestCase {
         let resolver = Resolver::new();
 
         let parser_formatter = NystromParserFormatter::new(&self.source);
-        let resolver_formatter = BasicResolverFormatter::new(&self.source);
+        let resolver_formatter = NystromResolverFormatter::new(&self.source);
         let value_formatter = NystromValueFormatter::new(&self.source);
 
         let program = match parser.parse() {
