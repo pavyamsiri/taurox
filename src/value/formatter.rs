@@ -350,7 +350,11 @@ impl ValueFormatter for NystromValueFormatter {
                 write!(buffer, "({line}) [Runtime] Undefined variable '{name}'.")
                     .expect(&WRITE_FMT_MSG)
             }
-            RuntimeErrorKind::InvalidCallee(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            RuntimeErrorKind::InvalidCallee(_) => write!(
+                buffer,
+                "({line}) [Runtime] Can only call functions and classes."
+            )
+            .expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::InvalidInstance(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::UndefinedProperty { .. } => write!(buffer, "").expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::InvalidArgumentCount { .. } => {

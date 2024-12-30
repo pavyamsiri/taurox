@@ -39,6 +39,12 @@ fn test_block() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_call() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/call");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
