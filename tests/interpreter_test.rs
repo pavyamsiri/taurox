@@ -147,6 +147,7 @@ fn test_engine(input_dir: &Path) -> Result<()> {
             test_case.check();
         });
         if res.is_err() {
+            println!("Fails test case {}", test_case.name);
             succeeded = false;
         }
     }

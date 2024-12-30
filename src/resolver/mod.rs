@@ -289,6 +289,8 @@ impl Resolver {
         }
 
         self.class = enclosing;
+        // NOTE(pavyamsiri): This resolve doesn't happen in the book but this fixes a bug where methods can't reference their class.
+        self.resolve_variable(ident);
         Ok(())
     }
 
