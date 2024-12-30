@@ -551,3 +551,50 @@ impl<'src> ParserFormatter for PrettyParserFormatter<'src> {
         }
     }
 }
+
+pub struct NystromParserFormatter {
+    line_breaks: LineBreaks,
+}
+
+impl NystromParserFormatter {
+    pub fn new(text: &str) -> Self {
+        let line_breaks = LineBreaks::new(text);
+        Self { line_breaks }
+    }
+
+    fn format_expression_parser_error(&self, buffer: &mut String, error: &ExpressionParserError) {
+        match error {
+            ExpressionParserError::NonExpression(_) => todo!(),
+            ExpressionParserError::InvalidLValue(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '=': Invalid assignment target."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+        }
+    }
+
+    fn format_general_parser_error(&self, buffer: &mut String, error: &GeneralParserError) {
+        let _ = buffer;
+        let _ = error;
+        todo!();
+    }
+
+    fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
+        let _ = buffer;
+        let _ = error;
+        todo!();
+    }
+}
+
+impl ParserFormatter for NystromParserFormatter {
+    fn format_error_in_place(&self, buffer: &mut String, error: &ParserError) {
+        match error {
+            ParserError::Expression(e) => self.format_expression_parser_error(buffer, e),
+            ParserError::General(e) => self.format_general_parser_error(buffer, e),
+            ParserError::Statement(e) => self.format_statement_parser_error(buffer, e),
+        }
+    }
+}

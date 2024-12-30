@@ -197,8 +197,7 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
     };
     use taurox::resolver::Resolver;
     use taurox::value::formatter::{
-        BasicFormatter as BasicValueFormatter, DebugFormatter as DebugValueFormatter,
-        PrettyFormatter as PrettyValueFormatter, ValueFormatter,
+        BasicValueFormatter, DebugValueFormatter, PrettyValueFormatter, ValueFormatter,
     };
 
     let mut parser = Parser::new(src, path);
@@ -265,7 +264,7 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
         Resolver,
     };
     use taurox::value::formatter::{
-        BasicFormatter, DebugFormatter, PrettyFormatter, ValueFormatter,
+        BasicValueFormatter, DebugValueFormatter, PrettyValueFormatter, ValueFormatter,
     };
 
     let parser_formatter: Box<dyn ParserFormatter> = match format {
@@ -279,9 +278,9 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
         ProgramFormat::Pretty => Box::new(PrettyResolverFormatter::new(src, path)),
     };
     let value_formatter: Box<dyn ValueFormatter> = match format {
-        ProgramFormat::Debug => Box::new(DebugFormatter {}),
-        ProgramFormat::Basic => Box::new(BasicFormatter::new(src)),
-        ProgramFormat::Pretty => Box::new(PrettyFormatter::new(src, path)),
+        ProgramFormat::Debug => Box::new(DebugValueFormatter {}),
+        ProgramFormat::Basic => Box::new(BasicValueFormatter::new(src)),
+        ProgramFormat::Pretty => Box::new(PrettyValueFormatter::new(src, path)),
     };
 
     let mut parser = Parser::new(src, path);

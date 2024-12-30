@@ -2,40 +2,53 @@ use super::error::{RuntimeError, RuntimeErrorKind};
 use super::LoxValue;
 use crate::lexer::LineBreaks;
 use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
+use std::fmt::Write;
 use std::path::Path;
 
+const WRITE_FMT_MSG: &'static str =
+    "Encountered an error while attempting to write format string to buffer.";
 const ARIADNE_MSG: &'static str = "Ariadne produces valid utf-8 strings";
 const ARIADNE_WRITE_MSG: &'static str = "Write into buffer should not fail.";
 
 pub trait ValueFormatter {
-    fn format(&self, value: &LoxValue) -> String;
-    fn format_error(&self, error: &RuntimeError) -> String;
-}
-
-pub struct DebugFormatter;
-
-impl ValueFormatter for DebugFormatter {
     fn format(&self, value: &LoxValue) -> String {
-        format!("{value:?}")
+        let mut buffer = String::new();
+        self.format_in_place(&mut buffer, value);
+        buffer
+    }
+    fn format_error(&self, error: &RuntimeError) -> String {
+        let mut buffer = String::new();
+        self.format_error_in_place(&mut buffer, error);
+        buffer
+    }
+    fn format_in_place(&self, buffer: &mut String, value: &LoxValue);
+    fn format_error_in_place(&self, buffer: &mut String, error: &RuntimeError);
+}
+
+pub struct DebugValueFormatter;
+
+impl ValueFormatter for DebugValueFormatter {
+    fn format_in_place(&self, buffer: &mut String, value: &LoxValue) {
+        write!(buffer, "{value:?}").expect(&WRITE_FMT_MSG);
     }
 
-    fn format_error(&self, error: &RuntimeError) -> String {
-        format!("{error:?}")
+    fn format_error_in_place(&self, buffer: &mut String, error: &RuntimeError) {
+        write!(buffer, "{error:?}").expect(&WRITE_FMT_MSG);
     }
 }
 
-pub struct BasicFormatter {
+pub struct BasicValueFormatter {
     line_breaks: LineBreaks,
 }
 
-impl BasicFormatter {
+impl BasicValueFormatter {
     pub fn new(text: &str) -> Self {
         let line_breaks = LineBreaks::new(text);
         Self { line_breaks }
     }
 }
 
-impl BasicFormatter {
+impl BasicValueFormatter {
     fn format_verbose(value: &LoxValue) -> String {
         match value {
             LoxValue::Number(v) => format!("Number({v})"),
@@ -59,69 +72,91 @@ impl BasicFormatter {
     }
 }
 
-impl ValueFormatter for BasicFormatter {
-    fn format(&self, value: &LoxValue) -> String {
-        format!("{value}")
+impl ValueFormatter for BasicValueFormatter {
+    fn format_in_place(&self, buffer: &mut String, value: &LoxValue) {
+        write!(buffer, "{value}").expect(&WRITE_FMT_MSG);
     }
 
-    fn format_error(&self, error: &RuntimeError) -> String {
+    fn format_error_in_place(&self, buffer: &mut String, error: &RuntimeError) {
         let line = self.line_breaks.get_line_from_span(error.span);
         match &error.kind {
             RuntimeErrorKind::NonNumeric(ref v) => {
-                format!("({line}) Non-Number {{Unary}}: {}", Self::format_verbose(v))
+                write!(
+                    buffer,
+                    "({line}) Non-Number {{Unary}}: {}",
+                    Self::format_verbose(v)
+                )
+                .expect(&WRITE_FMT_MSG);
             }
-            RuntimeErrorKind::NonNumerics(ref lhs, ref rhs) => format!(
+            RuntimeErrorKind::NonNumerics(ref lhs, ref rhs) => write!(
+                buffer,
                 "({line}) Non-Numbers {{Binary}}: [{}, {}]",
                 Self::format_verbose(lhs),
                 Self::format_verbose(rhs)
-            ),
-            RuntimeErrorKind::NonAddable(ref lhs, ref rhs) => format!(
+            )
+            .expect(&WRITE_FMT_MSG),
+            RuntimeErrorKind::NonAddable(ref lhs, ref rhs) => write!(
+                buffer,
                 "({line}) Non-Numbers/Non-Strings {{Binary}}: [{}, {}]",
                 Self::format_verbose(lhs),
                 Self::format_verbose(rhs)
-            ),
+            )
+            .expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::InvalidAccess(ref name) => {
-                format!("({line}) Invalid Access: {name}",)
+                write!(buffer, "({line}) Invalid Access: {name}").expect(&WRITE_FMT_MSG);
             }
             RuntimeErrorKind::InvalidCallee(ref callee) => {
-                format!("({line}) Invalid Callee: {}", Self::format_verbose(callee))
+                write!(
+                    buffer,
+                    "({line}) Invalid Callee: {}",
+                    Self::format_verbose(callee)
+                )
+                .expect(&WRITE_FMT_MSG);
             }
             RuntimeErrorKind::InvalidArgumentCount { actual, expected } => {
-                format!("({line}) Invalid Argument Count: {actual} of {expected}")
+                write!(
+                    buffer,
+                    "({line}) Invalid Argument Count: {actual} of {expected}"
+                )
+                .expect(&WRITE_FMT_MSG);
             }
             RuntimeErrorKind::InvalidInstance(ref object) => {
-                format!("({line}) Invalid Instance: {object}")
+                write!(buffer, "({line}) Invalid Instance: {object}").expect(&WRITE_FMT_MSG);
             }
             RuntimeErrorKind::UndefinedProperty {
                 ref object,
                 ref name,
             } => {
-                format!("({line}) Undefined Property Access: {name} of {object}")
+                write!(
+                    buffer,
+                    "({line}) Undefined Property Access: {name} of {object}"
+                )
+                .expect(&WRITE_FMT_MSG);
             }
             RuntimeErrorKind::InvalidSuperClass(name) => {
-                format!("({line}) Invalid Super Class: {name}")
+                write!(buffer, "({line}) Invalid Super Class: {name}").expect(&WRITE_FMT_MSG);
             }
         }
     }
 }
 
-pub struct PrettyFormatter<'src> {
+pub struct PrettyValueFormatter<'src> {
     text: &'src str,
     path: &'src Path,
 }
 
-impl<'src> PrettyFormatter<'src> {
+impl<'src> PrettyValueFormatter<'src> {
     pub fn new(text: &'src str, path: &'src Path) -> Self {
         Self { text, path }
     }
 }
 
-impl<'src> ValueFormatter for PrettyFormatter<'src> {
-    fn format(&self, value: &LoxValue) -> String {
-        format!("{value}")
+impl<'src> ValueFormatter for PrettyValueFormatter<'src> {
+    fn format_in_place(&self, buffer: &mut String, value: &LoxValue) {
+        write!(buffer, "{value}").expect(&WRITE_FMT_MSG);
     }
 
-    fn format_error(&self, error: &RuntimeError) -> String {
+    fn format_error_in_place(&self, buffer: &mut String, error: &RuntimeError) {
         let path = self
             .path
             .to_str()
@@ -137,7 +172,7 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                         Label::new((path, span.range()))
                             .with_message(format!(
                                 "Type is {} instead of numeric",
-                                BasicFormatter::format_verbose(&v).fg(Color::BrightRed)
+                                BasicValueFormatter::format_verbose(&v).fg(Color::BrightRed)
                             ))
                             .with_color(Color::BrightRed),
                     )
@@ -153,8 +188,8 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                         Label::new((path, span.range()))
                             .with_message(format!(
                                 "One or both of {} and {} is not numeric",
-                                BasicFormatter::format_verbose(&lhs).fg(Color::BrightRed),
-                                BasicFormatter::format_verbose(&rhs).fg(Color::BrightRed),
+                                BasicValueFormatter::format_verbose(&lhs).fg(Color::BrightRed),
+                                BasicValueFormatter::format_verbose(&rhs).fg(Color::BrightRed),
                             ))
                             .with_color(Color::BrightRed),
                     )
@@ -171,8 +206,8 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                         Label::new((path, span.range()))
                             .with_message(format!(
                                 "{} and {} are not the same type and/or are not numeric/string.",
-                                BasicFormatter::format_verbose(&lhs).fg(colors.next()),
-                                BasicFormatter::format_verbose(&rhs).fg(colors.next()),
+                                BasicValueFormatter::format_verbose(&lhs).fg(colors.next()),
+                                BasicValueFormatter::format_verbose(&rhs).fg(colors.next()),
                             ))
                             .with_color(Color::BrightRed),
                     )
@@ -204,7 +239,7 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                         Label::new((path, span.range()))
                             .with_message(format!(
                                 "{} is not callable.",
-                                BasicFormatter::format_verbose(&callee).fg(Color::BrightRed),
+                                BasicValueFormatter::format_verbose(&callee).fg(Color::BrightRed),
                             ))
                             .with_color(Color::BrightRed),
                     )
@@ -275,6 +310,41 @@ impl<'src> ValueFormatter for PrettyFormatter<'src> {
                     .expect(ARIADNE_WRITE_MSG);
             }
         }
-        String::from_utf8(output.into_inner()).expect(ARIADNE_MSG)
+        buffer.push_str(&String::from_utf8(output.into_inner()).expect(ARIADNE_MSG));
+    }
+}
+
+pub struct NystromValueFormatter {
+    line_breaks: LineBreaks,
+}
+
+impl NystromValueFormatter {
+    pub fn new(text: &str) -> Self {
+        let line_breaks = LineBreaks::new(text);
+        Self { line_breaks }
+    }
+}
+
+impl ValueFormatter for NystromValueFormatter {
+    fn format_in_place(&self, buffer: &mut String, value: &LoxValue) {
+        write!(buffer, "{value:?}").expect(&WRITE_FMT_MSG);
+    }
+
+    fn format_error_in_place(&self, buffer: &mut String, error: &RuntimeError) {
+        let line = self.line_breaks.get_line_from_span(error.span);
+        match &error.kind {
+            RuntimeErrorKind::NonNumeric(_) => todo!(),
+            RuntimeErrorKind::NonNumerics(_, _) => todo!(),
+            RuntimeErrorKind::NonAddable(_, _) => todo!(),
+            RuntimeErrorKind::InvalidAccess(name) => {
+                write!(buffer, "({line}) [Runtime] Undefined variable '{name}'.")
+                    .expect(&WRITE_FMT_MSG)
+            }
+            RuntimeErrorKind::InvalidCallee(_) => todo!(),
+            RuntimeErrorKind::InvalidInstance(_) => todo!(),
+            RuntimeErrorKind::UndefinedProperty { .. } => todo!(),
+            RuntimeErrorKind::InvalidArgumentCount { .. } => todo!(),
+            RuntimeErrorKind::InvalidSuperClass(_) => todo!(),
+        }
     }
 }

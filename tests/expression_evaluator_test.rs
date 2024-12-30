@@ -11,14 +11,14 @@ use taurox::{
         Parser,
     },
     resolver::Resolver,
-    value::formatter::{BasicFormatter, ValueFormatter},
+    value::formatter::{BasicValueFormatter, ValueFormatter},
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
     let mut parser = Parser::new(input, test_name.as_ref());
     // Create formatters
     let expression_formatter = SExpressionFormatter::new(input);
-    let value_formatter = BasicFormatter::new(input);
+    let value_formatter = BasicValueFormatter::new(input);
 
     let expr = match parser.parse_expression() {
         Ok(expr) => expr,
