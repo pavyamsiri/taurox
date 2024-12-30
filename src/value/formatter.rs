@@ -357,9 +357,11 @@ impl ValueFormatter for NystromValueFormatter {
             .expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::InvalidInstance(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::UndefinedProperty { .. } => write!(buffer, "").expect(&WRITE_FMT_MSG),
-            RuntimeErrorKind::InvalidArgumentCount { .. } => {
-                write!(buffer, "").expect(&WRITE_FMT_MSG)
-            }
+            RuntimeErrorKind::InvalidArgumentCount { actual, expected } => write!(
+                buffer,
+                "({line}) [Runtime] Expected {expected} arguments but got {actual}."
+            )
+            .expect(&WRITE_FMT_MSG),
             RuntimeErrorKind::InvalidSuperClass(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
         }
     }

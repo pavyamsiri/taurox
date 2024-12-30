@@ -269,7 +269,11 @@ impl ResolverFormatter for NystromResolverFormatter {
             ResolutionErrorKind::NonClassThis => write!(buffer, "").expect(&WRITE_FMT_MSG),
             ResolutionErrorKind::NonClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
             ResolutionErrorKind::NonSubClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
-            ResolutionErrorKind::ReturnInConstructor => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::ReturnInConstructor => write!(
+                buffer,
+                "({line}) [Compiler] Error at 'return': Can't return a value from an initializer."
+            )
+            .expect(&WRITE_FMT_MSG),
         }
     }
 }
