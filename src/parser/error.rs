@@ -1,4 +1,4 @@
-use super::statement::{Declaration, Statement};
+use super::statement::Statement;
 use crate::lexer::{LexicalError, Span, Token, TokenKind};
 use thiserror::Error;
 
@@ -67,7 +67,7 @@ pub enum StatementParserError {
     #[error("Expected a block but got {0:?}.")]
     NonBlock(Statement),
     #[error("Expected a non-declaration but got {0:?}.")]
-    InvalidNonDeclaration(Declaration),
+    InvalidNonDeclaration(Token),
     #[error("Expected a ';' after expression but got {0:?}.")]
     NoSemicolonAfterExpr(Token),
 }

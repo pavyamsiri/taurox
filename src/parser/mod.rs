@@ -470,13 +470,22 @@ impl<'src> Parser<'src> {
         };
 
         // Parse body
-        let body = self.parse_statement()?.ok_or(self.create_eof_error())?;
-        let body = match body {
-            Statement::Declaration(declaration) => {
-                Err(StatementParserError::InvalidNonDeclaration(declaration))
+        let body = {
+            let next = self.peek()?;
+            match next.kind {
+                TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
+                    return Err(StatementParserError::InvalidNonDeclaration(next).into());
+                }
+                _ => {
+                    let Statement::NonDeclaration(body) =
+                        self.parse_statement()?.ok_or(self.create_eof_error())?
+                    else {
+                        panic!("We already guarded against non-declarations above so we should only get non-declarations.");
+                    };
+                    body
+                }
             }
-            Statement::NonDeclaration(non_declaration) => Ok(non_declaration),
-        }?;
+        };
 
         let span = leftmost.span.merge(&body.span);
 

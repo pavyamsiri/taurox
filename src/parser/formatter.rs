@@ -401,15 +401,14 @@ impl<'src> BasicParserFormatter<'src> {
                     .expect(&WRITE_FMT_MSG);
                 self.format_statement(buffer, stmt);
             }
-            StatementParserError::InvalidNonDeclaration(decl) => {
+            StatementParserError::InvalidNonDeclaration(token) => {
                 let line = self
                     .expr_formatter
                     .get_line_breaks()
-                    .get_line_from_span(decl.span);
-                buffer
-                    .write_fmt(format_args!("({line}) Invalid non declaration: "))
+                    .get_line_from_span(token.span);
+
+                write!(buffer, "({line}) Invalid non declaration: {token:?}")
                     .expect(&WRITE_FMT_MSG);
-                self.format_declaration(buffer, decl);
             }
             StatementParserError::NoSemicolonAfterExpr(token) => {
                 let line = self
@@ -634,11 +633,7 @@ impl<'src> NystromParserFormatter<'src> {
             StatementParserError::NonBlock(_) => todo!(),
             StatementParserError::InvalidNonDeclaration(decl) => {
                 let line = self.line_breaks.get_line_from_span(decl.span);
-                let lexeme = match decl.kind {
-                    DeclarationKind::Variable { .. } => "var",
-                    DeclarationKind::Function(_) => "fun",
-                    DeclarationKind::Class { .. } => "class",
-                };
+                let lexeme = &self.text[decl.span.range()];
                 write!(
                     buffer,
                     "({line}) [Compiler] Error at '{lexeme}': Expect expression."
