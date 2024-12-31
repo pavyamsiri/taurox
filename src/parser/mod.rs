@@ -48,6 +48,7 @@ pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, LexicalError>>,
     has_errored: bool,
+    has_lexer_error: bool,
     done: bool,
     expression_reports: VecDeque<GeneralExpressionParserError>,
     statement_reports: VecDeque<ParserError>,
@@ -75,6 +76,9 @@ impl<'src> Parser<'src> {
 // Parse program
 impl<'src> Parser<'src> {
     pub fn parse(&mut self) -> Result<Option<Program>, ParserError> {
+        if self.has_lexer_error {
+            return Ok(None);
+        }
         self.report_error()?;
         let mut statements = Vec::new();
 
@@ -82,6 +86,8 @@ impl<'src> Parser<'src> {
             Ok(t) => t,
             Err(e) => {
                 let _ = self.next_token();
+                println!("Encountered lexical error");
+                self.has_lexer_error = true;
                 return Err(e.into());
             }
         };
@@ -95,9 +101,13 @@ impl<'src> Parser<'src> {
                     break;
                 }
                 Err(e) => {
-                    self.has_errored = true;
-                    self.done = self.synchronize()?;
-                    return Err(e);
+                    if self.synchronize()? && self.has_errored {
+                        self.has_errored = true;
+                        return Ok(None);
+                    } else {
+                        self.has_errored = true;
+                        return Err(e);
+                    }
                 }
             }
         }
@@ -767,8 +777,25 @@ impl<'src> Parser<'src> {
             }
             // This
             TokenKind::KeywordSuper => {
-                let _ = self.expect(TokenKind::Dot)?;
-                let method = self.expect_ident()?;
+                let _ = match self.next_token()? {
+                    token @ Token {
+                        kind: TokenKind::Dot,
+                        ..
+                    } => token,
+                    token => {
+                        return Err(ExpressionParserError::MissingDotAfterSuper(token).into());
+                    }
+                };
+                let method = match self.peek()? {
+                    Token {
+                        kind: TokenKind::Ident,
+                        ..
+                    } => self.expect_ident()?,
+                    _ => {
+                        let token = self.next_token()?;
+                        return Err(ExpressionParserError::MissingMethodName(token).into());
+                    }
+                };
                 let span = token.span.merge(&method.span);
 
                 let node = ExpressionNode::Atom(ExpressionAtom {
@@ -981,6 +1008,7 @@ impl<'src> Parser<'src> {
             expression_reports: VecDeque::new(),
             statement_reports: VecDeque::new(),
             done: false,
+            has_lexer_error: false,
         }
     }
 
@@ -1000,6 +1028,9 @@ impl<'src> Parser<'src> {
             Option::Some(token_or_error) => token_or_error,
             Option::None => {
                 let token_or_error = self.lexer.next_token();
+                if token_or_error.is_err() {
+                    self.has_lexer_error = true;
+                }
                 token_or_error
             }
         }

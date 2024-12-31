@@ -264,9 +264,15 @@ impl ResolverFormatter for NystromResolverFormatter {
                 "({line}) [Compiler] Error at 'return': Can't return from top-level code."
             )
             .expect(&WRITE_FMT_MSG),
-            ResolutionErrorKind::NonClassThis => write!(buffer, "").expect(&WRITE_FMT_MSG),
-            ResolutionErrorKind::NonClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
-            ResolutionErrorKind::NonSubClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::NonClassThis => {
+                write!(buffer, "({line}) [Compiler] Error at 'this': Can't use 'this' outside of a class.").expect(&WRITE_FMT_MSG)
+            }
+            ResolutionErrorKind::NonClassSuper => {
+                write!(buffer, "({line}) [Compiler] Error at 'super': Can't use 'super' outside of a class.").expect(&WRITE_FMT_MSG)
+            }
+            ResolutionErrorKind::NonSubClassSuper => {
+                write!(buffer, "({line}) [Compiler] Error at 'super': Can't use 'super' in a class with no superclass.").expect(&WRITE_FMT_MSG)
+            }
             ResolutionErrorKind::ReturnInConstructor => write!(
                 buffer,
                 "({line}) [Compiler] Error at 'return': Can't return a value from an initializer."

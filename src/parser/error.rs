@@ -33,6 +33,10 @@ pub enum ExpressionParserError {
     NoRightParenthesisAfterArguments(Token),
     #[error("Expected property name after '.'.")]
     MissingPropertyName(Token),
+    #[error("Expected '.' after super.")]
+    MissingDotAfterSuper(Token),
+    #[error("Expected a method name after super.")]
+    MissingMethodName(Token),
 }
 
 impl ExpressionParserError {
@@ -43,6 +47,8 @@ impl ExpressionParserError {
             Self::TooManyArguments { .. } => "PE004",
             Self::NoRightParenthesisAfterArguments(_) => "PE005",
             Self::MissingPropertyName(_) => "PE006",
+            Self::MissingDotAfterSuper(_) => "PE007",
+            Self::MissingMethodName(_) => "PE008",
         }
     }
 }

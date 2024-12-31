@@ -84,6 +84,26 @@ impl Resolver {
         Ok(self.resolution)
     }
 
+    pub fn resolve_program_report_errors(
+        mut self,
+        program: &Program,
+    ) -> Result<ResolutionMap, Vec<ResolutionError>> {
+        let mut errors = Vec::new();
+        for index in 0..program.len() {
+            let statement = program
+                .get_statement(index)
+                .expect("Iterating over valid indices.");
+            match self.resolve_statement(statement) {
+                Ok(_) => {}
+                Err(e) => errors.push(e),
+            }
+        }
+        if errors.is_empty() {
+            Ok(self.resolution)
+        } else {
+            Err(errors)
+        }
+    }
     pub fn resolve_expression_and_consume(
         mut self,
         expr: &Expression,

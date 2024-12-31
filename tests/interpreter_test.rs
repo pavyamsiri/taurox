@@ -196,12 +196,18 @@ impl TestCase {
             }
         };
 
-        let resolution = match resolver.resolve_program(&program) {
+        let resolution = match resolver.resolve_program_report_errors(&program) {
             Ok(r) => r,
-            Err(e) => {
-                let msg = resolver_formatter.format_error(&e);
+            Err(errors) => {
+                let mut buffer = String::new();
+                for (index, e) in errors.iter().enumerate() {
+                    resolver_formatter.format_error_in_place(&mut buffer, &e);
+                    if index < errors.len() - 1 {
+                        buffer.push('\n');
+                    }
+                }
                 assert_eq!(
-                    self.compiler_errors, msg,
+                    self.compiler_errors, buffer,
                     "Failed test {} at resolution stage.",
                     self.name,
                 );

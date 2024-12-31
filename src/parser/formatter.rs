@@ -250,6 +250,26 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                     write!(buffer, "({line}) Missing Property Name: {}", token.kind)
                         .expect(&WRITE_FMT_MSG);
                 }
+                ExpressionParserError::MissingDotAfterSuper(token) => {
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(token.span);
+                    write!(buffer, "({line}) Missing Dot After Super: {}", token.kind)
+                        .expect(&WRITE_FMT_MSG);
+                }
+                ExpressionParserError::MissingMethodName(token) => {
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(token.span);
+                    write!(
+                        buffer,
+                        "({line}) Missing Method Name After Super: {}",
+                        token.kind
+                    )
+                    .expect(&WRITE_FMT_MSG);
+                }
             },
             GeneralExpressionParserError::General(gen) => match gen {
                 GeneralParserError::UnexpectedToken {
@@ -371,6 +391,34 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .with_label(
                             Label::new((path, span.range()))
                                 .with_message("Missing a name here...")
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(text)), &mut output)
+                        .expect(&ARIADNE_WRITE_MSG);
+                }
+                ExpressionParserError::MissingDotAfterSuper(token) => {
+                    let span = token.span;
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Expected a '.' after super")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message("Missing a period here...")
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(text)), &mut output)
+                        .expect(&ARIADNE_WRITE_MSG);
+                }
+                ExpressionParserError::MissingMethodName(token) => {
+                    let span = token.span;
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Expected method name after super")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message("Missing a method name here...")
                                 .with_color(Color::BrightRed),
                         )
                         .finish()
@@ -707,6 +755,24 @@ impl<'src> NystromParserFormatter<'src> {
                 write!(
                     buffer,
                     "({line}) [Compiler] Error at {lexeme}: Expect property name after '.'."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            ExpressionParserError::MissingDotAfterSuper(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = token.span.get_lexeme(self.text);
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at {lexeme}: Expect '.' after 'super'."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            ExpressionParserError::MissingMethodName(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = token.span.get_lexeme(self.text);
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at {lexeme}: Expect superclass method name."
                 )
                 .expect(&WRITE_FMT_MSG);
             }

@@ -306,10 +306,12 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
 
     // Static analysis
     let resolver = Resolver::new();
-    let resolution = match resolver.resolve_program(&program) {
+    let resolution = match resolver.resolve_program_report_errors(&program) {
         Ok(r) => r,
-        Err(e) => {
-            eprintln!("{}", resolver_formatter.format_error(&e));
+        Err(errors) => {
+            for e in errors {
+                eprintln!("{}", resolver_formatter.format_error(&e));
+            }
             return Err(ProgramError::AnalysisError);
         }
     };
