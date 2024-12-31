@@ -1,0 +1,16 @@
+(1) AND and null
+(1) CLASS class null
+(1) ELSE else null
+(1) FALSE false null
+(1) FOR for null
+(1) FUN fun null
+(1) IF if null
+(1) NIL nil null
+(1) OR or null
+(1) RETURN return null
+(1) SUPER super null
+(1) THIS this null
+(1) TRUE true null
+(1) VAR var null
+(1) WHILE while null
+(1) EOF  null

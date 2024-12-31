@@ -1,0 +1,5 @@
+(1) IDENTIFIER space null
+(1) IDENTIFIER tabs null
+(1) IDENTIFIER newlines null
+(6) IDENTIFIER end null
+(6) EOF  null

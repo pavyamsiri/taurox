@@ -354,7 +354,7 @@ impl LexerStateExecutor for PeriodState {
                     kind: TokenKind::NumericLiteral,
                     span: Span {
                         start: self.start,
-                        length: source.len() - self.start,
+                        length: source.len() - self.start - '.'.len_utf8(),
                     },
                 }),
                 put_back: self.period,
@@ -552,7 +552,7 @@ impl LexerStateExecutor for SlashState {
         } else {
             LexerStateTransition::ChangeStateAndEmitAndPutBack {
                 new_state: LexerState::Normal(NormalState {
-                    location: next_char.offset + '/'.len_utf8(),
+                    location: next_char.offset,
                 }),
                 token_or_error: Ok(Token {
                     kind: TokenKind::Slash,

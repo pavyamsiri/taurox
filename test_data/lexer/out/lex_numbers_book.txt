@@ -1,0 +1,7 @@
+(1) NUMBER 123 123.0
+(2) NUMBER 123.456 123.456
+(3) DOT . null
+(3) NUMBER 456 456.0
+(4) NUMBER 123 123.0
+(4) DOT . null
+(4) EOF  null

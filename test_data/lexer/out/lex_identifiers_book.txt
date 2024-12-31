@@ -1,0 +1,9 @@
+(1) IDENTIFIER andy null
+(1) IDENTIFIER formless null
+(1) IDENTIFIER fo null
+(1) IDENTIFIER _ null
+(1) IDENTIFIER _123 null
+(1) IDENTIFIER _abc null
+(1) IDENTIFIER ab123 null
+(2) IDENTIFIER abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890_ null
+(2) EOF  null
