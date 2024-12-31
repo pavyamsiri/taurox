@@ -8,8 +8,8 @@ use crate::{
             Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         },
         statement::{
-            Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration,
-            NonDeclarationKind, Statement,
+            ClassDecl, Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration,
+            NonDeclarationKind, Statement, VariableDecl,
         },
         Program,
     },
@@ -180,7 +180,7 @@ impl Resolver {
 impl Resolver {
     fn resolve_declaration(&mut self, decl: &Declaration) -> Result<(), ResolutionError> {
         match &decl.kind {
-            DeclarationKind::Variable { name, initial } => {
+            DeclarationKind::Variable(VariableDecl { name, initial }) => {
                 self.resolve_variable_declaration(name, &decl.span, initial.as_ref())?;
             }
             DeclarationKind::Function(FunctionDecl {
@@ -190,11 +190,11 @@ impl Resolver {
             }) => {
                 self.resolve_function_declaration(name, &decl.span, parameters, body)?;
             }
-            DeclarationKind::Class {
+            DeclarationKind::Class(ClassDecl {
                 name,
                 methods,
                 super_class,
-            } => {
+            }) => {
                 self.resolve_class_declaration(name, &decl.span, methods, super_class.as_ref())?;
             }
         }

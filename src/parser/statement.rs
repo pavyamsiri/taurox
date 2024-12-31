@@ -17,10 +17,23 @@ impl Statement {
 }
 
 #[derive(Debug, Clone)]
+pub struct VariableDecl {
+    pub name: Ident,
+    pub initial: Option<Expression>,
+}
+
+#[derive(Debug, Clone)]
 pub struct FunctionDecl {
     pub name: Ident,
     pub parameters: Vec<Ident>,
     pub body: Vec<Statement>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ClassDecl {
+    pub name: Ident,
+    pub methods: Vec<FunctionDecl>,
+    pub super_class: Option<Ident>,
 }
 
 #[derive(Debug, Clone)]
@@ -31,16 +44,9 @@ pub struct Declaration {
 
 #[derive(Debug, Clone)]
 pub enum DeclarationKind {
-    Variable {
-        name: Ident,
-        initial: Option<Expression>,
-    },
+    Variable(VariableDecl),
     Function(FunctionDecl),
-    Class {
-        name: Ident,
-        methods: Vec<FunctionDecl>,
-        super_class: Option<Ident>,
-    },
+    Class(ClassDecl),
 }
 
 impl std::fmt::Display for DeclarationKind {

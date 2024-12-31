@@ -8,7 +8,8 @@ use super::{
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
     statement::{
-        Declaration, DeclarationKind, FunctionDecl, NonDeclaration, NonDeclarationKind, Statement,
+        ClassDecl, Declaration, DeclarationKind, FunctionDecl, NonDeclaration, NonDeclarationKind,
+        Statement, VariableDecl,
     },
     ParserError,
 };
@@ -455,13 +456,13 @@ impl<'src> BasicParserFormatter<'src> {
     fn format_declaration(&self, buffer: &mut String, decl: &Declaration) {
         let kind = &decl.kind;
         match kind {
-            DeclarationKind::Variable { name, .. } => {
+            DeclarationKind::Variable(VariableDecl { name, .. }) => {
                 write!(buffer, "VARDECL {name}").expect(&WRITE_FMT_MSG);
             }
             DeclarationKind::Function(FunctionDecl { name, .. }) => {
                 write!(buffer, "FUNDECL {name}").expect(&WRITE_FMT_MSG);
             }
-            DeclarationKind::Class { name, .. } => {
+            DeclarationKind::Class(ClassDecl { name, .. }) => {
                 write!(buffer, "CLADECL {name}").expect(&WRITE_FMT_MSG);
             }
         }
@@ -596,8 +597,8 @@ impl<'src> NystromParserFormatter<'src> {
                 )
                 .expect(&WRITE_FMT_MSG);
             }
-            GeneralParserError::UnexpectedEof(span) => todo!(),
-            GeneralParserError::LexicalError(lexical_error) => todo!(),
+            GeneralParserError::UnexpectedEof(_) => todo!(),
+            GeneralParserError::LexicalError(_) => todo!(),
         }
     }
 

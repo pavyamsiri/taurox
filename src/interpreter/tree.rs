@@ -6,7 +6,7 @@ use compact_str::ToCompactString;
 use super::{Interpreter, ProgramState, StatementInterpreter, SystemContext};
 use crate::environment::SharedEnvironment;
 use crate::lexer::Span;
-use crate::parser::statement::FunctionDecl;
+use crate::parser::statement::{ClassDecl, FunctionDecl, VariableDecl};
 use crate::resolver::ResolutionMap;
 use crate::value::error::{RuntimeError, RuntimeErrorKind};
 use crate::value::{Class, Function, Instance, LoxValue};
@@ -92,7 +92,7 @@ where
     ) -> Result<ProgramState, RuntimeError> {
         let state = match statement {
             Statement::Declaration(Declaration {
-                kind: DeclarationKind::Variable { name, initial, .. },
+                kind: DeclarationKind::Variable(VariableDecl { name, initial, .. }),
                 ..
             }) => self.interpret_variable_declaration(
                 environment,
@@ -107,11 +107,11 @@ where
             }) => self.interpret_function_declaration(environment, decl)?,
             Statement::Declaration(Declaration {
                 kind:
-                    DeclarationKind::Class {
+                    DeclarationKind::Class(ClassDecl {
                         name,
                         methods,
                         super_class,
-                    },
+                    }),
                 ..
             }) => self.interpret_class_declaration(
                 environment,

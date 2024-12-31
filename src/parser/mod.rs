@@ -17,8 +17,8 @@ use expression::{
     PostfixOperator, PrefixOperator,
 };
 use statement::{
-    Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration, NonDeclarationKind,
-    Statement,
+    ClassDecl, Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration,
+    NonDeclarationKind, Statement, VariableDecl,
 };
 use std::path::Path;
 
@@ -137,7 +137,7 @@ impl<'src> Parser<'src> {
 
         let span = leftmost.span.merge(&rightmost.span);
         let statement = Statement::Declaration(Declaration {
-            kind: DeclarationKind::Variable { name, initial },
+            kind: DeclarationKind::Variable(VariableDecl { name, initial }),
             span,
         });
 
@@ -257,11 +257,11 @@ impl<'src> Parser<'src> {
 
         let span = leftmost.span.merge(&rightmost.span);
         let statement = Statement::Declaration(Declaration {
-            kind: DeclarationKind::Class {
+            kind: DeclarationKind::Class(ClassDecl {
                 name,
                 methods,
                 super_class,
-            },
+            }),
             span,
         });
 
@@ -349,7 +349,7 @@ impl<'src> Parser<'src> {
                 let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
                 let initializer = match statement {
                     Statement::Declaration(Declaration {
-                        kind: DeclarationKind::Variable { name, initial },
+                        kind: DeclarationKind::Variable(VariableDecl { name, initial }),
                         span,
                     }) => Some(Initializer::VarDecl {
                         name,
