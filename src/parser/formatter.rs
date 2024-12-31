@@ -590,10 +590,12 @@ impl<'src> NystromParserFormatter<'src> {
         match error {
             GeneralParserError::UnexpectedToken { actual, expected } => {
                 let line = self.line_breaks.get_line_from_span(actual.span);
+                let actual = &self.text[actual.span.range()];
                 write!(
                     buffer,
                     "({line}) [Compiler] Expected '{}' but got '{}'.",
-                    expected, actual.kind
+                    expected.to_lexeme(),
+                    actual,
                 )
                 .expect(&WRITE_FMT_MSG);
             }

@@ -199,6 +199,52 @@ impl Display for TokenKind {
     }
 }
 
+impl TokenKind {
+    pub fn to_lexeme(&self) -> &'static str {
+        match self {
+            TokenKind::LeftParenthesis => "(",
+            TokenKind::RightParenthesis => ")",
+            TokenKind::Eof => "EOF",
+            TokenKind::LeftBrace => "{",
+            TokenKind::RightBrace => "}",
+            TokenKind::Comma => ",",
+            TokenKind::Dot => ".",
+            TokenKind::Minus => "-",
+            TokenKind::Plus => "+",
+            TokenKind::Semicolon => ";",
+            TokenKind::Star => "*",
+            TokenKind::Bang => "!",
+            TokenKind::BangEqual => "!=",
+            TokenKind::Equal => "=",
+            TokenKind::EqualEqual => "==",
+            TokenKind::LessThan => "<",
+            TokenKind::LessThanEqual => "<=",
+            TokenKind::GreaterThan => ">",
+            TokenKind::GreaterThanEqual => ">=",
+            TokenKind::Slash => "/",
+            TokenKind::StringLiteral => "STRING_LITERAL",
+            TokenKind::NumericLiteral => "NUMERIC_LITERAL",
+            TokenKind::Ident => "IDENTIFIER",
+            TokenKind::KeywordAnd => "and",
+            TokenKind::KeywordClass => "class",
+            TokenKind::KeywordElse => "else",
+            TokenKind::KeywordFalse => "false",
+            TokenKind::KeywordFor => "for",
+            TokenKind::KeywordFun => "fun",
+            TokenKind::KeywordIf => "if",
+            TokenKind::KeywordNil => "nil",
+            TokenKind::KeywordOr => "or",
+            TokenKind::KeywordPrint => "print",
+            TokenKind::KeywordReturn => "return",
+            TokenKind::KeywordSuper => "super",
+            TokenKind::KeywordThis => "this",
+            TokenKind::KeywordTrue => "true",
+            TokenKind::KeywordVar => "var",
+            TokenKind::KeywordWhile => "while",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
