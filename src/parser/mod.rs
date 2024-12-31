@@ -20,7 +20,7 @@ use statement::{
     ClassDecl, Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration,
     NonDeclarationKind, Statement, VariableDecl,
 };
-use std::path::Path;
+use std::{collections::VecDeque, path::Path};
 
 /// Only allow up to 255 parameters
 const MAX_PARAMETERS: usize = 255;
@@ -48,6 +48,7 @@ pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, LexicalError>>,
     has_errored: bool,
+    reports: VecDeque<ParserError>,
 }
 
 // Lexer based helpers
@@ -72,11 +73,20 @@ impl<'src> Parser<'src> {
 // Parse program
 impl<'src> Parser<'src> {
     pub fn parse(&mut self) -> Result<Option<Program>, ParserError> {
+        if let Some(e) = self.reports.pop_front() {
+            self.has_errored = true;
+            return Err(e);
+        }
+
         let mut statements = Vec::new();
 
         loop {
             match self.parse_statement() {
                 Ok(Some(statement)) => {
+                    if let Some(e) = self.reports.pop_front() {
+                        self.has_errored = true;
+                        return Err(e);
+                    }
                     statements.push(statement);
                 }
                 Ok(None) => {
@@ -84,42 +94,52 @@ impl<'src> Parser<'src> {
                 }
                 Err(e) => {
                     self.has_errored = true;
-                    // Synchronize to next statement boundary
-                    loop {
-                        let next = self.peek()?;
-                        match next.kind {
-                            TokenKind::KeywordClass
-                            | TokenKind::KeywordFun
-                            | TokenKind::KeywordFor
-                            | TokenKind::KeywordVar
-                            | TokenKind::KeywordIf
-                            | TokenKind::KeywordWhile
-                            | TokenKind::KeywordPrint
-                            | TokenKind::LeftBrace
-                            | TokenKind::KeywordReturn => {
-                                break;
-                            }
-                            TokenKind::Semicolon => {
-                                let _ = self.next_token()?;
-                                break;
-                            }
-                            TokenKind::Eof => {
-                                return Err(self.create_eof_error().into());
-                            }
-                            _ => {}
-                        }
-                        let _ = self.next_token()?;
-                    }
+                    self.synchronize()?;
                     return Err(e);
                 }
             }
         }
 
+        assert_eq!(
+            self.reports.len(),
+            0,
+            "Should have cleared out the reports before getting here."
+        );
         if self.has_errored {
             Ok(None)
         } else {
             Ok(Some(Program { statements }))
         }
+    }
+
+    fn synchronize(&mut self) -> Result<(), ParserError> {
+        // Synchronize to next statement boundary
+        loop {
+            let next = self.peek()?;
+            match next.kind {
+                TokenKind::KeywordClass
+                | TokenKind::KeywordFun
+                | TokenKind::KeywordFor
+                | TokenKind::KeywordVar
+                | TokenKind::KeywordIf
+                | TokenKind::KeywordWhile
+                | TokenKind::KeywordPrint
+                | TokenKind::LeftBrace
+                | TokenKind::KeywordReturn => {
+                    break;
+                }
+                TokenKind::Semicolon => {
+                    let _ = self.next_token()?;
+                    break;
+                }
+                TokenKind::Eof => {
+                    return Err(self.create_eof_error().into());
+                }
+                _ => {}
+            }
+            let _ = self.next_token()?;
+        }
+        Ok(())
     }
 }
 
@@ -715,17 +735,6 @@ impl<'src> Parser<'src> {
         const MSG: &'static str = "Caller must make sure `lhs` is a valid expression node ref.";
         if let Some(operator) = self.peek_infix_assignment_operator()? {
             let span = tree.get_span(lhs).expect(MSG);
-            let place = tree
-                .get_l_value(lhs)
-                .ok_or(ExpressionParserError::InvalidLValue(Token {
-                    kind: tree.get_kind(lhs).expect(MSG),
-                    span,
-                }))?;
-            let name = Ident {
-                name: place.into(),
-                span,
-            };
-
             let (lbp, rbp) = operator.get_binding_power();
             if lbp < min_bp {
                 return Ok(PrattParseOutcome::Break);
@@ -733,6 +742,25 @@ impl<'src> Parser<'src> {
             let _ = self.next_token()?;
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
+
+            let place = match tree.get_l_value(lhs) {
+                Some(name) => name,
+                None => {
+                    self.reports.push_back(
+                        ExpressionParserError::InvalidLValue(Token {
+                            kind: tree.get_kind(lhs).expect(MSG),
+                            span,
+                        })
+                        .into(),
+                    );
+                    "INVALID_L_VALUE"
+                }
+            };
+            let name = Ident {
+                name: place.into(),
+                span,
+            };
+
             return Ok(PrattParseOutcome::NewLHS(
                 tree.push(ExpressionNode::InfixAssignment { lhs: name, rhs }),
             ));
@@ -860,6 +888,7 @@ impl<'src> Parser<'src> {
             lexer,
             lookahead: None,
             has_errored: false,
+            reports: VecDeque::new(),
         }
     }
 
