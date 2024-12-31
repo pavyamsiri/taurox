@@ -392,6 +392,7 @@ impl Resolver {
         increment: Option<&Expression>,
         body: &NonDeclaration,
     ) -> Result<(), ResolutionError> {
+        self.enter_scope();
         if let Some(initializer) = initializer {
             match initializer {
                 Initializer::VarDecl {
@@ -413,6 +414,7 @@ impl Resolver {
             self.resolve_expression(increment)?;
         }
         self.resolve_non_declaration(body)?;
+        self.exit_scope();
         Ok(())
     }
 
