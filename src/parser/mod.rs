@@ -508,35 +508,25 @@ enum PrattParseOutcome {
 
 // Pratt parser for expressions
 impl<'src> Parser<'src> {
-    pub fn try_parse_expression(
-        &mut self,
-    ) -> Result<Option<Expression>, GeneralExpressionParserError> {
-        if let Some(e) = self.reports.pop_front() {
-            self.has_errored = true;
-            return Err(e.into());
-        }
-
+    pub fn try_parse_expression(mut self) -> Result<Expression, GeneralExpressionParserError> {
         let mut tree = IncompleteExpression::new();
         let root = match self.parse_expression_pratt(0, &mut tree) {
             Ok(root) => root,
             Err(e) => {
-                self.has_errored = true;
                 return Err(e);
             }
         };
 
         if let Some(e) = self.reports.pop_front() {
-            self.has_errored = true;
             return Err(e.into());
         }
 
-        if !self.has_errored {
-            Ok(Some(Expression::new(tree, root).expect(
-                "Root was obtained from the tree itself so it must be valid.",
-            )))
-        } else {
-            Ok(None)
-        }
+        assert!(
+            !self.has_errored,
+            "This shouldn't have been set by expression parsing."
+        );
+        Ok(Expression::new(tree, root)
+            .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
     pub fn parse_expression(&mut self) -> Result<Expression, GeneralExpressionParserError> {

@@ -161,24 +161,21 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
     };
     use taurox::parser::Parser;
 
-    let mut parser = Parser::new(src, path);
     let formatter: Box<dyn ExpressionFormatter> = match format {
         ExpressionFormat::Debug => Box::new(DebugExpressionFormatter {}),
         ExpressionFormat::SExpr => Box::new(SExpressionFormatter::new(src)),
         ExpressionFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
-    loop {
-        match parser.try_parse_expression() {
-            Ok(Some(expression)) => {
-                println!("{}", formatter.format(&expression));
-                return true;
-            }
-            Ok(None) => {
-                return false;
-            }
-            Err(err) => {
-                println!("{}", formatter.format_error(&err));
-            }
+
+    let parser = Parser::new(src, path);
+    match parser.try_parse_expression() {
+        Ok(expr) => {
+            println!("{}", formatter.format(&expr));
+            true
+        }
+        Err(e) => {
+            eprintln!("{}", formatter.format_error(&e));
+            false
         }
     }
 }
@@ -205,13 +202,14 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
         BasicValueFormatter, DebugValueFormatter, PrettyValueFormatter, ValueFormatter,
     };
 
-    let mut parser = Parser::new(src, path);
     let expression_formatter: Box<dyn ExpressionFormatter> = match format {
         ValueFormat::Debug => Box::new(DebugExpressionFormatter {}),
         ValueFormat::Basic => Box::new(SExpressionFormatter::new(src)),
         ValueFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
-    let expression = match parser.parse_expression() {
+
+    let parser = Parser::new(src, path);
+    let expression = match parser.try_parse_expression() {
         Ok(expr) => expr,
         Err(e) => {
             eprintln!("{}", expression_formatter.format_error(&e));
