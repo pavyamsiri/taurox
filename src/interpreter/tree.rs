@@ -583,9 +583,10 @@ impl TreeWalkStatementInterpreter {
                         span,
                     });
                 };
-                let mut fields = instance.fields.lock().unwrap();
                 let rhs =
                     self.evaluate_expression_node(expr, *value, environment, context, resolution)?;
+                // Grab fields after evaluating to avoid deadlocks
+                let mut fields = instance.fields.lock().unwrap();
                 fields.insert(name.name.to_compact_string(), rhs.clone());
                 rhs
             }
