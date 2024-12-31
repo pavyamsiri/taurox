@@ -535,7 +535,7 @@ impl TreeWalkStatementInterpreter {
                     self.evaluate_expression_node(expr, *object, environment, context, resolution)?;
                 let LoxValue::Instance(ref instance) = object_value else {
                     return Err(RuntimeError {
-                        kind: RuntimeErrorKind::InvalidInstance(object_value),
+                        kind: RuntimeErrorKind::InvalidInstanceGet(object_value),
                         span,
                     });
                 };
@@ -579,7 +579,7 @@ impl TreeWalkStatementInterpreter {
                     self.evaluate_expression_node(expr, *object, environment, context, resolution)?;
                 let LoxValue::Instance(instance) = lhs else {
                     return Err(RuntimeError {
-                        kind: RuntimeErrorKind::InvalidInstance(lhs),
+                        kind: RuntimeErrorKind::InvalidInstanceSet(lhs),
                         span,
                     });
                 };

@@ -15,8 +15,10 @@ pub enum RuntimeErrorKind {
     InvalidAccess(IdentName),
     #[error("Invalid Callee: {0}")]
     InvalidCallee(LoxValue),
-    #[error("Invalid Instance: {0}")]
-    InvalidInstance(LoxValue),
+    #[error("Invalid Instance Set: {0}")]
+    InvalidInstanceSet(LoxValue),
+    #[error("Invalid Instance Get: {0}")]
+    InvalidInstanceGet(LoxValue),
     #[error("Undefined property access: {object}")]
     UndefinedProperty { object: LoxValue, name: IdentName },
     #[error("Invalid Argument Count: {actual} of {expected}")]
@@ -41,9 +43,10 @@ impl RuntimeError {
             RuntimeErrorKind::InvalidAccess(_) => "RT004",
             RuntimeErrorKind::InvalidCallee(_) => "RT005",
             RuntimeErrorKind::InvalidArgumentCount { .. } => "RT006",
-            RuntimeErrorKind::InvalidInstance(_) => "RT007",
+            RuntimeErrorKind::InvalidInstanceSet(_) => "RT007",
             RuntimeErrorKind::UndefinedProperty { .. } => "RT008",
             RuntimeErrorKind::InvalidSuperClass(_) => "RT009",
+            RuntimeErrorKind::InvalidInstanceGet(_) => "RT010",
         }
     }
 }

@@ -75,6 +75,12 @@ fn test_constructor() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_field() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/field");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,

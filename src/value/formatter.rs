@@ -120,8 +120,11 @@ impl ValueFormatter for BasicValueFormatter {
                 )
                 .expect(&WRITE_FMT_MSG);
             }
-            RuntimeErrorKind::InvalidInstance(ref object) => {
-                write!(buffer, "({line}) Invalid Instance: {object}").expect(&WRITE_FMT_MSG);
+            RuntimeErrorKind::InvalidInstanceSet(ref object) => {
+                write!(buffer, "({line}) Invalid Instance Set: {object}").expect(&WRITE_FMT_MSG);
+            }
+            RuntimeErrorKind::InvalidInstanceGet(ref object) => {
+                write!(buffer, "({line}) Invalid Instance Get: {object}").expect(&WRITE_FMT_MSG);
             }
             RuntimeErrorKind::UndefinedProperty {
                 ref object,
@@ -264,13 +267,26 @@ impl<'src> ValueFormatter for PrettyValueFormatter<'src> {
                     .write((path, Source::from(self.text)), &mut output)
                     .expect(ARIADNE_WRITE_MSG);
             }
-            RuntimeErrorKind::InvalidInstance(_) => {
+            RuntimeErrorKind::InvalidInstanceSet(_) => {
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
-                    .with_message("Attempted to access a property on a non-instance value")
+                    .with_message("Attempted to set a field on a non-instance value")
                     .with_label(
                         Label::new((path, span.range()))
-                            .with_message("This is not a callable...")
+                            .with_message("This is not an instance...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(self.text)), &mut output)
+                    .expect(ARIADNE_WRITE_MSG);
+            }
+            RuntimeErrorKind::InvalidInstanceGet(_) => {
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Attempted to get a property on a non-instance value")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("This is not an instance...")
                             .with_color(Color::BrightRed),
                     )
                     .finish()
@@ -355,8 +371,18 @@ impl ValueFormatter for NystromValueFormatter {
                 "({line}) [Runtime] Can only call functions and classes."
             )
             .expect(&WRITE_FMT_MSG),
-            RuntimeErrorKind::InvalidInstance(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
-            RuntimeErrorKind::UndefinedProperty { .. } => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            RuntimeErrorKind::InvalidInstanceSet(_) => {
+                write!(buffer, "({line}) [Runtime] Only instances have fields.")
+                    .expect(&WRITE_FMT_MSG)
+            }
+            RuntimeErrorKind::InvalidInstanceGet(_) => {
+                write!(buffer, "({line}) [Runtime] Only instances have properties.")
+                    .expect(&WRITE_FMT_MSG)
+            }
+            RuntimeErrorKind::UndefinedProperty { name, .. } => {
+                write!(buffer, "({line}) [Runtime] Undefined property '{name}'.")
+                    .expect(&WRITE_FMT_MSG)
+            }
             RuntimeErrorKind::InvalidArgumentCount { actual, expected } => write!(
                 buffer,
                 "({line}) [Runtime] Expected {expected} arguments but got {actual}."
