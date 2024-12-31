@@ -733,7 +733,11 @@ impl<'src> NystromParserFormatter<'src> {
                     write!(buffer, "({line}) [Compiler] Error: Unexpected character.",)
                         .expect(&WRITE_FMT_MSG);
                 }
-                LexicalErrorKind::UnclosedString => todo!(),
+                LexicalErrorKind::UnclosedString => {
+                    let line = self.line_breaks.get_line_from_span(e.span);
+                    write!(buffer, "({line}) [Compiler] Error: Unterminated string.",)
+                        .expect(&WRITE_FMT_MSG);
+                }
             },
         }
     }

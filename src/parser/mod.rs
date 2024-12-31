@@ -78,7 +78,14 @@ impl<'src> Parser<'src> {
         self.report_error()?;
         let mut statements = Vec::new();
 
-        while !self.done && !matches!(self.peek()?.kind, TokenKind::Eof) {
+        let peek = match self.peek() {
+            Ok(t) => t,
+            Err(e) => {
+                let _ = self.next_token();
+                return Err(e.into());
+            }
+        };
+        while !self.done && !matches!(peek.kind, TokenKind::Eof) {
             match self.parse_statement() {
                 Ok(Some(statement)) => {
                     self.report_error()?;
@@ -124,7 +131,10 @@ impl<'src> Parser<'src> {
         loop {
             let next = match self.peek() {
                 Ok(next) => next,
-                Err(_) => return Ok(true),
+                Err(_) => {
+                    let _ = self.next_token();
+                    return Ok(true);
+                }
             };
             match next.kind {
                 TokenKind::KeywordClass
