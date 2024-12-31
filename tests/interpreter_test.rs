@@ -109,8 +109,9 @@ impl TestCase {
             match parser.parse() {
                 Ok(Some(program)) => break 'program program,
                 Ok(None) => {
+                    let actual = parser_buffer.trim_end();
                     assert_eq!(
-                        self.compiler_errors, parser_buffer,
+                        self.compiler_errors, actual,
                         "Failed test {} at compilation stage.",
                         self.name,
                     );
@@ -118,6 +119,7 @@ impl TestCase {
                 }
                 Err(e) => {
                     parser_formatter.format_error_in_place(&mut parser_buffer, &e);
+                    parser_buffer.push('\n');
                 }
             }
         };

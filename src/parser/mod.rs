@@ -162,7 +162,17 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 let expr = self.parse_expression()?;
-                let rightmost = self.expect(TokenKind::Semicolon)?;
+                let rightmost = {
+                    let next_token = self.next_token()?;
+                    match next_token.kind {
+                        TokenKind::Semicolon => next_token,
+                        _ => {
+                            return Err(
+                                StatementParserError::NoSemicolonAfterExpr(next_token).into()
+                            );
+                        }
+                    }
+                };
                 let span = expr.get_span().merge(&rightmost.span);
                 Statement::NonDeclaration(NonDeclaration {
                     kind: NonDeclarationKind::Expression(expr),

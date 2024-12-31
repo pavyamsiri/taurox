@@ -68,6 +68,8 @@ pub enum StatementParserError {
     NonBlock(Statement),
     #[error("Expected a non-declaration but got {0:?}.")]
     InvalidNonDeclaration(Declaration),
+    #[error("Expected a ';' after expression but got {0:?}.")]
+    NoSemicolonAfterExpr(Token),
 }
 
 impl StatementParserError {
@@ -75,6 +77,7 @@ impl StatementParserError {
         match self {
             StatementParserError::NonBlock(_) => "SP001",
             StatementParserError::InvalidNonDeclaration(_) => "SP002",
+            StatementParserError::NoSemicolonAfterExpr(_) => "SP003",
         }
     }
 }

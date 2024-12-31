@@ -411,6 +411,17 @@ impl<'src> BasicParserFormatter<'src> {
                     .expect(&WRITE_FMT_MSG);
                 self.format_declaration(buffer, decl);
             }
+            StatementParserError::NoSemicolonAfterExpr(token) => {
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(token.span);
+                write!(
+                    buffer,
+                    "({line}) Expected semicolon after expression but got {token:?}"
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
         }
     }
 
@@ -532,6 +543,20 @@ impl<'src> PrettyParserFormatter<'src> {
                     .write((path, Source::from(text)), &mut output)
                     .expect(&ARIADNE_WRITE_MSG);
             }
+            StatementParserError::NoSemicolonAfterExpr(token) => {
+                let span = token.span;
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Expected a semi-colon after an expression")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("Missing a semicolon here...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(&ARIADNE_WRITE_MSG);
+            }
         }
         buffer.push_str(&String::from_utf8(output.into_inner()).expect(ARIADNE_MSG));
     }
@@ -617,6 +642,15 @@ impl<'src> NystromParserFormatter<'src> {
                 write!(
                     buffer,
                     "({line}) [Compiler] Error at '{lexeme}': Expect expression."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            StatementParserError::NoSemicolonAfterExpr(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = &self.text[token.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Expect ';' after expression."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
