@@ -298,7 +298,6 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
             }
             Err(e) => {
                 eprintln!("{}", parser_formatter.format_error(&e));
-                return Err(ProgramError::CompileError);
             }
         }
     };

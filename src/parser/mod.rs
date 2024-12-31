@@ -47,6 +47,7 @@ impl Program {
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, LexicalError>>,
+    has_errored: bool,
 }
 
 // Lexer based helpers
@@ -73,11 +74,52 @@ impl<'src> Parser<'src> {
     pub fn parse(&mut self) -> Result<Option<Program>, ParserError> {
         let mut statements = Vec::new();
 
-        while let Some(statement) = self.parse_statement()? {
-            statements.push(statement);
+        loop {
+            match self.parse_statement() {
+                Ok(Some(statement)) => {
+                    statements.push(statement);
+                }
+                Ok(None) => {
+                    break;
+                }
+                Err(e) => {
+                    self.has_errored = true;
+                    // Synchronize to next statement boundary
+                    loop {
+                        let next = self.peek()?;
+                        match next.kind {
+                            TokenKind::KeywordClass
+                            | TokenKind::KeywordFun
+                            | TokenKind::KeywordFor
+                            | TokenKind::KeywordVar
+                            | TokenKind::KeywordIf
+                            | TokenKind::KeywordWhile
+                            | TokenKind::KeywordPrint
+                            | TokenKind::LeftBrace
+                            | TokenKind::KeywordReturn => {
+                                break;
+                            }
+                            TokenKind::Semicolon => {
+                                let _ = self.next_token()?;
+                                break;
+                            }
+                            TokenKind::Eof => {
+                                return Err(self.create_eof_error().into());
+                            }
+                            _ => {}
+                        }
+                        let _ = self.next_token()?;
+                    }
+                    return Err(e);
+                }
+            }
         }
 
-        Ok(Some(Program { statements }))
+        if self.has_errored {
+            Ok(None)
+        } else {
+            Ok(Some(Program { statements }))
+        }
     }
 }
 
@@ -817,6 +859,7 @@ impl<'src> Parser<'src> {
         Self {
             lexer,
             lookahead: None,
+            has_errored: false,
         }
     }
 
