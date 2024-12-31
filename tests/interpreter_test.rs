@@ -87,6 +87,12 @@ fn test_for() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_function() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/function");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
@@ -186,7 +192,7 @@ fn test_engine(input_dir: &Path) -> Result<()> {
             test_case.check();
         });
         if res.is_err() {
-            println!("Fails test case {}", test_case.name);
+            println!("\tFails test case {}", test_case.name);
             succeeded = false;
         }
     }

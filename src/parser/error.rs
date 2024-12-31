@@ -70,6 +70,8 @@ pub enum StatementParserError {
     InvalidNonDeclaration(Token),
     #[error("Expected a ';' after expression but got {0:?}.")]
     NoSemicolonAfterExpr(Token),
+    #[error("Functions with more than {max} parameters are not supported!")]
+    TooManyParameters { max: usize, location: Token },
 }
 
 impl StatementParserError {
@@ -78,6 +80,7 @@ impl StatementParserError {
             StatementParserError::NonBlock(_) => "SP001",
             StatementParserError::InvalidNonDeclaration(_) => "SP002",
             StatementParserError::NoSemicolonAfterExpr(_) => "SP003",
+            StatementParserError::TooManyParameters { .. } => "SP004",
         }
     }
 }

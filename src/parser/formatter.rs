@@ -421,6 +421,17 @@ impl<'src> BasicParserFormatter<'src> {
                 )
                 .expect(&WRITE_FMT_MSG);
             }
+            StatementParserError::TooManyParameters { max, location } => {
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(location.span);
+                write!(
+                    buffer,
+                    "({line}) Got more than {max} parameters: {location:?}"
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
         }
     }
 
@@ -556,6 +567,20 @@ impl<'src> PrettyParserFormatter<'src> {
                     .write((path, Source::from(text)), &mut output)
                     .expect(&ARIADNE_WRITE_MSG);
             }
+            StatementParserError::TooManyParameters { max, location } => {
+                let span = location.span;
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message(format!("Got more than {max} parameters"))
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("Too many parameters...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(&ARIADNE_WRITE_MSG);
+            }
         }
         buffer.push_str(&String::from_utf8(output.into_inner()).expect(ARIADNE_MSG));
     }
@@ -646,6 +671,15 @@ impl<'src> NystromParserFormatter<'src> {
                 write!(
                     buffer,
                     "({line}) [Compiler] Error at '{lexeme}': Expect ';' after expression."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            StatementParserError::TooManyParameters { max, location } => {
+                let line = self.line_breaks.get_line_from_span(location.span);
+                let lexeme = &self.text[location.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Can't have more than {max} parameters."
                 )
                 .expect(&WRITE_FMT_MSG);
             }

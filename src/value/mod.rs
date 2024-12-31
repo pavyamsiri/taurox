@@ -81,8 +81,8 @@ impl std::fmt::Display for LoxValue {
             Self::String(v) => write!(f, "{v}"),
             Self::Nil => write!(f, "nil"),
             Self::Bool(v) => write!(f, "{v}"),
-            Self::NativeFunction(fun) => {
-                write!(f, "<native fn `{}`>", fun.get_name())
+            Self::NativeFunction(_) => {
+                write!(f, "<native fn>")
             }
             Self::Function(func) => {
                 let name = &func.name;

@@ -226,8 +226,18 @@ impl<'src> Parser<'src> {
             Vec::new()
         } else {
             let mut parameters = Vec::new();
-            for _ in 0..MAX_PARAMETERS {
+            loop {
                 let parameter = self.expect_ident()?;
+                if parameters.len() >= MAX_PARAMETERS {
+                    return Err(StatementParserError::TooManyParameters {
+                        max: MAX_PARAMETERS,
+                        location: Token {
+                            kind: TokenKind::Ident,
+                            span: parameter.span,
+                        },
+                    }
+                    .into());
+                }
                 parameters.push(parameter);
 
                 if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
@@ -271,8 +281,18 @@ impl<'src> Parser<'src> {
             Vec::new()
         } else {
             let mut parameters = Vec::new();
-            for _ in 0..MAX_PARAMETERS {
+            loop {
                 let parameter = self.expect_ident()?;
+                if parameters.len() >= MAX_PARAMETERS {
+                    return Err(StatementParserError::TooManyParameters {
+                        max: MAX_PARAMETERS,
+                        location: Token {
+                            kind: TokenKind::Ident,
+                            span: parameter.span,
+                        },
+                    }
+                    .into());
+                }
                 parameters.push(parameter);
 
                 if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
