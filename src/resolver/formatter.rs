@@ -259,7 +259,11 @@ impl ResolverFormatter for NystromResolverFormatter {
             )
             .expect(&WRITE_FMT_MSG),
             ResolutionErrorKind::ShadowLocal { .. } => write!(buffer, "").expect(&WRITE_FMT_MSG),
-            ResolutionErrorKind::NonFunctionReturn => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::NonFunctionReturn => write!(
+                buffer,
+                "({line}) [Compiler] Error at 'return': Can't return from top-level code."
+            )
+            .expect(&WRITE_FMT_MSG),
             ResolutionErrorKind::NonClassThis => write!(buffer, "").expect(&WRITE_FMT_MSG),
             ResolutionErrorKind::NonClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
             ResolutionErrorKind::NonSubClassSuper => write!(buffer, "").expect(&WRITE_FMT_MSG),
