@@ -167,14 +167,18 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
         ExpressionFormat::SExpr => Box::new(SExpressionFormatter::new(src)),
         ExpressionFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
-    match parser.parse_expression() {
-        Ok(expression) => {
-            println!("{}", formatter.format(&expression));
-            true
-        }
-        Err(err) => {
-            println!("{}", formatter.format_error(&err));
-            false
+    loop {
+        match parser.try_parse_expression() {
+            Ok(Some(expression)) => {
+                println!("{}", formatter.format(&expression));
+                return true;
+            }
+            Ok(None) => {
+                return false;
+            }
+            Err(err) => {
+                println!("{}", formatter.format_error(&err));
+            }
         }
     }
 }

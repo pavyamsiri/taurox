@@ -48,7 +48,7 @@ pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, LexicalError>>,
     has_errored: bool,
-    reports: VecDeque<ParserError>,
+    reports: VecDeque<GeneralExpressionParserError>,
 }
 
 // Lexer based helpers
@@ -75,7 +75,7 @@ impl<'src> Parser<'src> {
     pub fn parse(&mut self) -> Result<Option<Program>, ParserError> {
         if let Some(e) = self.reports.pop_front() {
             self.has_errored = true;
-            return Err(e);
+            return Err(e.into());
         }
 
         let mut statements = Vec::new();
@@ -85,7 +85,7 @@ impl<'src> Parser<'src> {
                 Ok(Some(statement)) => {
                     if let Some(e) = self.reports.pop_front() {
                         self.has_errored = true;
-                        return Err(e);
+                        return Err(e.into());
                     }
                     statements.push(statement);
                 }
@@ -508,11 +508,42 @@ enum PrattParseOutcome {
 
 // Pratt parser for expressions
 impl<'src> Parser<'src> {
+    pub fn try_parse_expression(
+        &mut self,
+    ) -> Result<Option<Expression>, GeneralExpressionParserError> {
+        if let Some(e) = self.reports.pop_front() {
+            self.has_errored = true;
+            return Err(e.into());
+        }
+
+        let mut tree = IncompleteExpression::new();
+        let root = match self.parse_expression_pratt(0, &mut tree) {
+            Ok(root) => root,
+            Err(e) => {
+                self.has_errored = true;
+                return Err(e);
+            }
+        };
+
+        if let Some(e) = self.reports.pop_front() {
+            self.has_errored = true;
+            return Err(e.into());
+        }
+
+        if !self.has_errored {
+            Ok(Some(Expression::new(tree, root).expect(
+                "Root was obtained from the tree itself so it must be valid.",
+            )))
+        } else {
+            Ok(None)
+        }
+    }
+
     pub fn parse_expression(&mut self) -> Result<Expression, GeneralExpressionParserError> {
         let mut tree = IncompleteExpression::new();
-        let res = self.parse_expression_pratt(0, &mut tree)?;
+        let root = self.parse_expression_pratt(0, &mut tree)?;
 
-        Ok(Expression::new(tree, res)
+        Ok(Expression::new(tree, root)
             .expect("Root was obtained from the tree itself so it must be valid."))
     }
 
