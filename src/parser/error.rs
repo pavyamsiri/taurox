@@ -1,4 +1,3 @@
-use super::statement::Statement;
 use crate::lexer::{LexicalError, Span, Token, TokenKind};
 use thiserror::Error;
 
@@ -28,6 +27,10 @@ pub enum ExpressionParserError {
     NonExpression(Token),
     #[error("Encountered an invalid l-value {0:?}.")]
     InvalidLValue(Token),
+    #[error("Expected less than {max} arguments.")]
+    TooManyArguments { max: usize, location: Token },
+    #[error("Expected ')' after arguments.")]
+    NoRightParenthesisAfterArguments(Token),
 }
 
 impl ExpressionParserError {
@@ -35,6 +38,8 @@ impl ExpressionParserError {
         match self {
             Self::NonExpression(_) => "PE002",
             Self::InvalidLValue(_) => "PE003",
+            Self::TooManyArguments { .. } => "PE004",
+            Self::NoRightParenthesisAfterArguments(_) => "PE005",
         }
     }
 }
@@ -65,13 +70,15 @@ impl From<LexicalError> for GeneralExpressionParserError {
 #[derive(Debug, Error, Clone)]
 pub enum StatementParserError {
     #[error("Expected a block but got {0:?}.")]
-    NonBlock(Statement),
+    NonBlock(Token),
     #[error("Expected a non-declaration but got {0:?}.")]
     InvalidNonDeclaration(Token),
     #[error("Expected a ';' after expression but got {0:?}.")]
     NoSemicolonAfterExpr(Token),
-    #[error("Functions with more than {max} parameters are not supported!")]
+    #[error("Expected less than {max} parameters.")]
     TooManyParameters { max: usize, location: Token },
+    #[error("Expected ')' after parameters.")]
+    NoRightParenthesisAfterParameters(Token),
 }
 
 impl StatementParserError {
@@ -81,6 +88,7 @@ impl StatementParserError {
             StatementParserError::InvalidNonDeclaration(_) => "SP002",
             StatementParserError::NoSemicolonAfterExpr(_) => "SP003",
             StatementParserError::TooManyParameters { .. } => "SP004",
+            StatementParserError::NoRightParenthesisAfterParameters(_) => "SP005",
         }
     }
 }

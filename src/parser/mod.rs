@@ -4,7 +4,7 @@ pub mod formatter;
 pub mod statement;
 
 use crate::{
-    lexer::{Lexer, LexicalError, LineBreaks, Token, TokenKind},
+    lexer::{Lexer, LexicalError, LineBreaks, Span, Token, TokenKind},
     string::Ident,
 };
 pub use error::ParserError;
@@ -80,7 +80,8 @@ impl<'src> Parser<'src> {
 
         let mut statements = Vec::new();
 
-        loop {
+        let peek = self.peek()?;
+        while !matches!(peek.kind, TokenKind::Eof) {
             match self.parse_statement() {
                 Ok(Some(statement)) => {
                     if let Some(e) = self.reports.pop_front() {
@@ -218,61 +219,17 @@ impl<'src> Parser<'src> {
 
     fn parse_function_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordFun)?;
-        let name = self.expect_ident()?;
-        let _ = self.expect(TokenKind::LeftParenthesis)?;
-
-        // No parameters
-        let parameters = if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-            Vec::new()
-        } else {
-            let mut parameters = Vec::new();
-            loop {
-                let parameter = self.expect_ident()?;
-                if parameters.len() >= MAX_PARAMETERS {
-                    return Err(StatementParserError::TooManyParameters {
-                        max: MAX_PARAMETERS,
-                        location: Token {
-                            kind: TokenKind::Ident,
-                            span: parameter.span,
-                        },
-                    }
-                    .into());
-                }
-                parameters.push(parameter);
-
-                if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-                    break;
-                }
-                let _ = self.expect(TokenKind::Comma)?;
-            }
-            parameters
-        };
-
-        let (body, rightmost) = {
-            let body_statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
-            match body_statement {
-                Statement::NonDeclaration(NonDeclaration {
-                    kind: NonDeclarationKind::Block(body),
-                    span,
-                }) => (body, span),
-                s => Err(StatementParserError::NonBlock(s))?,
-            }
-        };
-
+        let (decl, rightmost) = self.try_parse_function()?;
         let span = leftmost.span.merge(&rightmost);
         let decl = Statement::Declaration(Declaration {
-            kind: DeclarationKind::Function(FunctionDecl {
-                name,
-                parameters,
-                body,
-            }),
+            kind: DeclarationKind::Function(decl),
             span,
         });
 
         Ok(decl)
     }
 
-    fn try_parse_function(&mut self) -> Result<FunctionDecl, ParserError> {
+    fn try_parse_function(&mut self) -> Result<(FunctionDecl, Span), ParserError> {
         let name = self.expect_ident()?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
@@ -295,23 +252,39 @@ impl<'src> Parser<'src> {
                 }
                 parameters.push(parameter);
 
-                if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-                    break;
+                let next_token = self.next_token()?;
+                match next_token.kind {
+                    TokenKind::RightParenthesis => {
+                        break;
+                    }
+                    TokenKind::Comma => {
+                        continue;
+                    }
+                    _ => {
+                        return Err(StatementParserError::NoRightParenthesisAfterParameters(
+                            next_token,
+                        )
+                        .into());
+                    }
                 }
-                let _ = self.expect(TokenKind::Comma)?;
             }
             parameters
         };
 
-        let (body, _) = {
-            let body_statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
-            match body_statement {
-                Statement::NonDeclaration(NonDeclaration {
-                    kind: NonDeclarationKind::Block(body),
-                    span,
-                }) => (body, span),
-                s => Err(StatementParserError::NonBlock(s))?,
-            }
+        let (body, rightmost) = {
+            let next_token = self.peek()?;
+            let body = match next_token.kind {
+                TokenKind::LeftBrace => self.parse_block_statement(),
+                _ => Err(StatementParserError::NonBlock(next_token).into()),
+            }?;
+            let Statement::NonDeclaration(NonDeclaration {
+                kind: NonDeclarationKind::Block(body),
+                span,
+            }) = body
+            else {
+                panic!("`parse_block_statement` will always return a block statement.");
+            };
+            (body, span)
         };
 
         let decl = FunctionDecl {
@@ -319,7 +292,7 @@ impl<'src> Parser<'src> {
             parameters,
             body,
         };
-        Ok(decl)
+        Ok((decl, rightmost))
     }
 
     fn parse_class_declaration(&mut self) -> Result<Statement, ParserError> {
@@ -341,7 +314,7 @@ impl<'src> Parser<'src> {
                     break 'block rightmost;
                 }
                 None => {
-                    let func = self.try_parse_function()?;
+                    let (func, _) = self.try_parse_function()?;
                     methods.push(func);
                 }
             }
@@ -898,17 +871,35 @@ impl<'src> Parser<'src> {
                     }
                     // Collect arguments
                     else {
-                        // NOTE: Only support up to 255 arguments
-                        for _ in 0..255 {
+                        loop {
+                            if arguments.len() >= MAX_PARAMETERS {
+                                let next_token = self.peek()?;
+                                let err = ExpressionParserError::TooManyArguments {
+                                    max: MAX_PARAMETERS,
+                                    location: next_token,
+                                };
+                                self.reports.push_back(err.into());
+                            }
                             let argument = self.parse_expression_pratt(0, tree)?;
                             arguments.push(argument);
 
-                            // Hit the end of the argument list
-                            if let Some(_) = self.eat_if(TokenKind::RightParenthesis)? {
-                                break;
+                            let next_token = self.next_token()?;
+                            match next_token.kind {
+                                TokenKind::RightParenthesis => {
+                                    break;
+                                }
+                                TokenKind::Comma => {
+                                    continue;
+                                }
+                                _ => {
+                                    return Err(
+                                        ExpressionParserError::NoRightParenthesisAfterArguments(
+                                            next_token,
+                                        )
+                                        .into(),
+                                    );
+                                }
                             }
-
-                            let _ = self.expect(TokenKind::Comma)?;
                         }
                         return Ok(PrattParseOutcome::NewLHS(tree.push(ExpressionNode::Call {
                             callee: lhs,

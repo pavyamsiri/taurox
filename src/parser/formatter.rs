@@ -7,10 +7,6 @@ use super::{
         Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         InfixOperator, InfixShortCircuitOperator, PrefixOperator,
     },
-    statement::{
-        ClassDecl, Declaration, DeclarationKind, FunctionDecl, NonDeclaration, NonDeclarationKind,
-        Statement, VariableDecl,
-    },
     ParserError,
 };
 use crate::lexer::{
@@ -226,6 +222,26 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                         .get_line_from_span(*span);
                     write!(buffer, "({line}) Invalid l-value: {kind}").expect(&WRITE_FMT_MSG);
                 }
+                ExpressionParserError::TooManyArguments { max, location } => {
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(location.span);
+                    write!(buffer, "({line}) Too Many Arguments: Max = {max}")
+                        .expect(&WRITE_FMT_MSG);
+                }
+                ExpressionParserError::NoRightParenthesisAfterArguments(token) => {
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(token.span);
+                    write!(
+                        buffer,
+                        "({line}) No Closing Parenthesis After Arguments: {}",
+                        token.kind
+                    )
+                    .expect(&WRITE_FMT_MSG);
+                }
             },
             GeneralExpressionParserError::General(gen) => match gen {
                 GeneralParserError::UnexpectedToken {
@@ -311,6 +327,34 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .write((path, Source::from(text)), &mut output)
                         .expect(ARIADNE_WRITE_MSG);
                 }
+                ExpressionParserError::TooManyArguments { max, location } => {
+                    let span = location.span;
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message(format!("Got more than {max} arguments"))
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message("Too many arguments...")
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(text)), &mut output)
+                        .expect(&ARIADNE_WRITE_MSG);
+                }
+                ExpressionParserError::NoRightParenthesisAfterArguments(token) => {
+                    let span = token.span;
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Expected a closing parenthesis after argument list")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message("Missing a closing parenthesis here...")
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(text)), &mut output)
+                        .expect(&ARIADNE_WRITE_MSG);
+                }
             },
             GeneralExpressionParserError::General(gen) => match gen {
                 GeneralParserError::UnexpectedToken {
@@ -391,15 +435,12 @@ impl<'src> BasicParserFormatter<'src> {
 
     fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
         match error {
-            StatementParserError::NonBlock(stmt) => {
+            StatementParserError::NonBlock(token) => {
                 let line = self
                     .expr_formatter
                     .get_line_breaks()
-                    .get_line_from_span(stmt.get_span());
-                buffer
-                    .write_fmt(format_args!("({line}) Non-Block: "))
-                    .expect(&WRITE_FMT_MSG);
-                self.format_statement(buffer, stmt);
+                    .get_line_from_span(token.span);
+                write!(buffer, "({line}) Non-Block: {token:?}").expect(&WRITE_FMT_MSG);
             }
             StatementParserError::InvalidNonDeclaration(token) => {
                 let line = self
@@ -432,59 +473,16 @@ impl<'src> BasicParserFormatter<'src> {
                 )
                 .expect(&WRITE_FMT_MSG);
             }
-        }
-    }
-
-    fn format_statement(&self, buffer: &mut String, stmt: &Statement) {
-        match stmt {
-            Statement::Declaration(decl) => self.format_declaration(buffer, decl),
-            Statement::NonDeclaration(NonDeclaration { kind, .. }) => match kind {
-                NonDeclarationKind::Expression(expr) => {
-                    buffer.push_str("EXPR ");
-                    self.expr_formatter.format_in_place(buffer, expr);
-                }
-                NonDeclarationKind::Print(expr) => {
-                    buffer.push_str("PRINT ");
-                    self.expr_formatter.format_in_place(buffer, expr);
-                }
-                NonDeclarationKind::Return { value } => {
-                    buffer.push_str("RETURN ");
-                    if let Some(expr) = value {
-                        buffer.push(' ');
-                        self.expr_formatter.format_in_place(buffer, expr);
-                    }
-                }
-                NonDeclarationKind::Block(_) => {
-                    write!(buffer, "BLOCK {{..}}").expect(&WRITE_FMT_MSG);
-                }
-                NonDeclarationKind::If { condition, .. } => {
-                    buffer.push_str("IF (");
-                    self.expr_formatter.format_in_place(buffer, condition);
-                    buffer.push_str(") ..");
-                }
-                NonDeclarationKind::While { condition, .. } => {
-                    buffer.push_str("WHILE (");
-                    self.expr_formatter.format_in_place(buffer, condition);
-                    buffer.push_str(") ..");
-                }
-                NonDeclarationKind::For { .. } => {
-                    buffer.push_str("FOR ..");
-                }
-            },
-        }
-    }
-
-    fn format_declaration(&self, buffer: &mut String, decl: &Declaration) {
-        let kind = &decl.kind;
-        match kind {
-            DeclarationKind::Variable(VariableDecl { name, .. }) => {
-                write!(buffer, "VARDECL {name}").expect(&WRITE_FMT_MSG);
-            }
-            DeclarationKind::Function(FunctionDecl { name, .. }) => {
-                write!(buffer, "FUNDECL {name}").expect(&WRITE_FMT_MSG);
-            }
-            DeclarationKind::Class(ClassDecl { name, .. }) => {
-                write!(buffer, "CLADECL {name}").expect(&WRITE_FMT_MSG);
+            StatementParserError::NoRightParenthesisAfterParameters(token) => {
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(token.span);
+                write!(
+                    buffer,
+                    "({line}) Expected right parenthesis after parameters but got {token:?}"
+                )
+                .expect(&WRITE_FMT_MSG);
             }
         }
     }
@@ -516,17 +514,9 @@ impl<'src> PrettyParserFormatter<'src> {
         let path = &self.expr_formatter.get_path().to_string_lossy();
         let mut output = std::io::Cursor::new(Vec::new());
         match error {
-            StatementParserError::NonBlock(stmt) => {
-                let span = stmt.get_span();
-                let mut msg = format!("Not a block statement ");
-                match stmt {
-                    Statement::Declaration(Declaration { kind, .. }) => {
-                        write!(msg, "{}", kind).expect(&WRITE_FMT_MSG);
-                    }
-                    Statement::NonDeclaration(NonDeclaration { kind, .. }) => {
-                        write!(msg, "{}", kind).expect(&WRITE_FMT_MSG);
-                    }
-                }
+            StatementParserError::NonBlock(token) => {
+                let span = token.span;
+                let msg = format!("Not a block statement {}", token.kind);
                 Report::build(ReportKind::Error, (path, span.range()))
                     .with_code(error.code())
                     .with_message("Expected a block statement")
@@ -575,6 +565,20 @@ impl<'src> PrettyParserFormatter<'src> {
                     .with_label(
                         Label::new((path, span.range()))
                             .with_message("Too many parameters...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(&ARIADNE_WRITE_MSG);
+            }
+            StatementParserError::NoRightParenthesisAfterParameters(token) => {
+                let span = token.span;
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Expected a closing parenthesis after parameter list")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("Missing a closing parenthesis here...")
                             .with_color(Color::BrightRed),
                     )
                     .finish()
@@ -632,6 +636,24 @@ impl<'src> NystromParserFormatter<'src> {
                 )
                 .expect(&WRITE_FMT_MSG);
             }
+            ExpressionParserError::TooManyArguments { max, location } => {
+                let line = self.line_breaks.get_line_from_span(location.span);
+                let lexeme = &self.text[location.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Can't have more than {max} arguments."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            ExpressionParserError::NoRightParenthesisAfterArguments(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = &self.text[token.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Expect ')' after arguments."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
         }
     }
 
@@ -655,7 +677,15 @@ impl<'src> NystromParserFormatter<'src> {
 
     fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
         match error {
-            StatementParserError::NonBlock(_) => todo!(),
+            StatementParserError::NonBlock(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = &self.text[token.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Expect '{{' before function body."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
             StatementParserError::InvalidNonDeclaration(decl) => {
                 let line = self.line_breaks.get_line_from_span(decl.span);
                 let lexeme = &self.text[decl.span.range()];
@@ -680,6 +710,15 @@ impl<'src> NystromParserFormatter<'src> {
                 write!(
                     buffer,
                     "({line}) [Compiler] Error at '{lexeme}': Can't have more than {max} parameters."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            StatementParserError::NoRightParenthesisAfterParameters(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = &self.text[token.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Expect ')' after parameters."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
