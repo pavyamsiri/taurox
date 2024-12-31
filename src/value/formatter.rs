@@ -388,7 +388,10 @@ impl ValueFormatter for NystromValueFormatter {
                 "({line}) [Runtime] Expected {expected} arguments but got {actual}."
             )
             .expect(&WRITE_FMT_MSG),
-            RuntimeErrorKind::InvalidSuperClass(_) => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            RuntimeErrorKind::InvalidSuperClass(_) => {
+                write!(buffer, "({line}) [Runtime] Superclass must be a class.")
+                    .expect(&WRITE_FMT_MSG)
+            }
         }
     }
 }

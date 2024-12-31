@@ -79,6 +79,8 @@ pub enum StatementParserError {
     TooManyParameters { max: usize, location: Token },
     #[error("Expected ')' after parameters.")]
     NoRightParenthesisAfterParameters(Token),
+    #[error("Expected super class name but got {0:?}.")]
+    InvalidSuperClassName(Token),
 }
 
 impl StatementParserError {
@@ -89,6 +91,7 @@ impl StatementParserError {
             StatementParserError::NoSemicolonAfterExpr(_) => "SP003",
             StatementParserError::TooManyParameters { .. } => "SP004",
             StatementParserError::NoRightParenthesisAfterParameters(_) => "SP005",
+            StatementParserError::InvalidSuperClassName(_) => "SP006",
         }
     }
 }

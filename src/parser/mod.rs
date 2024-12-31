@@ -301,7 +301,14 @@ impl<'src> Parser<'src> {
 
         // Optional super class
         let super_class = if let Some(_) = self.eat_if(TokenKind::LessThan)? {
-            Some(self.expect_ident()?)
+            let next_token = self.peek()?;
+            match next_token.kind {
+                TokenKind::Ident => Some(self.expect_ident()?),
+                _ => {
+                    let _ = self.next_token()?;
+                    return Err(StatementParserError::InvalidSuperClassName(next_token))?;
+                }
+            }
         } else {
             None
         };

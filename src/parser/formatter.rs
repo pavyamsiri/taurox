@@ -484,6 +484,17 @@ impl<'src> BasicParserFormatter<'src> {
                 )
                 .expect(&WRITE_FMT_MSG);
             }
+            StatementParserError::InvalidSuperClassName(token) => {
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(token.span);
+                write!(
+                    buffer,
+                    "({line}) Expected super class name but got {token:?}"
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
         }
     }
 }
@@ -579,6 +590,20 @@ impl<'src> PrettyParserFormatter<'src> {
                     .with_label(
                         Label::new((path, span.range()))
                             .with_message("Missing a closing parenthesis here...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(&ARIADNE_WRITE_MSG);
+            }
+            StatementParserError::InvalidSuperClassName(token) => {
+                let span = token.span;
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Expected a super class name")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("Expected a name of a class here...")
                             .with_color(Color::BrightRed),
                     )
                     .finish()
@@ -719,6 +744,15 @@ impl<'src> NystromParserFormatter<'src> {
                 write!(
                     buffer,
                     "({line}) [Compiler] Error at '{lexeme}': Expect ')' after parameters."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            StatementParserError::InvalidSuperClassName(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = &self.text[token.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Expect superclass name."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
