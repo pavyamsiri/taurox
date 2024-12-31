@@ -249,8 +249,8 @@ impl ResolverFormatter for NystromResolverFormatter {
     fn format_error_in_place(&self, buffer: &mut String, error: &ResolutionError) {
         let line = self.line_breaks.get_line_from_span(error.span);
         match &error.kind {
-            ResolutionErrorKind::SelfReferentialInitializer { .. } => {
-                write!(buffer, "").expect(&WRITE_FMT_MSG)
+            ResolutionErrorKind::SelfReferentialInitializer { destination, .. } => {
+                write!(buffer, "({line}) [Compiler] Error at '{}': Can't read local variable in its own initializer.", destination.name).expect(&WRITE_FMT_MSG)
             }
             ResolutionErrorKind::SelfReferentialInheritance { destination, .. } => write!(
                 buffer,
@@ -258,7 +258,10 @@ impl ResolverFormatter for NystromResolverFormatter {
                 destination.name
             )
             .expect(&WRITE_FMT_MSG),
-            ResolutionErrorKind::ShadowLocal { .. } => write!(buffer, "").expect(&WRITE_FMT_MSG),
+            ResolutionErrorKind::ShadowLocal { new, .. } => 
+            {
+                let line = self.line_breaks.get_line_from_span(new.span);
+                write!(buffer, "({line}) [Compiler] Error at '{}': Already a variable with this name in this scope.", new.name).expect(&WRITE_FMT_MSG);}
             ResolutionErrorKind::NonFunctionReturn => write!(
                 buffer,
                 "({line}) [Compiler] Error at 'return': Can't return from top-level code."

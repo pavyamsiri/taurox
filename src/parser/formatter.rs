@@ -565,6 +565,14 @@ impl<'src> BasicParserFormatter<'src> {
                 )
                 .expect(&WRITE_FMT_MSG);
             }
+            StatementParserError::InvalidVariableName(token) => {
+                let line = self
+                    .expr_formatter
+                    .get_line_breaks()
+                    .get_line_from_span(token.span);
+                write!(buffer, "({line}) Expected variable name got {token:?}")
+                    .expect(&WRITE_FMT_MSG);
+            }
         }
     }
 }
@@ -674,6 +682,20 @@ impl<'src> PrettyParserFormatter<'src> {
                     .with_label(
                         Label::new((path, span.range()))
                             .with_message("Expected a name of a class here...")
+                            .with_color(Color::BrightRed),
+                    )
+                    .finish()
+                    .write((path, Source::from(text)), &mut output)
+                    .expect(&ARIADNE_WRITE_MSG);
+            }
+            StatementParserError::InvalidVariableName(token) => {
+                let span = token.span;
+                Report::build(ReportKind::Error, (path, span.range()))
+                    .with_code(error.code())
+                    .with_message("Expected a variable name")
+                    .with_label(
+                        Label::new((path, span.range()))
+                            .with_message("Expected a variable name here...")
                             .with_color(Color::BrightRed),
                     )
                     .finish()
@@ -861,6 +883,15 @@ impl<'src> NystromParserFormatter<'src> {
                 write!(
                     buffer,
                     "({line}) [Compiler] Error at {lexeme}: Expect superclass name."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            StatementParserError::InvalidVariableName(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = token.span.get_lexeme(self.text);
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at {lexeme}: Expect variable name."
                 )
                 .expect(&WRITE_FMT_MSG);
             }

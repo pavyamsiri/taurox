@@ -228,7 +228,18 @@ impl<'src> Parser<'src> {
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordVar)?;
-        let name = self.expect_ident()?;
+        let name = {
+            match self.peek()? {
+                Token {
+                    kind: TokenKind::Ident,
+                    ..
+                } => self.expect_ident()?,
+                _ => {
+                    let token = self.next_token()?;
+                    return Err(StatementParserError::InvalidVariableName(token).into());
+                }
+            }
+        };
         let mut initial = None;
         // Assignment
         if let Some(_) = self.eat_if(TokenKind::Equal)? {

@@ -90,6 +90,8 @@ pub enum StatementParserError {
     NoRightParenthesisAfterParameters(Token),
     #[error("Expected super class name but got {0:?}.")]
     InvalidSuperClassName(Token),
+    #[error("Expected variable name but got {0:?}.")]
+    InvalidVariableName(Token),
 }
 
 impl StatementParserError {
@@ -101,6 +103,7 @@ impl StatementParserError {
             StatementParserError::TooManyParameters { .. } => "SP004",
             StatementParserError::NoRightParenthesisAfterParameters(_) => "SP005",
             StatementParserError::InvalidSuperClassName(_) => "SP006",
+            StatementParserError::InvalidVariableName(_) => "SP007",
         }
     }
 }
