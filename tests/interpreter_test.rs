@@ -105,6 +105,12 @@ fn test_inheritance() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_logical_operator() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/logical_operator");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
