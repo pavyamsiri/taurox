@@ -104,16 +104,21 @@ impl TestCase {
         let resolver_formatter = NystromResolverFormatter::new(&self.source);
         let value_formatter = NystromValueFormatter::new(&self.source);
 
-        let program = match parser.parse() {
-            Ok(p) => p,
-            Err(e) => {
-                let msg = parser_formatter.format_error(&e);
-                assert_eq!(
-                    self.compiler_errors, msg,
-                    "Failed test {} at compilation stage.",
-                    self.name,
-                );
-                return;
+        let mut parser_buffer = String::new();
+        let program = 'program: loop {
+            match parser.parse() {
+                Ok(Some(program)) => break 'program program,
+                Ok(None) => {
+                    assert_eq!(
+                        self.compiler_errors, parser_buffer,
+                        "Failed test {} at compilation stage.",
+                        self.name,
+                    );
+                    return;
+                }
+                Err(e) => {
+                    parser_formatter.format_error_in_place(&mut parser_buffer, &e);
+                }
             }
         };
 

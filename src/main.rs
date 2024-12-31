@@ -290,11 +290,16 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
     };
 
     let mut parser = Parser::new(src, path);
-    let program = match parser.parse() {
-        Ok(program) => program,
-        Err(e) => {
-            eprintln!("{}", parser_formatter.format_error(&e));
-            return Err(ProgramError::CompileError);
+    let program = 'program: loop {
+        match parser.parse() {
+            Ok(Some(program)) => break 'program program,
+            Ok(None) => {
+                return Err(ProgramError::CompileError);
+            }
+            Err(e) => {
+                eprintln!("{}", parser_formatter.format_error(&e));
+                return Err(ProgramError::CompileError);
+            }
         }
     };
 

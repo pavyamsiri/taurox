@@ -70,14 +70,14 @@ impl<'src> Parser<'src> {
 
 // Parse program
 impl<'src> Parser<'src> {
-    pub fn parse(&mut self) -> Result<Program, ParserError> {
+    pub fn parse(&mut self) -> Result<Option<Program>, ParserError> {
         let mut statements = Vec::new();
 
         while let Some(statement) = self.parse_statement()? {
             statements.push(statement);
         }
 
-        Ok(Program { statements })
+        Ok(Some(Program { statements }))
     }
 }
 
