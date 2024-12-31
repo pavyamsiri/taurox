@@ -426,7 +426,23 @@ impl<'src> Parser<'src> {
         let _ = self.expect(TokenKind::LeftParenthesis)?;
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
-        let body = self.parse_statement()?.ok_or(self.create_eof_error())?;
+        // Parse body
+        let body = {
+            let next = self.peek()?;
+            match next.kind {
+                TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
+                    return Err(StatementParserError::InvalidNonDeclaration(next).into());
+                }
+                _ => {
+                    let stmt @ Statement::NonDeclaration(_) =
+                        self.parse_statement()?.ok_or(self.create_eof_error())?
+                    else {
+                        panic!("We already guarded against non-declarations above so we should only get non-declarations.");
+                    };
+                    stmt
+                }
+            }
+        };
 
         let span = leftmost.span.merge(&body.get_span());
         Ok(Statement::NonDeclaration(NonDeclaration {
