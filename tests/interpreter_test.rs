@@ -153,6 +153,12 @@ fn test_string() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_super() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/super");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
