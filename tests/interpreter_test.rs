@@ -177,6 +177,12 @@ fn test_variable() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_regression() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/regression");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
