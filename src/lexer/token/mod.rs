@@ -98,6 +98,15 @@ impl Span {
             length: SpanLength::new(length as u32),
         }
     }
+
+    pub fn get_lexeme<'a>(&self, text: &'a str) -> String {
+        let slice = &text[self.range()];
+        if slice.is_empty() {
+            "end".to_string()
+        } else {
+            format!("'{slice}'")
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

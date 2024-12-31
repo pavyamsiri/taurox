@@ -242,6 +242,14 @@ impl<'src> ExpressionFormatter for SExpressionFormatter<'src> {
                     )
                     .expect(&WRITE_FMT_MSG);
                 }
+                ExpressionParserError::MissingPropertyName(token) => {
+                    let line = self
+                        .token_formatter
+                        .get_line_breaks()
+                        .get_line_from_span(token.span);
+                    write!(buffer, "({line}) Missing Property Name: {}", token.kind)
+                        .expect(&WRITE_FMT_MSG);
+                }
             },
             GeneralExpressionParserError::General(gen) => match gen {
                 GeneralParserError::UnexpectedToken {
@@ -349,6 +357,20 @@ impl<'src> ExpressionFormatter for PrettyExpressionFormatter<'src> {
                         .with_label(
                             Label::new((path, span.range()))
                                 .with_message("Missing a closing parenthesis here...")
+                                .with_color(Color::BrightRed),
+                        )
+                        .finish()
+                        .write((path, Source::from(text)), &mut output)
+                        .expect(&ARIADNE_WRITE_MSG);
+                }
+                ExpressionParserError::MissingPropertyName(token) => {
+                    let span = token.span;
+                    Report::build(ReportKind::Error, (path, span.range()))
+                        .with_code(error.code())
+                        .with_message("Expected the name of a propertry after '.'")
+                        .with_label(
+                            Label::new((path, span.range()))
+                                .with_message("Missing a name here...")
                                 .with_color(Color::BrightRed),
                         )
                         .finish()
@@ -646,10 +668,10 @@ impl<'src> NystromParserFormatter<'src> {
         match error {
             ExpressionParserError::NonExpression(token) => {
                 let line = self.line_breaks.get_line_from_span(token.span);
-                let lexeme = &self.text[token.span.range()];
+                let lexeme = token.span.get_lexeme(&self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Expect expression."
+                    "({line}) [Compiler] Error at {lexeme}: Expect expression."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
@@ -663,19 +685,28 @@ impl<'src> NystromParserFormatter<'src> {
             }
             ExpressionParserError::TooManyArguments { max, location } => {
                 let line = self.line_breaks.get_line_from_span(location.span);
-                let lexeme = &self.text[location.span.range()];
+                let lexeme = location.span.get_lexeme(self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Can't have more than {max} arguments."
+                    "({line}) [Compiler] Error at {lexeme}: Can't have more than {max} arguments."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
             ExpressionParserError::NoRightParenthesisAfterArguments(token) => {
                 let line = self.line_breaks.get_line_from_span(token.span);
-                let lexeme = &self.text[token.span.range()];
+                let lexeme = token.span.get_lexeme(self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Expect ')' after arguments."
+                    "({line}) [Compiler] Error at {lexeme}: Expect ')' after arguments."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            ExpressionParserError::MissingPropertyName(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = token.span.get_lexeme(self.text);
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at {lexeme}: Expect property name after '.'."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
@@ -711,55 +742,55 @@ impl<'src> NystromParserFormatter<'src> {
         match error {
             StatementParserError::NonBlock(token) => {
                 let line = self.line_breaks.get_line_from_span(token.span);
-                let lexeme = &self.text[token.span.range()];
+                let lexeme = token.span.get_lexeme(self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Expect '{{' before function body."
+                    "({line}) [Compiler] Error at {lexeme}: Expect '{{' before function body."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
             StatementParserError::InvalidNonDeclaration(decl) => {
                 let line = self.line_breaks.get_line_from_span(decl.span);
-                let lexeme = &self.text[decl.span.range()];
+                let lexeme = decl.span.get_lexeme(self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Expect expression."
+                    "({line}) [Compiler] Error at {lexeme}: Expect expression."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
             StatementParserError::NoSemicolonAfterExpr(token) => {
                 let line = self.line_breaks.get_line_from_span(token.span);
-                let lexeme = &self.text[token.span.range()];
+                let lexeme = token.span.get_lexeme(self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Expect ';' after expression."
+                    "({line}) [Compiler] Error at {lexeme}: Expect ';' after expression."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
             StatementParserError::TooManyParameters { max, location } => {
                 let line = self.line_breaks.get_line_from_span(location.span);
-                let lexeme = &self.text[location.span.range()];
+                let lexeme = location.span.get_lexeme(&self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Can't have more than {max} parameters."
+                    "({line}) [Compiler] Error at {lexeme}: Can't have more than {max} parameters."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
             StatementParserError::NoRightParenthesisAfterParameters(token) => {
                 let line = self.line_breaks.get_line_from_span(token.span);
-                let lexeme = &self.text[token.span.range()];
+                let lexeme = token.span.get_lexeme(self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Expect ')' after parameters."
+                    "({line}) [Compiler] Error at {lexeme}: Expect ')' after parameters."
                 )
                 .expect(&WRITE_FMT_MSG);
             }
             StatementParserError::InvalidSuperClassName(token) => {
                 let line = self.line_breaks.get_line_from_span(token.span);
-                let lexeme = &self.text[token.span.range()];
+                let lexeme = token.span.get_lexeme(self.text);
                 write!(
                     buffer,
-                    "({line}) [Compiler] Error at '{lexeme}': Expect superclass name."
+                    "({line}) [Compiler] Error at {lexeme}: Expect superclass name."
                 )
                 .expect(&WRITE_FMT_MSG);
             }

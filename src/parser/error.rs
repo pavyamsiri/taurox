@@ -31,6 +31,8 @@ pub enum ExpressionParserError {
     TooManyArguments { max: usize, location: Token },
     #[error("Expected ')' after arguments.")]
     NoRightParenthesisAfterArguments(Token),
+    #[error("Expected property name after '.'.")]
+    MissingPropertyName(Token),
 }
 
 impl ExpressionParserError {
@@ -40,6 +42,7 @@ impl ExpressionParserError {
             Self::InvalidLValue(_) => "PE003",
             Self::TooManyArguments { .. } => "PE004",
             Self::NoRightParenthesisAfterArguments(_) => "PE005",
+            Self::MissingPropertyName(_) => "PE006",
         }
     }
 }

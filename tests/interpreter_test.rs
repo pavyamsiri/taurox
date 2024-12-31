@@ -129,6 +129,12 @@ fn test_nil() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_number() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/number");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,

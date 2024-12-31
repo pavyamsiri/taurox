@@ -927,7 +927,18 @@ impl<'src> Parser<'src> {
                 }
                 PostfixOperator::Access => {
                     let _ = self.expect(TokenKind::Dot)?;
-                    let ident = self.expect_ident()?;
+                    let ident = {
+                        let next_token = self.peek()?;
+                        match next_token.kind {
+                            TokenKind::Ident => self.expect_ident()?,
+                            _ => {
+                                let _ = self.next_token()?;
+                                return Err(
+                                    ExpressionParserError::MissingPropertyName(next_token).into()
+                                );
+                            }
+                        }
+                    };
 
                     if let Some(_) = self.eat_if(TokenKind::Equal)? {
                         let rhs = self.parse_expression_pratt(0, tree)?;
