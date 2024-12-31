@@ -111,6 +111,12 @@ fn test_logical_operator() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_method() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/method");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,

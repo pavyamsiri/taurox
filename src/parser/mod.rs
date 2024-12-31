@@ -48,7 +48,9 @@ pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Result<Token, LexicalError>>,
     has_errored: bool,
-    reports: VecDeque<GeneralExpressionParserError>,
+    done: bool,
+    expression_reports: VecDeque<GeneralExpressionParserError>,
+    statement_reports: VecDeque<ParserError>,
 }
 
 // Lexer based helpers
@@ -73,21 +75,14 @@ impl<'src> Parser<'src> {
 // Parse program
 impl<'src> Parser<'src> {
     pub fn parse(&mut self) -> Result<Option<Program>, ParserError> {
-        if let Some(e) = self.reports.pop_front() {
-            self.has_errored = true;
-            return Err(e.into());
-        }
-
+        self.report_error()?;
         let mut statements = Vec::new();
 
         let peek = self.peek()?;
-        while !matches!(peek.kind, TokenKind::Eof) {
+        while !self.done && !matches!(peek.kind, TokenKind::Eof) {
             match self.parse_statement() {
                 Ok(Some(statement)) => {
-                    if let Some(e) = self.reports.pop_front() {
-                        self.has_errored = true;
-                        return Err(e.into());
-                    }
+                    self.report_error()?;
                     statements.push(statement);
                 }
                 Ok(None) => {
@@ -95,14 +90,14 @@ impl<'src> Parser<'src> {
                 }
                 Err(e) => {
                     self.has_errored = true;
-                    self.synchronize()?;
+                    self.done = self.synchronize()?;
                     return Err(e);
                 }
             }
         }
 
         assert_eq!(
-            self.reports.len(),
+            self.expression_reports.len(),
             0,
             "Should have cleared out the reports before getting here."
         );
@@ -113,10 +108,23 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn synchronize(&mut self) -> Result<(), ParserError> {
+    fn report_error(&mut self) -> Result<(), ParserError> {
+        if let Some(e) = self.expression_reports.pop_front() {
+            self.has_errored = true;
+            return Err(e.into());
+        }
+        if let Some(e) = self.statement_reports.pop_front() {
+            self.has_errored = true;
+            return Err(e.into());
+        }
+        Ok(())
+    }
+
+    fn synchronize(&mut self) -> Result<bool, ParserError> {
         // Synchronize to next statement boundary
         loop {
             let next = self.peek()?;
+            println!("SYNC: {next:?}");
             match next.kind {
                 TokenKind::KeywordClass
                 | TokenKind::KeywordFun
@@ -134,13 +142,13 @@ impl<'src> Parser<'src> {
                     break;
                 }
                 TokenKind::Eof => {
-                    return Err(self.create_eof_error().into());
+                    return Ok(true);
                 }
                 _ => {}
             }
             let _ = self.next_token()?;
         }
-        Ok(())
+        Ok(false)
     }
 }
 
@@ -241,16 +249,18 @@ impl<'src> Parser<'src> {
             loop {
                 let parameter = self.expect_ident()?;
                 if parameters.len() >= MAX_PARAMETERS {
-                    return Err(StatementParserError::TooManyParameters {
+                    let err = StatementParserError::TooManyParameters {
                         max: MAX_PARAMETERS,
                         location: Token {
                             kind: TokenKind::Ident,
                             span: parameter.span,
                         },
                     }
-                    .into());
+                    .into();
+                    self.statement_reports.push_back(err);
+                } else {
+                    parameters.push(parameter);
                 }
-                parameters.push(parameter);
 
                 let next_token = self.next_token()?;
                 match next_token.kind {
@@ -517,7 +527,7 @@ impl<'src> Parser<'src> {
             }
         };
 
-        if let Some(e) = self.reports.pop_front() {
+        if let Some(e) = self.expression_reports.pop_front() {
             return Err(e.into());
         }
 
@@ -786,7 +796,7 @@ impl<'src> Parser<'src> {
             let place = match tree.get_l_value(lhs) {
                 Some(name) => name,
                 None => {
-                    self.reports.push_back(
+                    self.expression_reports.push_back(
                         ExpressionParserError::InvalidLValue(Token {
                             kind: tree.get_kind(lhs).expect(MSG),
                             span,
@@ -885,7 +895,7 @@ impl<'src> Parser<'src> {
                                     max: MAX_PARAMETERS,
                                     location: next_token,
                                 };
-                                self.reports.push_back(err.into());
+                                self.expression_reports.push_back(err.into());
                             }
                             let argument = self.parse_expression_pratt(0, tree)?;
                             arguments.push(argument);
@@ -946,7 +956,9 @@ impl<'src> Parser<'src> {
             lexer,
             lookahead: None,
             has_errored: false,
-            reports: VecDeque::new(),
+            expression_reports: VecDeque::new(),
+            statement_reports: VecDeque::new(),
+            done: false,
         }
     }
 
