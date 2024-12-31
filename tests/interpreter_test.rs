@@ -81,6 +81,12 @@ fn test_field() -> Result<()> {
     test_engine(input_dir)
 }
 
+#[test]
+fn test_for() -> Result<()> {
+    let input_dir = Path::new("./test_data/interpreter/for");
+    test_engine(input_dir)
+}
+
 struct TestCase {
     name: String,
     source: String,
@@ -165,7 +171,9 @@ fn test_engine(input_dir: &Path) -> Result<()> {
             continue;
         }
 
+        println!("Parsing {path:?}");
         let test_case = parse_test_case(&path)?;
+        println!("Checking {}", test_case.name);
 
         let res = std::panic::catch_unwind(|| {
             test_case.check();
@@ -209,6 +217,15 @@ fn parse_test_case(input_path: &Path) -> Result<TestCase> {
         } else if let Some(comment_index) = line.find("// Error at") {
             let expected = &line[comment_index..].strip_prefix("// ").unwrap().trim();
             let expected = format!("({}) [Compiler] {expected}", line_index + 1);
+            expected_compiler_errors.push(expected);
+        } else if let Some(comment_index) = line.find("// [line ") {
+            let body = &line[comment_index..]
+                .strip_prefix("// [line ")
+                .unwrap()
+                .trim();
+            let (left, right) = body.split_once("] ").unwrap();
+            let line_number: usize = left.parse().unwrap();
+            let expected = format!("({}) [Compiler] {right}", line_number);
             expected_compiler_errors.push(expected);
         } else if let Some(comment_index) = line.find("// expect runtime error:") {
             let expected = &line[comment_index..]

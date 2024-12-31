@@ -552,19 +552,28 @@ impl<'src> ParserFormatter for PrettyParserFormatter<'src> {
     }
 }
 
-pub struct NystromParserFormatter {
+pub struct NystromParserFormatter<'src> {
+    text: &'src str,
     line_breaks: LineBreaks,
 }
 
-impl NystromParserFormatter {
-    pub fn new(text: &str) -> Self {
+impl<'src> NystromParserFormatter<'src> {
+    pub fn new(text: &'src str) -> Self {
         let line_breaks = LineBreaks::new(text);
-        Self { line_breaks }
+        Self { line_breaks, text }
     }
 
     fn format_expression_parser_error(&self, buffer: &mut String, error: &ExpressionParserError) {
         match error {
-            ExpressionParserError::NonExpression(_) => todo!(),
+            ExpressionParserError::NonExpression(token) => {
+                let line = self.line_breaks.get_line_from_span(token.span);
+                let lexeme = &self.text[token.span.range()];
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Expect expression."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
             ExpressionParserError::InvalidLValue(token) => {
                 let line = self.line_breaks.get_line_from_span(token.span);
                 write!(
@@ -577,19 +586,42 @@ impl NystromParserFormatter {
     }
 
     fn format_general_parser_error(&self, buffer: &mut String, error: &GeneralParserError) {
-        let _ = buffer;
-        let _ = error;
-        todo!();
+        match error {
+            GeneralParserError::UnexpectedToken { actual, expected } => {
+                let line = self.line_breaks.get_line_from_span(actual.span);
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Expected '{}' but got '{}'.",
+                    expected, actual.kind
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+            GeneralParserError::UnexpectedEof(span) => todo!(),
+            GeneralParserError::LexicalError(lexical_error) => todo!(),
+        }
     }
 
     fn format_statement_parser_error(&self, buffer: &mut String, error: &StatementParserError) {
-        let _ = buffer;
-        let _ = error;
-        todo!();
+        match error {
+            StatementParserError::NonBlock(_) => todo!(),
+            StatementParserError::InvalidNonDeclaration(decl) => {
+                let line = self.line_breaks.get_line_from_span(decl.span);
+                let lexeme = match decl.kind {
+                    DeclarationKind::Variable { .. } => "var",
+                    DeclarationKind::Function(_) => "fun",
+                    DeclarationKind::Class { .. } => "class",
+                };
+                write!(
+                    buffer,
+                    "({line}) [Compiler] Error at '{lexeme}': Expect expression."
+                )
+                .expect(&WRITE_FMT_MSG);
+            }
+        }
     }
 }
 
-impl ParserFormatter for NystromParserFormatter {
+impl<'src> ParserFormatter for NystromParserFormatter<'src> {
     fn format_error_in_place(&self, buffer: &mut String, error: &ParserError) {
         match error {
             ParserError::Expression(e) => self.format_expression_parser_error(buffer, e),

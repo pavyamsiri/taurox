@@ -451,7 +451,7 @@ impl TreeWalkStatementInterpreter {
             _ => {}
         };
 
-        loop {
+        let state = 'body: loop {
             let flag = match condition {
                 Option::Some(condition) => self
                     .evaluate(condition, &mut environment, context, resolution)?
@@ -460,18 +460,21 @@ impl TreeWalkStatementInterpreter {
             };
 
             if !flag {
-                break;
+                break 'body ProgramState::Run;
             }
 
-            self.interpret_non_declaration(body, &mut environment, context, resolution)?;
+            match self.interpret_non_declaration(body, &mut environment, context, resolution)? {
+                ProgramState::Run => {}
+                state @ (ProgramState::Return(_) | ProgramState::Terminate) => break 'body state,
+            }
             match increment {
                 Option::Some(increment) => {
                     self.evaluate(increment, &mut environment, context, resolution)?;
                 }
                 Option::None => {}
             }
-        }
-        Ok(ProgramState::Run)
+        };
+        Ok(state)
     }
 }
 

@@ -62,6 +62,7 @@ pub enum ProgramFormat {
     Debug,
     Basic,
     Pretty,
+    Nystrom,
 }
 
 fn main() -> ExitCode {
@@ -252,35 +253,40 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
     };
     use taurox::parser::{
         formatter::{
-            BasicParserFormatter, DebugParserFormatter, ParserFormatter, PrettyParserFormatter,
+            BasicParserFormatter, DebugParserFormatter, NystromParserFormatter, ParserFormatter,
+            PrettyParserFormatter,
         },
         Parser,
     };
     use taurox::resolver::{
         formatter::{
-            BasicResolverFormatter, DebugResolverFormatter, PrettyResolverFormatter,
-            ResolverFormatter,
+            BasicResolverFormatter, DebugResolverFormatter, NystromResolverFormatter,
+            PrettyResolverFormatter, ResolverFormatter,
         },
         Resolver,
     };
     use taurox::value::formatter::{
-        BasicValueFormatter, DebugValueFormatter, PrettyValueFormatter, ValueFormatter,
+        BasicValueFormatter, DebugValueFormatter, NystromValueFormatter, PrettyValueFormatter,
+        ValueFormatter,
     };
 
     let parser_formatter: Box<dyn ParserFormatter> = match format {
         ProgramFormat::Debug => Box::new(DebugParserFormatter {}),
         ProgramFormat::Basic => Box::new(BasicParserFormatter::new(src)),
         ProgramFormat::Pretty => Box::new(PrettyParserFormatter::new(src, path)),
+        ProgramFormat::Nystrom => Box::new(NystromParserFormatter::new(src)),
     };
     let resolver_formatter: Box<dyn ResolverFormatter> = match format {
         ProgramFormat::Debug => Box::new(DebugResolverFormatter {}),
         ProgramFormat::Basic => Box::new(BasicResolverFormatter::new(src)),
         ProgramFormat::Pretty => Box::new(PrettyResolverFormatter::new(src, path)),
+        ProgramFormat::Nystrom => Box::new(NystromResolverFormatter::new(src)),
     };
     let value_formatter: Box<dyn ValueFormatter> = match format {
         ProgramFormat::Debug => Box::new(DebugValueFormatter {}),
         ProgramFormat::Basic => Box::new(BasicValueFormatter::new(src)),
         ProgramFormat::Pretty => Box::new(PrettyValueFormatter::new(src, path)),
+        ProgramFormat::Nystrom => Box::new(NystromValueFormatter::new(src)),
     };
 
     let mut parser = Parser::new(src, path);
