@@ -14,7 +14,7 @@ use crate::lexer::{
         LineFormatter as LineTokenFormatter, PrettyFormatter as PrettyTokenFormatter,
         TokenFormatter,
     },
-    LineBreaks, Token,
+    LexicalErrorKind, LineBreaks, Token,
 };
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use std::{fmt::Write, path::Path};
@@ -696,7 +696,14 @@ impl<'src> NystromParserFormatter<'src> {
                 .expect(&WRITE_FMT_MSG);
             }
             GeneralParserError::UnexpectedEof(_) => todo!(),
-            GeneralParserError::LexicalError(_) => todo!(),
+            GeneralParserError::LexicalError(e) => match e.kind {
+                LexicalErrorKind::Unrecognized(_) => {
+                    let line = self.line_breaks.get_line_from_span(e.span);
+                    write!(buffer, "({line}) [Compiler] Error: Unexpected character.",)
+                        .expect(&WRITE_FMT_MSG);
+                }
+                LexicalErrorKind::UnclosedString => todo!(),
+            },
         }
     }
 

@@ -78,8 +78,7 @@ impl<'src> Parser<'src> {
         self.report_error()?;
         let mut statements = Vec::new();
 
-        let peek = self.peek()?;
-        while !self.done && !matches!(peek.kind, TokenKind::Eof) {
+        while !self.done && !matches!(self.peek()?.kind, TokenKind::Eof) {
             match self.parse_statement() {
                 Ok(Some(statement)) => {
                     self.report_error()?;
@@ -123,8 +122,10 @@ impl<'src> Parser<'src> {
     fn synchronize(&mut self) -> Result<bool, ParserError> {
         // Synchronize to next statement boundary
         loop {
-            let next = self.peek()?;
-            println!("SYNC: {next:?}");
+            let next = match self.peek() {
+                Ok(next) => next,
+                Err(_) => return Ok(true),
+            };
             match next.kind {
                 TokenKind::KeywordClass
                 | TokenKind::KeywordFun
