@@ -346,23 +346,28 @@ impl<'src> Parser<'src> {
             }
             // Initializer exists
             else {
-                let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
-                let initializer = match statement {
-                    Statement::Declaration(Declaration {
-                        kind: DeclarationKind::Variable(VariableDecl { name, initial }),
-                        span,
-                    }) => Some(Initializer::VarDecl {
-                        name,
-                        initial,
-                        stmt_span: span,
-                    }),
-                    Statement::NonDeclaration(NonDeclaration {
-                        kind: NonDeclarationKind::Expression(expr),
-                        ..
-                    }) => Some(Initializer::Expression(expr)),
-                    _ => None,
-                };
-                initializer
+                let token = self.peek()?;
+                match token.kind {
+                    TokenKind::KeywordVar => {
+                        let Statement::Declaration(Declaration {
+                            kind: DeclarationKind::Variable(decl),
+                            span,
+                        }) = self.parse_variable_declaration()?
+                        else {
+                            panic!("`parse_variable_declaration` will only return variable declaration statements.");
+                        };
+                        Some(Initializer::VarDecl {
+                            name: decl.name,
+                            initial: decl.initial,
+                            stmt_span: span,
+                        })
+                    }
+                    _ => {
+                        let expr = self.parse_expression()?;
+                        self.expect(TokenKind::Semicolon)?;
+                        Some(Initializer::Expression(expr))
+                    }
+                }
             }
         };
 
