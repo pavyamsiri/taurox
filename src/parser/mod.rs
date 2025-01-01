@@ -382,23 +382,7 @@ impl<'src> Parser<'src> {
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
         // Parse body
-        let body = {
-            let next = self.peek();
-            match next.kind {
-                TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
-                    return Err(StatementParserError::InvalidNonDeclaration(next).into());
-                }
-                _ => {
-                    let stmt @ Statement::NonDeclaration(_) =
-                        self.parse_statement()?.ok_or(self.create_eof_error())?
-                    else {
-                        panic!("We already guarded against non-declarations above so we should only get non-declarations.");
-                    };
-                    stmt
-                }
-            }
-        };
-
+        let body = self.expect_non_declaration()?;
         let span = leftmost.span.merge(&body.get_span());
         let stmt = WhileStatement {
             condition,
@@ -456,23 +440,7 @@ impl<'src> Parser<'src> {
         };
 
         // Parse body
-        let body = {
-            let next = self.peek();
-            match next.kind {
-                TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
-                    return Err(StatementParserError::InvalidNonDeclaration(next).into());
-                }
-                _ => {
-                    let Statement::NonDeclaration(body) =
-                        self.parse_statement()?.ok_or(self.create_eof_error())?
-                    else {
-                        panic!("We already guarded against non-declarations above so we should only get non-declarations.");
-                    };
-                    body
-                }
-            }
-        };
-
+        let body = self.expect_non_declaration()?;
         let span = leftmost.span.merge(&body.get_span());
 
         let stmt = ForStatement {
@@ -1059,6 +1027,20 @@ impl<'src> Parser<'src> {
             Ok(next_token)
         }
     }
+
+    fn expect_non_declaration(&mut self) -> Result<NonDeclaration, ParserError> {
+        let next = self.peek();
+        let stmt = match next.kind {
+            TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
+                return Err(StatementParserError::InvalidNonDeclaration(next).into());
+            }
+            _ => self
+                .parse_non_declaration()?
+                .ok_or(self.create_eof_error())?,
+        };
+        Ok(stmt)
+    }
+
     fn eat_if(&mut self, next: TokenKind) -> Result<Option<Token>, GeneralParserError> {
         let next_token = self.peek();
         if next_token.kind != next {

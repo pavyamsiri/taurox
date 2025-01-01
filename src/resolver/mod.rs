@@ -343,7 +343,7 @@ impl Resolver {
 
     fn resolve_while_statement(&mut self, stmt: &WhileStatement) -> Result<(), ResolutionError> {
         self.resolve_expression(&stmt.condition)?;
-        self.resolve_statement(&stmt.body)?;
+        self.resolve_non_declaration(&stmt.body)?;
         Ok(())
     }
 

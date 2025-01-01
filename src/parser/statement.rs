@@ -122,7 +122,7 @@ pub struct IfStatement {
 #[derive(Debug, Clone)]
 pub struct WhileStatement {
     pub condition: Expression,
-    pub body: Box<Statement>,
+    pub body: Box<NonDeclaration>,
     pub span: Span,
 }
 

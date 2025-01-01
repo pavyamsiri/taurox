@@ -323,7 +323,7 @@ impl TreeWalkStatementInterpreter {
             .evaluate(&stmt.condition, environment, context, resolution)?
             .is_truthy()
         {
-            match self.interpret_statement(&stmt.body, environment, context, resolution)? {
+            match self.interpret_non_declaration(&stmt.body, environment, context, resolution)? {
                 ProgramState::Run => {}
                 s => {
                     return Ok(s);
