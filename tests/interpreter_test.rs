@@ -339,6 +339,15 @@ fn parse_test_case(input_path: &Path) -> Result<TestCase> {
             let line_number: usize = left.parse().unwrap();
             let expected = format!("({}) [Compiler] {right}", line_number);
             expected_compiler_errors.push(expected);
+        } else if let Some(comment_index) = line.find("// [java line ") {
+            let body = &line[comment_index..]
+                .strip_prefix("// [java line ")
+                .unwrap()
+                .trim();
+            let (left, right) = body.split_once("] ").unwrap();
+            let line_number: usize = left.parse().unwrap();
+            let expected = format!("({}) [Compiler] {right}", line_number);
+            expected_compiler_errors.push(expected);
         } else if let Some(comment_index) = line.find("// expect runtime error:") {
             let expected = &line[comment_index..]
                 .strip_prefix("// expect runtime error:")

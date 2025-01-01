@@ -92,7 +92,7 @@ impl<'src> Parser<'src> {
             }
         }
 
-        if self.expression_reports.is_empty() {
+        if self.expression_reports.is_empty() && self.statement_reports.is_empty() {
             Ok(Program { statements })
         } else {
             self.statement_reports
@@ -119,6 +119,9 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Semicolon => {
                     let _ = self.next_token();
+                    if matches!(self.peek().kind, TokenKind::RightBrace) {
+                        continue;
+                    }
                     break;
                 }
                 TokenKind::Eof => {
@@ -549,7 +552,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub fn parse_expression(&mut self) -> Result<Expression, GeneralExpressionParserError> {
+    fn parse_expression(&mut self) -> Result<Expression, GeneralExpressionParserError> {
         let mut tree = IncompleteExpression::new();
         let root = self.parse_expression_pratt(0, &mut tree)?;
 
