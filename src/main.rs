@@ -309,7 +309,7 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
 
     // Static analysis
     let resolver = Resolver::new();
-    let resolution = match resolver.resolve_program_report_errors(&program) {
+    let resolution = match resolver.resolve_program(&program) {
         Ok(r) => r,
         Err(errors) => {
             for e in errors {

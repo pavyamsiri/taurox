@@ -74,17 +74,7 @@ impl Resolver {
         }
     }
 
-    pub fn resolve_program(mut self, program: &Program) -> Result<ResolutionMap, ResolutionError> {
-        for index in 0..program.len() {
-            let statement = program
-                .get_statement(index)
-                .expect("Iterating over valid indices.");
-            self.resolve_statement(statement)?;
-        }
-        Ok(self.resolution)
-    }
-
-    pub fn resolve_program_report_errors(
+    pub fn resolve_program(
         mut self,
         program: &Program,
     ) -> Result<ResolutionMap, Vec<ResolutionError>> {
