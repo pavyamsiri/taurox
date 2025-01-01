@@ -193,7 +193,7 @@ struct TestCase {
 
 impl TestCase {
     pub fn check(&self) {
-        let mut parser = Parser::new(&self.source, self.name.as_ref());
+        let parser = Parser::new(&self.source, self.name.as_ref());
         let resolver = Resolver::new();
 
         let parser_formatter = NystromParserFormatter::new(&self.source);
@@ -201,22 +201,21 @@ impl TestCase {
         let value_formatter = NystromValueFormatter::new(&self.source);
 
         let mut parser_buffer = String::new();
-        let program = 'program: loop {
-            match parser.parse() {
-                Ok(Some(program)) => break 'program program,
-                Ok(None) => {
-                    let actual = parser_buffer.trim_end();
-                    assert_eq!(
-                        self.compiler_errors, actual,
-                        "Failed test {} at compilation stage.",
-                        self.name,
-                    );
-                    return;
+        let program = match parser.parse() {
+            Ok(program) => program,
+            Err(errors) => {
+                for (index, e) in errors.iter().enumerate() {
+                    parser_formatter.format_error_in_place(&mut parser_buffer, e);
+                    if index < errors.len() - 1 {
+                        parser_buffer.push('\n');
+                    }
                 }
-                Err(e) => {
-                    parser_formatter.format_error_in_place(&mut parser_buffer, &e);
-                    parser_buffer.push('\n');
-                }
+                assert_eq!(
+                    self.compiler_errors, parser_buffer,
+                    "Failed test {} at compilation stage.",
+                    self.name,
+                );
+                return;
             }
         };
 

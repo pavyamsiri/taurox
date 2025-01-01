@@ -168,8 +168,8 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
         ExpressionFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
 
-    let parser = Parser::new(src, path);
-    match parser.try_parse_expression() {
+    let mut parser = Parser::new(src, path);
+    match parser.parse_expression() {
         Ok(expr) => {
             println!("{}", formatter.format(&expr));
             true
@@ -209,8 +209,8 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
         ValueFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
 
-    let parser = Parser::new(src, path);
-    let expression = match parser.try_parse_expression() {
+    let mut parser = Parser::new(src, path);
+    let expression = match parser.parse_expression() {
         Ok(expr) => expr,
         Err(e) => {
             eprintln!("{}", expression_formatter.format_error(&e));
@@ -292,16 +292,14 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
         ProgramFormat::Nystrom => Box::new(NystromValueFormatter::new(src)),
     };
 
-    let mut parser = Parser::new(src, path);
-    let program = 'program: loop {
-        match parser.parse() {
-            Ok(Some(program)) => break 'program program,
-            Ok(None) => {
-                return Err(ProgramError::CompileError);
-            }
-            Err(e) => {
+    let parser = Parser::new(src, path);
+    let program = match parser.parse() {
+        Ok(program) => program,
+        Err(errors) => {
+            for e in errors {
                 eprintln!("{}", parser_formatter.format_error(&e));
             }
+            return Err(ProgramError::CompileError);
         }
     };
 

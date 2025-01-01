@@ -4,7 +4,7 @@ pub mod formatter;
 pub mod statement;
 
 use crate::{
-    lexer::{Lexer, LexicalError, LineBreaks, Span, Token, TokenKind},
+    lexer::{Lexer, LineBreaks, Span, Token, TokenKind},
     string::Ident,
 };
 pub use error::ParserError;
@@ -46,10 +46,7 @@ impl Program {
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
-    lookahead: Option<Result<Token, LexicalError>>,
-    has_errored: bool,
-    has_lexer_error: bool,
-    done: bool,
+    lookahead: Option<Token>,
     expression_reports: VecDeque<GeneralExpressionParserError>,
     statement_reports: VecDeque<ParserError>,
 }
@@ -75,77 +72,39 @@ impl<'src> Parser<'src> {
 
 // Parse program
 impl<'src> Parser<'src> {
-    pub fn parse(&mut self) -> Result<Option<Program>, ParserError> {
-        if self.has_lexer_error {
-            return Ok(None);
-        }
-        self.report_error()?;
+    pub fn parse(mut self) -> Result<Program, Vec<ParserError>> {
         let mut statements = Vec::new();
 
-        let peek = match self.peek() {
-            Ok(t) => t,
-            Err(e) => {
-                let _ = self.next_token();
-                println!("Encountered lexical error");
-                self.has_lexer_error = true;
-                return Err(e.into());
-            }
-        };
-        while !self.done && !matches!(peek.kind, TokenKind::Eof) {
+        loop {
             match self.parse_statement() {
                 Ok(Some(statement)) => {
-                    self.report_error()?;
                     statements.push(statement);
                 }
                 Ok(None) => {
                     break;
                 }
                 Err(e) => {
-                    if self.synchronize()? && self.has_errored {
-                        self.has_errored = true;
-                        return Ok(None);
-                    } else {
-                        self.has_errored = true;
-                        return Err(e);
+                    self.statement_reports.push_back(e);
+                    if self.synchronize() {
+                        break;
                     }
                 }
             }
         }
 
-        assert_eq!(
-            self.expression_reports.len(),
-            0,
-            "Should have cleared out the reports before getting here."
-        );
-        if self.has_errored {
-            Ok(None)
+        if self.expression_reports.is_empty() {
+            Ok(Program { statements })
         } else {
-            Ok(Some(Program { statements }))
+            self.statement_reports
+                .extend(self.expression_reports.into_iter().map(|v| v.into()));
+            Err(self.statement_reports.into())
         }
     }
 
-    fn report_error(&mut self) -> Result<(), ParserError> {
-        if let Some(e) = self.expression_reports.pop_front() {
-            self.has_errored = true;
-            return Err(e.into());
-        }
-        if let Some(e) = self.statement_reports.pop_front() {
-            self.has_errored = true;
-            return Err(e.into());
-        }
-        Ok(())
-    }
-
-    fn synchronize(&mut self) -> Result<bool, ParserError> {
+    fn synchronize(&mut self) -> bool {
         // Synchronize to next statement boundary
         loop {
-            let next = match self.peek() {
-                Ok(next) => next,
-                Err(_) => {
-                    let _ = self.next_token();
-                    return Ok(true);
-                }
-            };
+            let next = self.peek();
             match next.kind {
                 TokenKind::KeywordClass
                 | TokenKind::KeywordFun
@@ -159,24 +118,24 @@ impl<'src> Parser<'src> {
                     break;
                 }
                 TokenKind::Semicolon => {
-                    let _ = self.next_token()?;
+                    let _ = self.next_token();
                     break;
                 }
                 TokenKind::Eof => {
-                    return Ok(true);
+                    return true;
                 }
                 _ => {}
             }
-            let _ = self.next_token()?;
+            let _ = self.next_token();
         }
-        Ok(false)
+        false
     }
 }
 
 // Parse statements
 impl<'src> Parser<'src> {
     pub fn parse_statement(&mut self) -> Result<Option<Statement>, ParserError> {
-        let first = self.peek()?;
+        let first = self.peek();
         let statement = match first.kind {
             TokenKind::KeywordFun => self.parse_function_declaration()?,
             TokenKind::KeywordVar => self.parse_variable_declaration()?,
@@ -193,7 +152,7 @@ impl<'src> Parser<'src> {
             _ => {
                 let expr = self.parse_expression()?;
                 let rightmost = {
-                    let next_token = self.next_token()?;
+                    let next_token = self.next_token();
                     match next_token.kind {
                         TokenKind::Semicolon => next_token,
                         _ => {
@@ -229,13 +188,13 @@ impl<'src> Parser<'src> {
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordVar)?;
         let name = {
-            match self.peek()? {
+            match self.peek() {
                 Token {
                     kind: TokenKind::Ident,
                     ..
                 } => self.expect_ident()?,
                 _ => {
-                    let token = self.next_token()?;
+                    let token = self.next_token();
                     return Err(StatementParserError::InvalidVariableName(token).into());
                 }
             }
@@ -294,7 +253,7 @@ impl<'src> Parser<'src> {
                     parameters.push(parameter);
                 }
 
-                let next_token = self.next_token()?;
+                let next_token = self.next_token();
                 match next_token.kind {
                     TokenKind::RightParenthesis => {
                         break;
@@ -314,7 +273,7 @@ impl<'src> Parser<'src> {
         };
 
         let (body, rightmost) = {
-            let next_token = self.peek()?;
+            let next_token = self.peek();
             let body = match next_token.kind {
                 TokenKind::LeftBrace => self.parse_block_statement(),
                 _ => Err(StatementParserError::NonBlock(next_token).into()),
@@ -343,11 +302,11 @@ impl<'src> Parser<'src> {
 
         // Optional super class
         let super_class = if let Some(_) = self.eat_if(TokenKind::LessThan)? {
-            let next_token = self.peek()?;
+            let next_token = self.peek();
             match next_token.kind {
                 TokenKind::Ident => Some(self.expect_ident()?),
                 _ => {
-                    let _ = self.next_token()?;
+                    let _ = self.next_token();
                     return Err(StatementParserError::InvalidSuperClassName(next_token))?;
                 }
             }
@@ -439,7 +398,7 @@ impl<'src> Parser<'src> {
         let _ = self.expect(TokenKind::RightParenthesis)?;
         // Parse body
         let body = {
-            let next = self.peek()?;
+            let next = self.peek();
             match next.kind {
                 TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
                     return Err(StatementParserError::InvalidNonDeclaration(next).into());
@@ -476,7 +435,7 @@ impl<'src> Parser<'src> {
             }
             // Initializer exists
             else {
-                let token = self.peek()?;
+                let token = self.peek();
                 match token.kind {
                     TokenKind::KeywordVar => {
                         let Statement::Declaration(Declaration {
@@ -529,7 +488,7 @@ impl<'src> Parser<'src> {
 
         // Parse body
         let body = {
-            let next = self.peek()?;
+            let next = self.peek();
             match next.kind {
                 TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
                     return Err(StatementParserError::InvalidNonDeclaration(next).into());
@@ -566,27 +525,6 @@ enum PrattParseOutcome {
 
 // Pratt parser for expressions
 impl<'src> Parser<'src> {
-    pub fn try_parse_expression(mut self) -> Result<Expression, GeneralExpressionParserError> {
-        let mut tree = IncompleteExpression::new();
-        let root = match self.parse_expression_pratt(0, &mut tree) {
-            Ok(root) => root,
-            Err(e) => {
-                return Err(e);
-            }
-        };
-
-        if let Some(e) = self.expression_reports.pop_front() {
-            return Err(e.into());
-        }
-
-        assert!(
-            !self.has_errored,
-            "This shouldn't have been set by expression parsing."
-        );
-        Ok(Expression::new(tree, root)
-            .expect("Root was obtained from the tree itself so it must be valid."))
-    }
-
     pub fn parse_expression(&mut self) -> Result<Expression, GeneralExpressionParserError> {
         let mut tree = IncompleteExpression::new();
         let root = self.parse_expression_pratt(0, &mut tree)?;
@@ -598,7 +536,7 @@ impl<'src> Parser<'src> {
     fn peek_infix_operator(
         &mut self,
     ) -> Result<Option<InfixOperator>, GeneralExpressionParserError> {
-        let token = self.peek()?;
+        let token = self.peek();
 
         match token.kind {
             TokenKind::Plus => Ok(Some(InfixOperator::Add)),
@@ -677,7 +615,7 @@ impl<'src> Parser<'src> {
     fn peek_postfix_operator(
         &mut self,
     ) -> Result<Option<PostfixOperator>, GeneralExpressionParserError> {
-        let token = self.peek()?;
+        let token = self.peek();
 
         match token.kind {
             TokenKind::LeftParenthesis => Ok(Some(PostfixOperator::Call)),
@@ -689,7 +627,7 @@ impl<'src> Parser<'src> {
         &mut self,
     ) -> Result<Option<InfixAssignmentOperator>, GeneralExpressionParserError> {
         type Operator = InfixAssignmentOperator;
-        let token = self.peek()?;
+        let token = self.peek();
 
         match token.kind {
             TokenKind::Equal => Ok(Some(Operator::Assign)),
@@ -701,7 +639,7 @@ impl<'src> Parser<'src> {
         &mut self,
     ) -> Result<Option<InfixShortCircuitOperator>, GeneralExpressionParserError> {
         type Operator = InfixShortCircuitOperator;
-        let token = self.peek()?;
+        let token = self.peek();
 
         match token.kind {
             TokenKind::KeywordAnd => Ok(Some(Operator::And)),
@@ -714,7 +652,7 @@ impl<'src> Parser<'src> {
         &mut self,
         tree: &mut IncompleteExpression,
     ) -> Result<ExpressionNodeRef, GeneralExpressionParserError> {
-        let token = self.next_token()?;
+        let token = self.next_token();
 
         if matches!(token.kind, TokenKind::Eof) {
             return Err(self.create_eof_error().into());
@@ -804,7 +742,7 @@ impl<'src> Parser<'src> {
             }
             // This
             TokenKind::KeywordSuper => {
-                let _ = match self.next_token()? {
+                let _ = match self.next_token() {
                     token @ Token {
                         kind: TokenKind::Dot,
                         ..
@@ -813,13 +751,13 @@ impl<'src> Parser<'src> {
                         return Err(ExpressionParserError::MissingDotAfterSuper(token).into());
                     }
                 };
-                let method = match self.peek()? {
+                let method = match self.peek() {
                     Token {
                         kind: TokenKind::Ident,
                         ..
                     } => self.expect_ident()?,
                     _ => {
-                        let token = self.next_token()?;
+                        let token = self.next_token();
                         return Err(ExpressionParserError::MissingMethodName(token).into());
                     }
                 };
@@ -854,7 +792,7 @@ impl<'src> Parser<'src> {
             if lbp < min_bp {
                 return Ok(PrattParseOutcome::Break);
             }
-            let _ = self.next_token()?;
+            let _ = self.next_token();
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
 
@@ -894,7 +832,7 @@ impl<'src> Parser<'src> {
             if lbp < min_bp {
                 return Ok(PrattParseOutcome::Break);
             }
-            let _ = self.next_token()?;
+            let _ = self.next_token();
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
             return Ok(PrattParseOutcome::NewLHS(
@@ -915,7 +853,7 @@ impl<'src> Parser<'src> {
             if lbp < min_bp {
                 return Ok(PrattParseOutcome::Break);
             }
-            let _ = self.next_token()?;
+            let _ = self.next_token();
 
             let rhs = self.parse_expression_pratt(rbp, tree)?;
             return Ok(PrattParseOutcome::NewLHS(
@@ -955,7 +893,7 @@ impl<'src> Parser<'src> {
                     else {
                         loop {
                             if arguments.len() >= MAX_PARAMETERS {
-                                let next_token = self.peek()?;
+                                let next_token = self.peek();
                                 let err = ExpressionParserError::TooManyArguments {
                                     max: MAX_PARAMETERS,
                                     location: next_token,
@@ -965,7 +903,7 @@ impl<'src> Parser<'src> {
                             let argument = self.parse_expression_pratt(0, tree)?;
                             arguments.push(argument);
 
-                            let next_token = self.next_token()?;
+                            let next_token = self.next_token();
                             match next_token.kind {
                                 TokenKind::RightParenthesis => {
                                     break;
@@ -992,11 +930,11 @@ impl<'src> Parser<'src> {
                 PostfixOperator::Access => {
                     let _ = self.expect(TokenKind::Dot)?;
                     let ident = {
-                        let next_token = self.peek()?;
+                        let next_token = self.peek();
                         match next_token.kind {
                             TokenKind::Ident => self.expect_ident()?,
                             _ => {
-                                let _ = self.next_token()?;
+                                let _ = self.next_token();
                                 return Err(
                                     ExpressionParserError::MissingPropertyName(next_token).into()
                                 );
@@ -1031,17 +969,14 @@ impl<'src> Parser<'src> {
         Self {
             lexer,
             lookahead: None,
-            has_errored: false,
             expression_reports: VecDeque::new(),
             statement_reports: VecDeque::new(),
-            done: false,
-            has_lexer_error: false,
         }
     }
 
-    fn peek(&mut self) -> Result<Token, LexicalError> {
+    fn peek(&mut self) -> Token {
         match self.lookahead {
-            Option::Some(ref token_or_error) => token_or_error.clone(),
+            Option::Some(ref token) => token.clone(),
             Option::None => {
                 let next_token = self.next_token();
                 self.lookahead = Some(next_token.clone());
@@ -1050,21 +985,26 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn next_token(&mut self) -> Result<Token, LexicalError> {
+    fn next_token(&mut self) -> Token {
         match self.lookahead.take() {
-            Option::Some(token_or_error) => token_or_error,
+            Option::Some(token) => token,
             Option::None => {
-                let token_or_error = self.lexer.next_token();
-                if token_or_error.is_err() {
-                    self.has_lexer_error = true;
-                }
-                token_or_error
+                let token = 'token: loop {
+                    match self.lexer.next_token() {
+                        Ok(token) => break 'token token,
+                        Err(e) => {
+                            self.statement_reports.push_back(e.into());
+                        }
+                    }
+                };
+
+                token
             }
         }
     }
 
     fn expect_ident(&mut self) -> Result<Ident, GeneralParserError> {
-        let next_token = self.next_token()?;
+        let next_token = self.next_token();
         if next_token.kind != TokenKind::Ident {
             return Err(GeneralParserError::UnexpectedToken {
                 actual: next_token,
@@ -1084,7 +1024,7 @@ impl<'src> Parser<'src> {
     }
 
     fn expect(&mut self, expected: TokenKind) -> Result<Token, GeneralParserError> {
-        let next_token = self.next_token()?;
+        let next_token = self.next_token();
         if next_token.kind != expected {
             Err(GeneralParserError::UnexpectedToken {
                 actual: next_token,
@@ -1096,11 +1036,11 @@ impl<'src> Parser<'src> {
     }
 
     fn eat_if(&mut self, next: TokenKind) -> Result<Option<Token>, GeneralParserError> {
-        let next_token = self.peek()?;
+        let next_token = self.peek();
         if next_token.kind != next {
             Ok(None)
         } else {
-            let _ = self.next_token().expect("Just peeked.");
+            let _ = self.next_token();
             Ok(Some(next_token))
         }
     }
