@@ -6,7 +6,10 @@ use compact_str::ToCompactString;
 use super::{Interpreter, ProgramState, StatementInterpreter, SystemContext};
 use crate::environment::SharedEnvironment;
 use crate::lexer::Span;
-use crate::parser::statement::{ClassDecl, FunctionDecl, VariableDecl};
+use crate::parser::statement::{
+    BlockStatement, ClassDecl, ExpressionStatement, ForStatement, FunctionDecl, IfStatement,
+    PrintStatement, ReturnStatement, VariableDecl, WhileStatement,
+};
 use crate::resolver::ResolutionMap;
 use crate::value::error::{RuntimeError, RuntimeErrorKind};
 use crate::value::{Class, Function, Instance, LoxValue};
@@ -16,10 +19,7 @@ use crate::{
             Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
             InfixOperator, InfixShortCircuitOperator, PrefixOperator,
         },
-        statement::{
-            Declaration, DeclarationKind, Initializer, NonDeclaration, NonDeclarationKind,
-            Statement,
-        },
+        statement::{Declaration, Initializer, NonDeclaration, Statement},
         Program,
     },
     string::Ident,
@@ -91,35 +91,15 @@ where
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
         let state = match statement {
-            Statement::Declaration(Declaration {
-                kind: DeclarationKind::Variable(VariableDecl { name, initial, .. }),
-                ..
-            }) => self.interpret_variable_declaration(
-                environment,
-                context,
-                name,
-                initial.as_ref(),
-                resolution,
-            )?,
-            Statement::Declaration(Declaration {
-                kind: DeclarationKind::Function(decl @ FunctionDecl { .. }),
-                ..
-            }) => self.interpret_function_declaration(environment, decl)?,
-            Statement::Declaration(Declaration {
-                kind:
-                    DeclarationKind::Class(ClassDecl {
-                        name,
-                        methods,
-                        super_class,
-                    }),
-                ..
-            }) => self.interpret_class_declaration(
-                environment,
-                name,
-                methods,
-                super_class.as_ref(),
-                resolution,
-            )?,
+            Statement::Declaration(Declaration::Variable(decl)) => {
+                self.interpret_variable_declaration(environment, context, &decl, resolution)?
+            }
+            Statement::Declaration(Declaration::Function(decl)) => {
+                self.interpret_function_declaration(environment, decl)?
+            }
+            Statement::Declaration(Declaration::Class(decl)) => {
+                self.interpret_class_declaration(environment, decl, resolution)?
+            }
             Statement::NonDeclaration(statement) => {
                 self.interpret_non_declaration(statement, environment, context, resolution)?
             }
@@ -147,52 +127,27 @@ impl TreeWalkStatementInterpreter {
         context: &mut C,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
-        let kind = &statement.kind;
-        let state = match kind {
-            NonDeclarationKind::Expression(expr) => {
-                self.interpret_expression_statement(environment, context, expr, resolution)?
+        let state = match statement {
+            NonDeclaration::Expression(stmt) => {
+                self.interpret_expression_statement(environment, context, stmt, resolution)?
             }
-            NonDeclarationKind::Print(expr) => {
-                self.interpret_print_statement(environment, context, expr, resolution)?
+            NonDeclaration::Print(stmt) => {
+                self.interpret_print_statement(environment, context, stmt, resolution)?
             }
-            NonDeclarationKind::Block(statements) => {
-                self.interpret_block_statement(environment, context, statements, resolution)?
+            NonDeclaration::Block(stmt) => {
+                self.interpret_block_statement(environment, context, stmt, resolution)?
             }
-            NonDeclarationKind::If {
-                condition,
-                success,
-                failure,
-            } => self.interpret_if_statement(
-                environment,
-                context,
-                condition,
-                success,
-                failure.as_ref().as_ref(),
-                resolution,
-            )?,
-            NonDeclarationKind::While { condition, body } => self.interpret_while_statement(
-                environment,
-                context,
-                condition,
-                body.as_ref(),
-                resolution,
-            )?,
-            NonDeclarationKind::For {
-                initializer,
-                condition,
-                increment,
-                body,
-            } => self.interpret_for_statement(
-                environment,
-                context,
-                initializer.as_ref(),
-                condition.as_ref(),
-                increment.as_ref(),
-                body,
-                resolution,
-            )?,
-            NonDeclarationKind::Return { value } => {
-                self.interpret_return_statement(environment, context, value.as_ref(), resolution)?
+            NonDeclaration::If(stmt) => {
+                self.interpret_if_statement(environment, context, stmt, resolution)?
+            }
+            NonDeclaration::While(stmt) => {
+                self.interpret_while_statement(environment, context, stmt, resolution)?
+            }
+            NonDeclaration::For(stmt) => {
+                self.interpret_for_statement(environment, context, stmt, resolution)?
+            }
+            NonDeclaration::Return(stmt) => {
+                self.interpret_return_statement(environment, context, stmt, resolution)?
             }
         };
         Ok(state)
@@ -202,16 +157,15 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        ident: &Ident,
-        initial: Option<&Expression>,
+        decl: &VariableDecl,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
-        let initial = if let Some(expr) = initial {
-            self.evaluate(expr, environment, context, resolution)?
+        let initial = if let Some(expr) = &decl.initial {
+            self.evaluate(&expr, environment, context, resolution)?
         } else {
             LoxValue::Nil
         };
-        environment.declare(&ident.name, initial);
+        environment.declare(&decl.name.name, initial);
         Ok(ProgramState::Run)
     }
 
@@ -223,7 +177,7 @@ impl TreeWalkStatementInterpreter {
         let function = Function {
             name: decl.name.clone(),
             parameters: decl.parameters.to_vec(),
-            body: decl.body.to_vec(),
+            body: decl.body.clone(),
             closure: environment.new_scope(),
             is_constructor: false,
         };
@@ -234,9 +188,7 @@ impl TreeWalkStatementInterpreter {
     fn interpret_class_declaration(
         &self,
         environment: &mut SharedEnvironment,
-        ident: &Ident,
-        method_decls: &[FunctionDecl],
-        super_class: Option<&Ident>,
+        decl: &ClassDecl,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
         // Either enum
@@ -255,9 +207,9 @@ impl TreeWalkStatementInterpreter {
         }
 
         // Handle subclassing
-        let super_class = if let Some(super_class) = super_class {
+        let super_class = if let Some(super_class) = &decl.super_class {
             let super_class_value = self
-                .read_variable(super_class, &environment, resolution)
+                .read_variable(&super_class, &environment, resolution)
                 .ok_or(RuntimeError {
                     kind: RuntimeErrorKind::InvalidAccess(super_class.name.clone()),
                     span: super_class.span,
@@ -275,7 +227,7 @@ impl TreeWalkStatementInterpreter {
             None
         };
 
-        let name = &ident.name;
+        let name = &decl.name.name;
         environment.declare(name, LoxValue::Nil);
 
         let inner_environment = match super_class {
@@ -289,7 +241,7 @@ impl TreeWalkStatementInterpreter {
 
         // Create methods
         let mut methods = Vec::new();
-        for decl in method_decls {
+        for decl in decl.methods.iter() {
             let is_constructor = &(*decl.name.name) == "init";
             let method = Function {
                 name: decl.name.clone(),
@@ -302,7 +254,7 @@ impl TreeWalkStatementInterpreter {
         }
 
         let class = Class {
-            name: ident.clone(),
+            name: decl.name.clone(),
             methods,
             super_class,
         };
@@ -319,10 +271,10 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        expr: &Expression,
+        stmt: &PrintStatement,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
-        let result = self.evaluate(expr, environment, context, resolution)?;
+        let result = self.evaluate(&stmt.expr, environment, context, resolution)?;
         context.writeln(&format!("{result}"));
         Ok(ProgramState::Run)
     }
@@ -331,10 +283,10 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        expr: &Expression,
+        stmt: &ExpressionStatement,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
-        let _ = self.evaluate(expr, environment, context, resolution)?;
+        let _ = self.evaluate(&stmt.expr, environment, context, resolution)?;
         Ok(ProgramState::Run)
     }
 
@@ -342,19 +294,18 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        condition: &Expression,
-        success: &Statement,
-        failure: Option<&Statement>,
+        stmt: &IfStatement,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
         let mut state = ProgramState::Run;
         if self
-            .evaluate(condition, environment, context, resolution)?
+            .evaluate(&stmt.condition, environment, context, resolution)?
             .is_truthy()
         {
-            state = self.interpret_statement(success, environment, context, resolution)?;
+            state =
+                self.interpret_statement(stmt.success.as_ref(), environment, context, resolution)?;
         } else {
-            if let Some(failure) = failure {
+            if let Some(failure) = stmt.failure.as_ref() {
                 state = self.interpret_statement(failure, environment, context, resolution)?;
             }
         }
@@ -365,15 +316,14 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        condition: &Expression,
-        body: &Statement,
+        stmt: &WhileStatement,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
         while self
-            .evaluate(condition, environment, context, resolution)?
+            .evaluate(&stmt.condition, environment, context, resolution)?
             .is_truthy()
         {
-            match self.interpret_statement(body, environment, context, resolution)? {
+            match self.interpret_statement(&stmt.body, environment, context, resolution)? {
                 ProgramState::Run => {}
                 s => {
                     return Ok(s);
@@ -388,10 +338,10 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        value: Option<&Expression>,
+        stmt: &ReturnStatement,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
-        let value = if let Some(expr) = value {
+        let value = if let Some(ref expr) = stmt.value {
             self.evaluate(expr, environment, context, resolution)?
         } else {
             LoxValue::Nil
@@ -404,12 +354,12 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        statements: &Vec<Statement>,
+        stmt: &BlockStatement,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
         let mut environment = environment.new_scope();
         let mut state = ProgramState::Run;
-        for statement in statements {
+        for statement in stmt.body.iter() {
             match self.interpret_statement(statement, &mut environment, context, resolution)? {
                 ProgramState::Run => {}
                 s => {
@@ -425,35 +375,24 @@ impl TreeWalkStatementInterpreter {
         &self,
         environment: &mut SharedEnvironment,
         context: &mut C,
-        initializer: Option<&Initializer>,
-        condition: Option<&Expression>,
-        increment: Option<&Expression>,
-        body: &NonDeclaration,
+        stmt: &ForStatement,
         resolution: &ResolutionMap,
     ) -> Result<ProgramState, RuntimeError> {
         // Run the initializer
         let mut environment = environment.new_scope();
-        match initializer {
-            Some(Initializer::VarDecl {
-                ref name, initial, ..
-            }) => {
-                self.interpret_variable_declaration(
-                    &mut environment,
-                    context,
-                    name,
-                    initial.as_ref(),
-                    resolution,
-                )?;
+        match &stmt.initializer {
+            Some(Initializer::VariableDecl(decl)) => {
+                self.interpret_variable_declaration(&mut environment, context, decl, resolution)?;
             }
-            Some(Initializer::Expression(ref expr)) => {
-                self.evaluate(expr, &mut environment, context, resolution)?;
+            Some(Initializer::Expression(stmt)) => {
+                self.interpret_expression_statement(&mut environment, context, stmt, resolution)?;
             }
             _ => {}
         };
 
         let state = 'body: loop {
-            let flag = match condition {
-                Option::Some(condition) => self
+            let flag = match stmt.condition {
+                Option::Some(ref condition) => self
                     .evaluate(condition, &mut environment, context, resolution)?
                     .is_truthy(),
                 Option::None => true,
@@ -463,12 +402,17 @@ impl TreeWalkStatementInterpreter {
                 break 'body ProgramState::Run;
             }
 
-            match self.interpret_non_declaration(body, &mut environment, context, resolution)? {
+            match self.interpret_non_declaration(
+                &stmt.body,
+                &mut environment,
+                context,
+                resolution,
+            )? {
                 ProgramState::Run => {}
                 state @ (ProgramState::Return(_) | ProgramState::Terminate) => break 'body state,
             }
-            match increment {
-                Option::Some(increment) => {
+            match stmt.increment {
+                Option::Some(ref increment) => {
                     self.evaluate(increment, &mut environment, context, resolution)?;
                 }
                 Option::None => {}

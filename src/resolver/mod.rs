@@ -8,8 +8,8 @@ use crate::{
             Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         },
         statement::{
-            ClassDecl, Declaration, DeclarationKind, FunctionDecl, Initializer, NonDeclaration,
-            NonDeclarationKind, Statement, VariableDecl,
+            BlockStatement, ClassDecl, Declaration, ForStatement, FunctionDecl, IfStatement,
+            Initializer, NonDeclaration, ReturnStatement, Statement, VariableDecl, WhileStatement,
         },
         Program,
     },
@@ -189,77 +189,52 @@ impl Resolver {
 // Implementation
 impl Resolver {
     fn resolve_declaration(&mut self, decl: &Declaration) -> Result<(), ResolutionError> {
-        match &decl.kind {
-            DeclarationKind::Variable(VariableDecl { name, initial }) => {
-                self.resolve_variable_declaration(name, &decl.span, initial.as_ref())?;
+        match &decl {
+            Declaration::Variable(decl) => {
+                self.resolve_variable_declaration(decl)?;
             }
-            DeclarationKind::Function(FunctionDecl {
-                name,
-                parameters,
-                body,
-            }) => {
-                self.resolve_function_declaration(name, &decl.span, parameters, body)?;
+            Declaration::Function(decl) => {
+                self.resolve_function_declaration(decl)?;
             }
-            DeclarationKind::Class(ClassDecl {
-                name,
-                methods,
-                super_class,
-            }) => {
-                self.resolve_class_declaration(name, &decl.span, methods, super_class.as_ref())?;
+            Declaration::Class(decl) => {
+                self.resolve_class_declaration(decl)?;
             }
         }
         Ok(())
     }
 
-    fn resolve_variable_declaration(
-        &mut self,
-        ident: &Ident,
-        span: &Span,
-        initializer: Option<&Expression>,
-    ) -> Result<(), ResolutionError> {
-        self.declare(ident, span)?;
-        if let Some(initializer) = initializer {
-            self.resolve_expression(initializer)?;
+    fn resolve_variable_declaration(&mut self, decl: &VariableDecl) -> Result<(), ResolutionError> {
+        self.declare(&decl.name, &decl.span)?;
+        if let Some(initial) = &decl.initial {
+            self.resolve_expression(initial)?;
         }
-        self.define(ident, span);
+        self.define(&decl.name, &decl.span);
         Ok(())
     }
 
-    fn resolve_function_declaration(
-        &mut self,
-        ident: &Ident,
-        span: &Span,
-        parameters: &[Ident],
-        body: &[Statement],
-    ) -> Result<(), ResolutionError> {
-        self.declare(ident, span)?;
-        self.define(ident, span);
-        self.resolve_function(parameters, body, FunctionEnvironment::Function)?;
+    fn resolve_function_declaration(&mut self, decl: &FunctionDecl) -> Result<(), ResolutionError> {
+        self.declare(&decl.name, &decl.span)?;
+        self.define(&decl.name, &decl.span);
+        self.resolve_function(&decl.parameters, &decl.body, FunctionEnvironment::Function)?;
 
         Ok(())
     }
 
-    fn resolve_class_declaration(
-        &mut self,
-        ident: &Ident,
-        span: &Span,
-        methods: &[FunctionDecl],
-        super_class: Option<&Ident>,
-    ) -> Result<(), ResolutionError> {
+    fn resolve_class_declaration(&mut self, decl: &ClassDecl) -> Result<(), ResolutionError> {
         let enclosing = self.class;
         self.class = ClassEnvironment::Class;
 
-        self.declare(ident, span)?;
-        self.define(ident, span);
+        self.declare(&decl.name, &decl.span)?;
+        self.define(&decl.name, &decl.span);
 
-        if let Some(super_class) = super_class {
-            if super_class.name == ident.name {
+        if let Some(super_class) = &decl.super_class {
+            if &super_class.name == &decl.name.name {
                 return Err(ResolutionError {
                     kind: ResolutionErrorKind::SelfReferentialInheritance {
-                        destination: ident.clone(),
+                        destination: decl.name.clone(),
                         reference: super_class.clone(),
                     },
-                    span: span.clone(),
+                    span: decl.span,
                 });
             }
 
@@ -268,24 +243,24 @@ impl Resolver {
         }
 
         // Handle super class scoping
-        if super_class.is_some() {
+        if decl.super_class.is_some() {
             let super_ident = Ident {
                 name: "super".into(),
-                span: span.clone(),
+                span: decl.span.clone(),
             };
             self.enter_scope();
-            self.declare(&super_ident, span)?;
-            self.define(&super_ident, span);
+            self.declare(&super_ident, &decl.span)?;
+            self.define(&super_ident, &decl.span);
         }
 
         self.enter_scope();
         let this_ident = Ident {
             name: "this".into(),
-            span: span.clone(),
+            span: decl.span,
         };
-        self.declare(&this_ident, span)?;
-        self.define(&this_ident, span);
-        for decl in methods {
+        self.declare(&this_ident, &decl.span)?;
+        self.define(&this_ident, &decl.span);
+        for decl in decl.methods.iter() {
             let function_type = if &(*decl.name.name) == "init" {
                 FunctionEnvironment::Constructor
             } else {
@@ -296,20 +271,20 @@ impl Resolver {
         self.exit_scope();
 
         // Pop off extra super class scope
-        if super_class.is_some() {
+        if decl.super_class.is_some() {
             self.exit_scope();
         }
 
         self.class = enclosing;
         // NOTE(pavyamsiri): This resolve doesn't happen in the book but this fixes a bug where methods can't reference their class.
-        self.resolve_variable(ident);
+        self.resolve_variable(&decl.name);
         Ok(())
     }
 
     fn resolve_function(
         &mut self,
         parameters: &[Ident],
-        body: &[Statement],
+        body: &BlockStatement,
         environment: FunctionEnvironment,
     ) -> Result<(), ResolutionError> {
         let enclosing = self.function;
@@ -319,7 +294,7 @@ impl Resolver {
             self.declare(param, &param.span)?;
             self.define(param, &param.span);
         }
-        for statement in body {
+        for statement in body.iter() {
             self.resolve_statement(statement)?;
         }
         self.exit_scope();
@@ -331,125 +306,88 @@ impl Resolver {
 // Non-declarations
 impl Resolver {
     fn resolve_non_declaration(&mut self, stmt: &NonDeclaration) -> Result<(), ResolutionError> {
-        match &stmt.kind {
-            NonDeclarationKind::Expression(expression) => self.resolve_expression(expression)?,
-            NonDeclarationKind::Print(expression) => self.resolve_expression(expression)?,
-            NonDeclarationKind::Block(statements) => {
+        match &stmt {
+            NonDeclaration::Expression(stmt) => self.resolve_expression(&stmt.expr)?,
+            NonDeclaration::Print(stmt) => self.resolve_expression(&stmt.expr)?,
+            NonDeclaration::Block(block) => {
                 self.enter_scope();
-                for statement in statements {
-                    self.resolve_statement(statement)?;
+                for stmt in block.iter() {
+                    self.resolve_statement(stmt)?;
                 }
                 self.exit_scope();
             }
-            NonDeclarationKind::If {
-                condition,
-                success,
-                failure,
-            } => {
-                self.resolve_if_statement(condition, success, failure.as_ref().as_ref())?;
+            NonDeclaration::If(stmt) => {
+                self.resolve_if_statement(stmt)?;
             }
-            NonDeclarationKind::While { condition, body } => {
-                self.resolve_while_statement(condition, body)?;
+            NonDeclaration::While(stmt) => {
+                self.resolve_while_statement(stmt)?;
             }
-            NonDeclarationKind::For {
-                initializer,
-                condition,
-                increment,
-                body,
-            } => {
-                self.resolve_for_statement(
-                    initializer.as_ref(),
-                    condition.as_ref(),
-                    increment.as_ref(),
-                    body,
-                )?;
+            NonDeclaration::For(stmt) => {
+                self.resolve_for_statement(stmt)?;
             }
-            NonDeclarationKind::Return { value } => {
-                self.resolve_return_statement(value.as_ref(), &stmt.span)?;
+            NonDeclaration::Return(stmt) => {
+                self.resolve_return_statement(stmt)?;
             }
         }
         Ok(())
     }
 
-    fn resolve_if_statement(
-        &mut self,
-        condition: &Expression,
-        success: &Statement,
-        failure: Option<&Statement>,
-    ) -> Result<(), ResolutionError> {
-        self.resolve_expression(condition)?;
-        self.resolve_statement(success)?;
-        if let Some(failure) = failure {
+    fn resolve_if_statement(&mut self, stmt: &IfStatement) -> Result<(), ResolutionError> {
+        self.resolve_expression(&stmt.condition)?;
+        self.resolve_statement(&stmt.success)?;
+        if let Some(failure) = &stmt.failure.as_ref() {
             self.resolve_statement(failure)?;
         }
         Ok(())
     }
 
-    fn resolve_while_statement(
-        &mut self,
-        condition: &Expression,
-        body: &Statement,
-    ) -> Result<(), ResolutionError> {
-        self.resolve_expression(condition)?;
-        self.resolve_statement(body)?;
+    fn resolve_while_statement(&mut self, stmt: &WhileStatement) -> Result<(), ResolutionError> {
+        self.resolve_expression(&stmt.condition)?;
+        self.resolve_statement(&stmt.body)?;
         Ok(())
     }
 
-    fn resolve_for_statement(
-        &mut self,
-        initializer: Option<&Initializer>,
-        condition: Option<&Expression>,
-        increment: Option<&Expression>,
-        body: &NonDeclaration,
-    ) -> Result<(), ResolutionError> {
+    fn resolve_for_statement(&mut self, stmt: &ForStatement) -> Result<(), ResolutionError> {
         self.enter_scope();
-        if let Some(initializer) = initializer {
+        if let Some(initializer) = &stmt.initializer {
             match initializer {
-                Initializer::VarDecl {
-                    name,
-                    initial,
-                    stmt_span,
-                } => {
-                    self.resolve_variable_declaration(name, stmt_span, initial.as_ref())?;
+                Initializer::VariableDecl(decl) => {
+                    self.resolve_variable_declaration(decl)?;
                 }
-                Initializer::Expression(expression) => {
-                    self.resolve_expression(expression)?;
+                Initializer::Expression(stmt) => {
+                    self.resolve_expression(&stmt.expr)?;
                 }
             }
         }
-        if let Some(condition) = condition {
+        if let Some(condition) = &stmt.condition {
             self.resolve_expression(condition)?;
         }
-        if let Some(increment) = increment {
+        if let Some(increment) = &stmt.increment {
             self.resolve_expression(increment)?;
         }
-        self.resolve_non_declaration(body)?;
+        self.resolve_non_declaration(&stmt.body)?;
         self.exit_scope();
         Ok(())
     }
 
-    fn resolve_return_statement(
-        &mut self,
-        expr: Option<&Expression>,
-        span: &Span,
-    ) -> Result<(), ResolutionError> {
+    fn resolve_return_statement(&mut self, stmt: &ReturnStatement) -> Result<(), ResolutionError> {
         if matches!(self.function, FunctionEnvironment::None) {
             return Err(ResolutionError {
                 kind: ResolutionErrorKind::NonFunctionReturn,
-                span: span.clone(),
+                span: stmt.span,
             });
         }
         match self.function {
             FunctionEnvironment::None => Err(ResolutionError {
                 kind: ResolutionErrorKind::NonFunctionReturn,
-                span: span.clone(),
+                span: stmt.span,
             }),
-            FunctionEnvironment::Constructor if expr.is_some() => Err(ResolutionError {
+            FunctionEnvironment::Constructor if stmt.value.is_some() => Err(ResolutionError {
                 kind: ResolutionErrorKind::ReturnInConstructor,
-                span: span.clone(),
+                span: stmt.span,
             }),
             _ => {
-                if let Some(expr) = expr {
+                if let Some(expr) = &stmt.value {
                     self.resolve_expression(expr)?;
                 }
                 Ok(())
