@@ -168,14 +168,16 @@ fn parse(src: &str, path: &Path, format: &ExpressionFormat) -> bool {
         ExpressionFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
 
-    let mut parser = Parser::new(src, path);
-    match parser.parse_expression() {
+    let parser = Parser::new(src, path);
+    match parser.consume_expression() {
         Ok(expr) => {
             println!("{}", formatter.format(&expr));
             true
         }
-        Err(e) => {
-            eprintln!("{}", formatter.format_error(&e));
+        Err(errors) => {
+            for e in errors {
+                eprintln!("{}", formatter.format_error(&e));
+            }
             false
         }
     }
@@ -209,11 +211,13 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
         ValueFormat::Pretty => Box::new(PrettyExpressionFormatter::new(src, path)),
     };
 
-    let mut parser = Parser::new(src, path);
-    let expression = match parser.parse_expression() {
+    let parser = Parser::new(src, path);
+    let expression = match parser.consume_expression() {
         Ok(expr) => expr,
-        Err(e) => {
-            eprintln!("{}", expression_formatter.format_error(&e));
+        Err(errors) => {
+            for e in errors {
+                eprintln!("{}", expression_formatter.format_error(&e));
+            }
             return Err(ProgramError::CompileError);
         }
     };

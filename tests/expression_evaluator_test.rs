@@ -15,16 +15,19 @@ use taurox::{
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
-    let mut parser = Parser::new(input, test_name.as_ref());
+    let parser = Parser::new(input, test_name.as_ref());
     // Create formatters
     let expression_formatter = SExpressionFormatter::new(input);
     let value_formatter = BasicValueFormatter::new(input);
 
-    let expr = match parser.parse_expression() {
+    let expr = match parser.consume_expression() {
         Ok(expr) => expr,
-        Err(e) => {
-            let actual = format!("{}", expression_formatter.format_error(&e));
-            assert_eq!(actual, expected, "Failed the test {test_name} [value]");
+        Err(errors) => {
+            let mut buffer = String::new();
+            for e in errors {
+                expression_formatter.format_error_in_place(&mut buffer, &e);
+            }
+            assert_eq!(buffer, expected, "Failed the test {test_name} [value]");
             return;
         }
     };

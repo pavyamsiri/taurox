@@ -525,6 +525,30 @@ enum PrattParseOutcome {
 
 // Pratt parser for expressions
 impl<'src> Parser<'src> {
+    pub fn consume_expression(mut self) -> Result<Expression, Vec<GeneralExpressionParserError>> {
+        let mut tree = IncompleteExpression::new();
+        let root = match self.parse_expression_pratt(0, &mut tree) {
+            Ok(root) => root,
+            Err(e) => {
+                self.expression_reports.push_back(e);
+                return Err(self.expression_reports.into());
+            }
+        };
+
+        if self.expression_reports.is_empty() {
+            Ok(Expression::new(tree, root)
+                .expect("Root was obtained from the tree itself so it must be valid."))
+        } else {
+            assert_eq!(
+                self.statement_reports.len(),
+                0,
+                "Parsing just an expression should not encounter any statement errors."
+            );
+
+            Err(self.expression_reports.into())
+        }
+    }
+
     pub fn parse_expression(&mut self) -> Result<Expression, GeneralExpressionParserError> {
         let mut tree = IncompleteExpression::new();
         let root = self.parse_expression_pratt(0, &mut tree)?;

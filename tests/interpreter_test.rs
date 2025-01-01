@@ -212,7 +212,7 @@ impl TestCase {
                 }
                 assert_eq!(
                     self.compiler_errors, parser_buffer,
-                    "Failed test {} at compilation stage.",
+                    "Failed test {} at compilation stage. [expected vs actual]",
                     self.name,
                 );
                 return;
@@ -231,7 +231,7 @@ impl TestCase {
                 }
                 assert_eq!(
                     self.compiler_errors, buffer,
-                    "Failed test {} at resolution stage.",
+                    "Failed test {} at resolution stage. [expected vs actual]",
                     self.name,
                 );
                 return;
@@ -253,7 +253,7 @@ impl TestCase {
                     let msg = value_formatter.format_error(&e);
                     assert_eq!(
                         self.runtime_errors, msg,
-                        "Failed test {} at runtime.",
+                        "Failed test {} at runtime [expected vs actual].",
                         self.name,
                     );
                     return;
@@ -261,7 +261,11 @@ impl TestCase {
             }
         }
         let msg = context.into_data();
-        assert_eq!(self.output, msg, "Failed test {} at print.", self.name);
+        assert_eq!(
+            self.output, msg,
+            "Failed test {} at print [expected vs actual].",
+            self.name
+        );
     }
 }
 

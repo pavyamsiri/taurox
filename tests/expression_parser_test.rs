@@ -10,14 +10,17 @@ use taurox::parser::{
 };
 
 fn check(input: &str, expected: &str, test_name: &str) {
-    let mut parser = Parser::new(input, test_name.as_ref());
+    let parser = Parser::new(input, test_name.as_ref());
     let formatter = SExpressionFormatter::new(input);
 
-    let expr = match parser.parse_expression() {
+    let expr = match parser.consume_expression() {
         Ok(expression) => expression,
-        Err(err) => {
-            let actual = formatter.format_error(&err);
-            assert_eq!(expected, actual, "Failed the test {test_name} [Error]");
+        Err(errors) => {
+            let mut buffer = String::new();
+            for err in errors {
+                formatter.format_error_in_place(&mut buffer, &err);
+            }
+            assert_eq!(expected, buffer, "Failed the test {test_name} [Error]");
             return;
         }
     };
