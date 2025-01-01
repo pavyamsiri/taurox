@@ -154,17 +154,9 @@ impl<'src> Parser<'src> {
             }
             _ => {
                 let expr = self.parse_expression()?;
-                let rightmost = {
-                    let next_token = self.next_token();
-                    match next_token.kind {
-                        TokenKind::Semicolon => next_token,
-                        _ => {
-                            return Err(
-                                StatementParserError::NoSemicolonAfterExpr(next_token).into()
-                            );
-                        }
-                    }
-                };
+                let rightmost = self.expect_or(TokenKind::Semicolon, |token| {
+                    StatementParserError::NoSemicolonAfterExpr(token).into()
+                })?;
                 let span = expr.get_span().merge(&rightmost.span);
                 Statement::NonDeclaration(NonDeclaration {
                     kind: NonDeclarationKind::Expression(expr),
@@ -190,18 +182,8 @@ impl<'src> Parser<'src> {
 
     fn parse_variable_declaration(&mut self) -> Result<Statement, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordVar)?;
-        let name = {
-            match self.peek() {
-                Token {
-                    kind: TokenKind::Ident,
-                    ..
-                } => self.expect_ident()?,
-                _ => {
-                    let token = self.next_token();
-                    return Err(StatementParserError::InvalidVariableName(token).into());
-                }
-            }
-        };
+        let name =
+            self.expect_ident_or(|token| StatementParserError::InvalidVariableName(token).into())?;
         let mut initial = None;
         // Assignment
         if let Some(_) = self.eat_if(TokenKind::Equal)? {
@@ -305,14 +287,9 @@ impl<'src> Parser<'src> {
 
         // Optional super class
         let super_class = if let Some(_) = self.eat_if(TokenKind::LessThan)? {
-            let next_token = self.peek();
-            match next_token.kind {
-                TokenKind::Ident => Some(self.expect_ident()?),
-                _ => {
-                    let _ = self.next_token();
-                    return Err(StatementParserError::InvalidSuperClassName(next_token))?;
-                }
-            }
+            Some(self.expect_ident_or(|token| {
+                StatementParserError::InvalidSuperClassName(token).into()
+            })?)
         } else {
             None
         };
@@ -1050,6 +1027,25 @@ impl<'src> Parser<'src> {
         })
     }
 
+    fn expect_ident_or(
+        &mut self,
+        wrap_err: impl FnOnce(Token) -> ParserError,
+    ) -> Result<Ident, ParserError> {
+        let next_token = self.next_token();
+        if next_token.kind != TokenKind::Ident {
+            return Err(wrap_err(next_token));
+        }
+
+        let name = self
+            .lexer
+            .get_lexeme(&next_token.span)
+            .expect("Token came from lexer so it is valid.");
+
+        Ok(Ident {
+            name: name.into(),
+            span: next_token.span,
+        })
+    }
     fn expect(&mut self, expected: TokenKind) -> Result<Token, GeneralParserError> {
         let next_token = self.next_token();
         if next_token.kind != expected {
@@ -1062,6 +1058,18 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn expect_or(
+        &mut self,
+        expected: TokenKind,
+        wrap_err: impl FnOnce(Token) -> ParserError,
+    ) -> Result<Token, ParserError> {
+        let next_token = self.next_token();
+        if next_token.kind != expected {
+            Err(wrap_err(next_token))
+        } else {
+            Ok(next_token)
+        }
+    }
     fn eat_if(&mut self, next: TokenKind) -> Result<Option<Token>, GeneralParserError> {
         let next_token = self.peek();
         if next_token.kind != next {
