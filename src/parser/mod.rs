@@ -21,7 +21,7 @@ use statement::{
     IfStatement, Initializer, NonDeclaration, PrintStatement, ReturnStatement, Statement,
     VariableDecl, WhileStatement,
 };
-use std::{collections::VecDeque, path::Path};
+use std::path::Path;
 
 /// Only allow up to 255 parameters
 const MAX_PARAMETERS: usize = 255;
@@ -48,8 +48,8 @@ impl Program {
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     lookahead: Option<Token>,
-    expression_reports: VecDeque<GeneralExpressionParserError>,
-    statement_reports: VecDeque<ParserError>,
+    expression_reports: Vec<GeneralExpressionParserError>,
+    statement_reports: Vec<ParserError>,
 }
 
 // Lexer based helpers
@@ -85,7 +85,7 @@ impl<'src> Parser<'src> {
                     break;
                 }
                 Err(e) => {
-                    self.statement_reports.push_back(e);
+                    self.statement_reports.push(e);
                     if self.synchronize() {
                         break;
                     }
@@ -247,7 +247,7 @@ impl<'src> Parser<'src> {
                         },
                     }
                     .into();
-                    self.statement_reports.push_back(err);
+                    self.statement_reports.push(err);
                 } else {
                     parameters.push(parameter);
                 }
@@ -467,7 +467,7 @@ impl<'src> Parser<'src> {
         let root = match self.parse_expression_pratt(0, &mut tree) {
             Ok(root) => root,
             Err(e) => {
-                self.expression_reports.push_back(e);
+                self.expression_reports.push(e);
                 return Err(self.expression_reports.into());
             }
         };
@@ -760,7 +760,7 @@ impl<'src> Parser<'src> {
             let place = match tree.get_l_value(lhs) {
                 Some(name) => name,
                 None => {
-                    self.expression_reports.push_back(
+                    self.expression_reports.push(
                         ExpressionParserError::InvalidLValue(Token {
                             kind: tree.get_kind(lhs).expect(MSG),
                             span,
@@ -859,7 +859,7 @@ impl<'src> Parser<'src> {
                                     max: MAX_PARAMETERS,
                                     location: next_token,
                                 };
-                                self.expression_reports.push_back(err.into());
+                                self.expression_reports.push(err.into());
                             }
                             let argument = self.parse_expression_pratt(0, tree)?;
                             arguments.push(argument);
@@ -930,8 +930,8 @@ impl<'src> Parser<'src> {
         Self {
             lexer,
             lookahead: None,
-            expression_reports: VecDeque::new(),
-            statement_reports: VecDeque::new(),
+            expression_reports: Vec::new(),
+            statement_reports: Vec::new(),
         }
     }
 
@@ -954,7 +954,7 @@ impl<'src> Parser<'src> {
                     match self.lexer.next_token() {
                         Ok(token) => break 'token token,
                         Err(e) => {
-                            self.statement_reports.push_back(e.into());
+                            self.statement_reports.push(e.into());
                         }
                     }
                 };
