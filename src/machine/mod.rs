@@ -1,6 +1,7 @@
 use crate::{
     compiler::{Chunk, Compiler, Opcode},
     interpreter::SystemContext,
+    lexer::Span,
     resolver::ResolvedProgram,
     value::{error::RuntimeError, LoxValue},
 };
@@ -42,21 +43,85 @@ where
 {
     fn interpret_chunk(&mut self, chunk: &Chunk) -> Result<(), RuntimeError> {
         loop {
-            let (inst, offset) = chunk
-                .decode_at(self.ip)
-                .expect("Reading bytes out of bounds should never happen unless we segfault.");
+            let Some((inst, offset)) = chunk.decode_at(self.ip) else {
+                eprintln!("SEGFAULT AT IP = {}", self.ip);
+                eprintln!("{}", chunk.disassemble());
+                panic!("SEGFAULT");
+            };
 
             match inst {
-                Opcode::Return => {
-                    println!("{}", chunk.disassemble());
-                    println!("STACK\n{}", self.print_stack());
-                    return Ok(());
-                }
                 Opcode::Const(handle) => {
                     let value = chunk
                         .get_constant(handle)
                         .expect("Compiled chunks should have valid constant handles.");
                     self.stack.push(value.into());
+                }
+                Opcode::Return => {
+                    println!("{}", chunk.disassemble());
+                    println!("STACK\n{}", self.print_stack());
+                    return Ok(());
+                }
+                Opcode::Multiply => {
+                    let (lhs, rhs) = self
+                        .pop_binary_operands()
+                        .expect("Not enough values on the stack!");
+                    self.stack
+                        .push(lhs.multiply(&rhs).map_err(|kind| RuntimeError {
+                            kind,
+                            span: Span {
+                                start: 0.into(),
+                                length: 0.into(),
+                            },
+                        })?);
+                }
+                Opcode::Divide => {
+                    let (lhs, rhs) = self
+                        .pop_binary_operands()
+                        .expect("Not enough values on the stack!");
+                    self.stack
+                        .push(lhs.divide(&rhs).map_err(|kind| RuntimeError {
+                            kind,
+                            span: Span {
+                                start: 0.into(),
+                                length: 0.into(),
+                            },
+                        })?);
+                }
+                Opcode::Add => {
+                    let (lhs, rhs) = self
+                        .pop_binary_operands()
+                        .expect("Not enough values on the stack!");
+                    self.stack.push(lhs.add(&rhs).map_err(|kind| RuntimeError {
+                        kind,
+                        span: Span {
+                            start: 0.into(),
+                            length: 0.into(),
+                        },
+                    })?);
+                }
+                Opcode::Subtract => {
+                    let (lhs, rhs) = self
+                        .pop_binary_operands()
+                        .expect("Not enough values on the stack!");
+                    self.stack
+                        .push(lhs.subtract(&rhs).map_err(|kind| RuntimeError {
+                            kind,
+                            span: Span {
+                                start: 0.into(),
+                                length: 0.into(),
+                            },
+                        })?);
+                }
+                Opcode::Negate => {
+                    let operand = self.stack.pop().expect("Not enough values on the stack");
+                    self.stack
+                        .push(operand.numeric_negate().map_err(|kind| RuntimeError {
+                            kind,
+                            span: Span {
+                                start: 0.into(),
+                                length: 0.into(),
+                            },
+                        })?);
                 }
             }
             self.ip = offset;
@@ -70,5 +135,11 @@ where
             write!(buffer, "{INDENT}{index:02}: {value}").expect(WRITE_FMT_MSG);
         }
         buffer
+    }
+
+    fn pop_binary_operands(&mut self) -> Option<(LoxValue, LoxValue)> {
+        let rhs = self.stack.pop()?;
+        let lhs = self.stack.pop()?;
+        Some((lhs, rhs))
     }
 }

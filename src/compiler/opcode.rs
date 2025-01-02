@@ -52,14 +52,33 @@ impl ConstantPool {
 pub enum Opcode {
     Return,
     Const(ConstRef),
+    Multiply,
+    Divide,
+    Add,
+    Subtract,
+    Negate,
 }
 
 impl Opcode {
+    // Opcode table
+    const C_RETURN: u8 = 0x01;
+    const C_CONST: u8 = 0x02;
+    const C_MULTIPLY: u8 = 0x03;
+    const C_DIVIDE: u8 = 0x04;
+    const C_ADD: u8 = 0x05;
+    const C_SUBTRACT: u8 = 0x06;
+    const C_NEGATE: u8 = 0x07;
+
     pub fn decode(data: &[u8]) -> Option<(Opcode, &[u8])> {
         let (first, rest) = data.split_first()?;
-        let (opcode, rest) = match first {
-            0xDE => (Opcode::Return, rest),
-            0xAD => {
+        let (opcode, rest) = match *first {
+            Opcode::C_RETURN => (Opcode::Return, rest),
+            Opcode::C_MULTIPLY => (Opcode::Multiply, rest),
+            Opcode::C_DIVIDE => (Opcode::Divide, rest),
+            Opcode::C_ADD => (Opcode::Add, rest),
+            Opcode::C_SUBTRACT => (Opcode::Subtract, rest),
+            Opcode::C_NEGATE => (Opcode::Negate, rest),
+            Opcode::C_CONST => {
                 let (handle_bytes, rest) = rest.split_at(4);
                 let [first, second, third, fourth] = handle_bytes else {
                     return None;
@@ -77,18 +96,28 @@ impl Opcode {
     pub fn encode(&self, chunk: &mut IncompleteChunk) {
         match self {
             Opcode::Return => {
-                chunk.emit_u8(0xDE);
+                chunk.emit_u8(Opcode::C_RETURN);
             }
             Opcode::Const(handle) => {
-                chunk.emit_u8(0xAD);
+                chunk.emit_u8(Opcode::C_CONST);
                 chunk.emit_u32(handle.0);
             }
+            Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
+            Opcode::Divide => chunk.emit_u8(Opcode::C_DIVIDE),
+            Opcode::Add => chunk.emit_u8(Opcode::C_ADD),
+            Opcode::Subtract => chunk.emit_u8(Opcode::C_SUBTRACT),
+            Opcode::Negate => chunk.emit_u8(Opcode::C_NEGATE),
         }
     }
 
     pub fn format(&self, buffer: &mut String, chunk: &Chunk) {
         match self {
             Opcode::Return => buffer.push_str("ret"),
+            Opcode::Multiply => buffer.push_str("mul"),
+            Opcode::Divide => buffer.push_str("div"),
+            Opcode::Add => buffer.push_str("add"),
+            Opcode::Subtract => buffer.push_str("sub"),
+            Opcode::Negate => buffer.push_str("neg"),
             Opcode::Const(handle) => {
                 buffer.push_str("ldc ");
                 let value = chunk

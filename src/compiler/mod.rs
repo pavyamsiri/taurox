@@ -10,7 +10,7 @@ use std::sync::Arc;
 const WRITE_FMT_MSG: &'static str =
     "Encountered an error while attempting to write format string to buffer.";
 
-struct IncompleteChunk<'src> {
+pub struct IncompleteChunk<'src> {
     name: IdentName,
     text: &'src str,
     line_breaks: LineBreaks,
@@ -48,6 +48,31 @@ impl<'src> IncompleteChunk<'src> {
     pub fn emit_return(&mut self, span: Span) {
         self.spans.push(span);
         Opcode::Return.encode(self);
+    }
+
+    pub fn emit_multiply(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::Multiply.encode(self);
+    }
+
+    pub fn emit_divide(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::Divide.encode(self);
+    }
+
+    pub fn emit_add(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::Add.encode(self);
+    }
+
+    pub fn emit_subtract(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::Subtract.encode(self);
+    }
+
+    pub fn emit_negate(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::Negate.encode(self);
     }
 
     pub fn emit_constant(&mut self, span: Span, value: LoxConstant) {
@@ -162,30 +187,14 @@ pub struct Compiler {}
 
 impl Compiler {
     pub fn compile<'src>(program: &ResolvedProgram, text: &'src str) -> Chunk<'src> {
+        let dummy_span = Span {
+            start: 0.into(),
+            length: 0.into(),
+        };
         let mut chunk = IncompleteChunk::new("TEST".into(), text);
-        chunk.emit_constant(
-            Span {
-                start: 3.into(),
-                length: 5.into(),
-            },
-            LoxConstant::Number(4512.0084),
-        );
-        chunk.emit_return(Span {
-            start: 0.into(),
-            length: 3.into(),
-        });
-        chunk.emit_return(Span {
-            start: 0.into(),
-            length: 3.into(),
-        });
-        chunk.emit_return(Span {
-            start: 0.into(),
-            length: 3.into(),
-        });
-        chunk.emit_return(Span {
-            start: 8.into(),
-            length: 2.into(),
-        });
+        chunk.emit_constant(dummy_span, LoxConstant::Number(4512.0084));
+        chunk.emit_negate(dummy_span);
+        chunk.emit_return(dummy_span);
         chunk.finish()
     }
 }
