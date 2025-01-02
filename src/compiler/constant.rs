@@ -11,7 +11,7 @@ const WRITE_FMT_MSG: &'static str =
 #[derive(Debug, Clone, Copy)]
 pub struct ConstRef(pub u32);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LoxConstant {
     Number(f64),
     Nil,
@@ -83,14 +83,25 @@ impl ConstantPool {
     }
 
     pub fn push_constant(&mut self, value: LoxConstant) -> ConstRef {
-        self.data.push(value);
-        ConstRef((self.data.len() - 1) as u32)
+        // Find if there is a constant that has the same value
+        if let Some(old_handle) = self
+            .data
+            .iter()
+            .enumerate()
+            .find(|&(_, v)| v == &value)
+            .and_then(|(index, _)| Some(index))
+        {
+            ConstRef(old_handle as u32)
+        } else {
+            self.data.push(value);
+            ConstRef((self.data.len() - 1) as u32)
+        }
     }
 
     pub fn push_str(&mut self, text: &str) -> ConstRef {
         let handle = self.interned_strings.intern(text);
-        self.data.push(LoxConstant::String(handle));
-        ConstRef((self.data.len() - 1) as u32)
+        let value = LoxConstant::String(handle);
+        self.push_constant(value)
     }
 
     pub fn format_constant(&self, handle: ConstRef, buffer: &mut String) {

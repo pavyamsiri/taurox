@@ -277,10 +277,15 @@ impl<'src> Chunk<'src> {
                 None => false,
             };
             if same {
-                write!(buffer, "{:>width$}| ", " ", width = num_digits).expect(WRITE_FMT_MSG);
+                write!(buffer, "{:>width$}| ", " ", width = num_digits - 1).expect(WRITE_FMT_MSG);
             } else {
-                write!(buffer, "{:>width$}{line_number} ", "L", width = num_digits)
-                    .expect(WRITE_FMT_MSG);
+                write!(
+                    buffer,
+                    "{:>width$} ",
+                    format!("L{line_number}"),
+                    width = num_digits
+                )
+                .expect(WRITE_FMT_MSG);
             }
             if let Some(opcode) = opcode {
                 opcode.format(&mut buffer, self);
