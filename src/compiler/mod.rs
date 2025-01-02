@@ -1,3 +1,4 @@
+mod constant;
 mod opcode;
 
 use crate::lexer::{LineBreaks, Span};
@@ -8,8 +9,9 @@ use crate::parser::expression::{
 use crate::parser::statement::{ExpressionStatement, Statement};
 use crate::resolver::ResolvedProgram;
 use crate::string::IdentName;
-pub use opcode::DecodeError;
-pub use opcode::{ConstRef, ConstantPool, LoxConstant, Opcode};
+use constant::InternStringHandle;
+pub use constant::{ConstRef, ConstantPool, LoxConstant};
+pub use opcode::{DecodeError, Opcode};
 use std::fmt::Write;
 use std::sync::Arc;
 
@@ -120,6 +122,13 @@ impl<'src> IncompleteChunk<'src> {
         Opcode::Const(handle).encode(self);
     }
 
+    pub fn emit_string_literal(&mut self, span: Span, text: &str) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        let handle = self.constants.push_str(text);
+        Opcode::Const(handle).encode(self);
+    }
+
     pub fn finish(self) -> Chunk<'src> {
         Chunk {
             name: self.name,
@@ -212,6 +221,10 @@ impl<'src> Chunk<'src> {
 
     pub fn get_constant(&self, handle: ConstRef) -> Option<&LoxConstant> {
         self.constants.get(handle)
+    }
+
+    pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
+        self.constants.get_string(handle)
     }
 
     pub fn disassemble(&self) -> String {
@@ -389,7 +402,9 @@ impl Compiler {
                 chunk.emit_constant(span, LoxConstant::Nil);
             }
             ExpressionAtomKind::Identifier(rc) => todo!(),
-            ExpressionAtomKind::StringLiteral(rc) => todo!(),
+            ExpressionAtomKind::StringLiteral(text) => {
+                chunk.emit_string_literal(span, &text);
+            }
             ExpressionAtomKind::This => todo!(),
             ExpressionAtomKind::Super(rc) => todo!(),
         }

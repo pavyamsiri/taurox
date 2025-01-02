@@ -1,7 +1,6 @@
 use thiserror::Error;
 
-use super::{Chunk, IncompleteChunk};
-use crate::{machine::value::VMValue, value::LoxValue};
+use super::{Chunk, ConstRef, IncompleteChunk};
 use std::fmt::Write;
 
 const WRITE_FMT_MSG: &'static str =
@@ -13,66 +12,6 @@ pub enum DecodeError {
     InvalidOpcode { value: u8 },
     #[error("Incomplete operand for opcode {opcode:?}.")]
     IncompleteOperand { opcode: u8 },
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum LoxConstant {
-    Number(f64),
-    Nil,
-    Bool(bool),
-}
-
-impl std::fmt::Display for LoxConstant {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LoxConstant::Number(value) => write!(f, "{value}"),
-            LoxConstant::Nil => write!(f, "nil"),
-            LoxConstant::Bool(value) => write!(f, "{value}"),
-        }
-    }
-}
-
-impl From<&LoxConstant> for LoxValue {
-    fn from(value: &LoxConstant) -> Self {
-        match value {
-            LoxConstant::Number(value) => Self::Number(*value),
-            LoxConstant::Nil => Self::Nil,
-            LoxConstant::Bool(value) => Self::Bool(*value),
-        }
-    }
-}
-
-impl From<&LoxConstant> for VMValue {
-    fn from(value: &LoxConstant) -> Self {
-        match value {
-            LoxConstant::Number(value) => Self::Number(*value),
-            LoxConstant::Nil => Self::Nil,
-            LoxConstant::Bool(value) => Self::Bool(*value),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct ConstRef(u32);
-
-#[derive(Debug)]
-pub struct ConstantPool {
-    data: Vec<LoxConstant>,
-}
-
-impl ConstantPool {
-    pub fn new() -> Self {
-        Self { data: Vec::new() }
-    }
-
-    pub fn get(&self, handle: ConstRef) -> Option<&LoxConstant> {
-        self.data.get(handle.0 as usize)
-    }
-
-    pub fn push_constant(&mut self, value: LoxConstant) -> ConstRef {
-        self.data.push(value);
-        ConstRef((self.data.len() - 1) as u32)
-    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -160,11 +99,8 @@ impl Opcode {
         match self {
             Opcode::Const(handle) => {
                 buffer.push_str("ldc");
-                let value = chunk
-                    .get_constant(*handle)
-                    .expect("OP_CONSTANT has an invalid constant reference.");
-                write!(buffer, " {:<width$}${} = {value}", " ", handle.0, width = 4)
-                    .expect(WRITE_FMT_MSG);
+                write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
+                chunk.constants.format_constant(*handle, buffer);
             }
             Opcode::Return => buffer.push_str("ret"),
             Opcode::Multiply => buffer.push_str("mul"),

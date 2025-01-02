@@ -1,10 +1,11 @@
-use super::error::VMRuntimeErrorKind;
+use super::{error::VMRuntimeErrorKind, garbage::VMStringRef};
 
 #[derive(Debug, Clone)]
 pub enum VMValue {
     Number(f64),
     Nil,
     Bool(bool),
+    String(VMStringRef),
 }
 
 impl std::fmt::Display for VMValue {
@@ -13,6 +14,7 @@ impl std::fmt::Display for VMValue {
             Self::Number(v) => write!(f, "{v}"),
             Self::Nil => write!(f, "nil"),
             Self::Bool(v) => write!(f, "{v}"),
+            Self::String(v) => write!(f, "<string ref {v:?}>"),
         }
     }
 }
@@ -41,13 +43,6 @@ impl VMValue {
 // Binary
 impl VMValue {
     // Arithmetic + string concatenation
-    pub fn add(&self, other: &VMValue) -> Result<VMValue, VMRuntimeErrorKind> {
-        match (self, other) {
-            (VMValue::Number(lhs), VMValue::Number(rhs)) => Ok(VMValue::Number(lhs + rhs)),
-            (lhs, rhs) => Err(VMRuntimeErrorKind::NonAddable(lhs.clone(), rhs.clone())),
-        }
-    }
-
     pub fn subtract(&self, other: &VMValue) -> Result<VMValue, VMRuntimeErrorKind> {
         match (self, other) {
             (VMValue::Number(lhs), VMValue::Number(rhs)) => Ok(VMValue::Number(lhs - rhs)),
