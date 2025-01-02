@@ -123,7 +123,8 @@ where
                 }
                 Opcode::Equals => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack.push(VMValue::Bool(lhs.is_equal(&rhs)));
+                    let value = VMValue::Bool(self.is_equal(&lhs, &rhs));
+                    self.stack.push(value);
                 }
                 Opcode::LessThan => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
@@ -187,6 +188,27 @@ where
                 Ok(VMValue::String(handle))
             }
             (lhs, rhs) => Err(VMRuntimeErrorKind::NonAddable(lhs.clone(), rhs.clone())),
+        }
+    }
+
+    // Equality
+    pub fn is_equal(&self, left: &VMValue, right: &VMValue) -> bool {
+        match (left, right) {
+            (VMValue::Number(lhs), VMValue::Number(rhs)) => lhs == rhs,
+            (VMValue::Bool(lhs), VMValue::Bool(rhs)) => lhs == rhs,
+            (VMValue::Nil, VMValue::Nil) => true,
+            (VMValue::String(lhs), VMValue::String(rhs)) => {
+                let lhs = self
+                    .string_allocator
+                    .get(*lhs)
+                    .expect("[Equal]: LHS Handle should be valid.");
+                let rhs = self
+                    .string_allocator
+                    .get(*rhs)
+                    .expect("[Equal]: RHS Handle should be valid.");
+                lhs == rhs
+            }
+            _ => false,
         }
     }
 }

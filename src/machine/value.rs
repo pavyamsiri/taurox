@@ -78,14 +78,4 @@ impl VMValue {
             (lhs, rhs) => Err(VMRuntimeErrorKind::NonNumerics(lhs.clone(), rhs.clone())),
         }
     }
-
-    // Equality
-    pub fn is_equal(&self, other: &VMValue) -> bool {
-        match (self, other) {
-            (VMValue::Number(lhs), VMValue::Number(rhs)) => lhs == rhs,
-            (VMValue::Nil, VMValue::Nil) => true,
-            (VMValue::Bool(lhs), VMValue::Bool(rhs)) => lhs == rhs,
-            _ => false,
-        }
-    }
 }
