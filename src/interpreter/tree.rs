@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use compact_str::ToCompactString;
 
-use super::{ProgramState, SystemContext};
+use super::SystemContext;
 use crate::environment::SharedEnvironment;
 use crate::lexer::Span;
 use crate::parser::statement::{
@@ -23,6 +23,12 @@ use crate::{
     },
     string::Ident,
 };
+
+#[derive(Debug)]
+enum ProgramState {
+    Run,
+    Return(LoxValue),
+}
 
 pub struct TreeWalkInterpreter<C: SystemContext> {
     environment: SharedEnvironment,
@@ -44,16 +50,12 @@ where
 
     pub fn run(mut self, program: &ResolvedProgram) -> Result<C, RuntimeError> {
         for stmt in program.iter() {
-            let state = self.interpreter.interpret_statement(
+            self.interpreter.interpret_statement(
                 program,
                 &mut self.environment,
                 &mut self.context,
                 stmt,
             )?;
-            match state {
-                ProgramState::Terminate => break,
-                _ => {}
-            }
         }
         Ok(self.context)
     }
@@ -406,7 +408,7 @@ impl TreeWalkStatementInterpreter {
                 body.clone(),
             )? {
                 ProgramState::Run => {}
-                state @ (ProgramState::Return(_) | ProgramState::Terminate) => return Ok(state),
+                state @ ProgramState::Return(_) => return Ok(state),
             }
 
             // Increment
@@ -832,9 +834,6 @@ impl TreeWalkStatementInterpreter {
                 ProgramState::Return(v) => {
                     result = v;
                     break;
-                }
-                ProgramState::Terminate => {
-                    panic!("Terminating during function?");
                 }
             }
         }
