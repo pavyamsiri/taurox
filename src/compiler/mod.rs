@@ -6,10 +6,13 @@ use crate::parser::expression::{
     Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
     InfixOperator, PrefixOperator,
 };
-use crate::parser::statement::{ExpressionStatement, PrintStatement, Statement, VariableDecl};
+use crate::parser::statement::{
+    BlockStatement, ExpressionStatement, PrintStatement, Statement, VariableDecl,
+};
 use crate::resolver::ResolvedProgram;
-use crate::string::{IdentName, InternStringHandle};
+use crate::string::{Ident, IdentName, InternStringHandle, StringInterner};
 pub use constant::{ConstRef, ConstantPool, LoxConstant};
+use opcode::StackSlot;
 pub use opcode::{DecodeError, Opcode};
 use std::fmt::Write;
 use std::sync::Arc;
@@ -161,6 +164,18 @@ impl<'src> IncompleteChunk<'src> {
         Opcode::Const(handle).encode(self);
     }
 
+    pub fn emit_get_local(&mut self, span: Span, slot: StackSlot) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        Opcode::GetLocal(slot).encode(self);
+    }
+
+    pub fn emit_set_local(&mut self, span: Span, slot: StackSlot) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        Opcode::SetLocal(slot).encode(self);
+    }
+
     pub fn finish(self) -> Chunk<'src> {
         Chunk {
             name: self.name,
@@ -308,10 +323,56 @@ impl<'src> Chunk<'src> {
     }
 }
 
-pub struct Compiler;
+struct Local {
+    name: InternStringHandle,
+    depth: usize,
+}
+
+pub struct Compiler {
+    locals: Vec<Local>,
+    interner: StringInterner,
+    depth: usize,
+}
 
 impl Compiler {
-    pub fn compile<'src>(&self, program: &ResolvedProgram, text: &'src str) -> Chunk<'src> {
+    pub fn new() -> Self {
+        Self {
+            locals: Vec::new(),
+            depth: 0,
+            interner: StringInterner::new(),
+        }
+    }
+
+    fn add_local(&mut self, ident: &Ident) {
+        let handle = self.interner.intern(&ident.name);
+        let local = Local {
+            name: handle,
+            depth: self.depth,
+        };
+        self.locals.push(local);
+    }
+
+    fn enter_scope(&mut self) {
+        self.depth += 1;
+    }
+
+    #[must_use]
+    fn exit_scope(&mut self) -> usize {
+        let old_depth = self.depth;
+        self.depth = self.depth.saturating_sub(1);
+
+        if let Some(index) = self
+            .locals
+            .iter()
+            .position(|local| local.depth >= old_depth)
+        {
+            self.locals.drain(index..).count()
+        } else {
+            0
+        }
+    }
+
+    pub fn compile<'src>(mut self, program: &ResolvedProgram, text: &'src str) -> Chunk<'src> {
         let mut chunk = IncompleteChunk::new("PROGRAM".into(), text);
 
         for stmt in program.iter() {
@@ -322,7 +383,7 @@ impl Compiler {
     }
 
     fn compile_stmt<'stmt>(
-        &self,
+        &mut self,
         program: &ResolvedProgram,
         chunk: &mut IncompleteChunk,
         stmt: Statement<'stmt>,
@@ -333,7 +394,7 @@ impl Compiler {
             Statement::ClassDecl(_) => todo!(),
             Statement::Expression(stmt) => self.compile_expression_stmt(program, chunk, stmt),
             Statement::Print(stmt) => self.compile_print_stmt(program, chunk, stmt),
-            Statement::Block(_) => todo!(),
+            Statement::Block(stmt) => self.compile_block_stmt(program, chunk, stmt),
             Statement::If(_) => todo!(),
             Statement::While(_) => todo!(),
             Statement::For(_) => todo!(),
@@ -341,9 +402,8 @@ impl Compiler {
         }
     }
 
-    // TODO(pavyamsiri): Every variable is global right now.
     fn compile_variable_decl(
-        &self,
+        &mut self,
         program: &ResolvedProgram,
         chunk: &mut IncompleteChunk,
         decl: &VariableDecl,
@@ -353,7 +413,15 @@ impl Compiler {
         } else {
             chunk.emit_constant(decl.span, LoxConstant::Nil);
         }
-        chunk.emit_define_global(decl.span, &decl.name.name);
+
+        // Local scope
+        if self.depth > 0 {
+            self.add_local(&decl.name);
+        }
+        // Global scope
+        else {
+            chunk.emit_define_global(decl.span, &decl.name.name);
+        }
     }
 
     fn compile_expression_stmt(
@@ -374,6 +442,27 @@ impl Compiler {
     ) {
         self.compile_expression(program, chunk, &stmt.expr);
         chunk.emit_print(stmt.span);
+    }
+
+    fn compile_block_stmt(
+        &mut self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        block: &BlockStatement,
+    ) {
+        self.enter_scope();
+
+        for stmt in block.iter() {
+            let stmt = program
+                .get_statement(stmt)
+                .expect("[Compile Block]: Handles are all valid.");
+            self.compile_stmt(program, chunk, stmt);
+        }
+
+        let to_pop = self.exit_scope();
+        for _ in 0..to_pop {
+            chunk.emit_pop(block.span);
+        }
     }
 }
 
@@ -438,8 +527,12 @@ impl Compiler {
             }
             ExpressionNode::InfixAssignment { lhs, rhs } => {
                 self.compile_expression_node(program, chunk, expr, *rhs);
-                // TODO(pavyamsiri): Only globals are supported right now.
-                chunk.emit_set_global(span, &lhs.name);
+                let ident_name = &lhs.name;
+                if let Some(slot) = self.resolve_local(ident_name) {
+                    chunk.emit_set_local(span, StackSlot(slot as u32));
+                } else {
+                    chunk.emit_set_global(span, &lhs.name);
+                }
             }
             ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
                 todo!()
@@ -473,8 +566,12 @@ impl Compiler {
                 chunk.emit_constant(span, LoxConstant::Nil);
             }
             ExpressionAtomKind::Identifier(ident) => {
-                // TODO(pavyamsiri): All identifiers are implicit global gets which is wrong.
-                chunk.emit_get_global(span, ident);
+                let ident_name = &(**ident);
+                if let Some(slot) = self.resolve_local(ident_name) {
+                    chunk.emit_get_local(span, StackSlot(slot as u32));
+                } else {
+                    chunk.emit_get_global(span, ident);
+                }
             }
             ExpressionAtomKind::StringLiteral(text) => {
                 chunk.emit_string_literal(span, &text);
@@ -482,5 +579,18 @@ impl Compiler {
             ExpressionAtomKind::This => todo!(),
             ExpressionAtomKind::Super(rc) => todo!(),
         }
+    }
+
+    fn resolve_local(&self, name: &str) -> Option<usize> {
+        for (index, local) in self.locals.iter().enumerate().rev() {
+            let local_name = self
+                .interner
+                .get_string(local.name)
+                .expect("[Resolve Local]: All handles are valid.");
+            if local_name == name {
+                return Some(index);
+            }
+        }
+        None
     }
 }

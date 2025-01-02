@@ -11,6 +11,8 @@ pub enum VMError {
     Runtime(#[from] VMRuntimeError),
     #[error("Only have {actual} out of expected {expected}")]
     MissingStackOperands { expected: usize, actual: usize },
+    #[error("Invalid stack slot {slot} for stack of size {size}")]
+    InvalidSlot { slot: usize, size: usize },
 }
 
 #[derive(Debug, Error, Clone)]

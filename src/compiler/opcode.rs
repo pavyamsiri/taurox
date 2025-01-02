@@ -15,6 +15,9 @@ pub enum DecodeError {
 }
 
 #[derive(Debug, Clone, Copy)]
+pub struct StackSlot(pub u32);
+
+#[derive(Debug, Clone, Copy)]
 pub enum Opcode {
     Return,
     Const(ConstRef),
@@ -32,6 +35,8 @@ pub enum Opcode {
     DefineGlobal(ConstRef),
     GetGlobal(ConstRef),
     SetGlobal(ConstRef),
+    GetLocal(StackSlot),
+    SetLocal(StackSlot),
 }
 
 impl Opcode {
@@ -52,6 +57,8 @@ impl Opcode {
     const C_DEFINE_GLOBAL: u8 = 0x0E;
     const C_GET_GLOBAL: u8 = 0x0F;
     const C_SET_GLOBAL: u8 = 0x10;
+    const C_GET_LOCAL: u8 = 0x11;
+    const C_SET_LOCAL: u8 = 0x12;
 
     pub fn decode_at(data: &[u8], index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
         let Some(first) = data.get(index) else {
@@ -82,6 +89,14 @@ impl Opcode {
             Opcode::C_SET_GLOBAL => {
                 let handle = parse_u32(Opcode::C_SET_GLOBAL)?;
                 (Opcode::SetGlobal(ConstRef(handle)), index + 5)
+            }
+            Opcode::C_GET_LOCAL => {
+                let slot = parse_u32(Opcode::C_GET_GLOBAL)?;
+                (Opcode::GetLocal(StackSlot(slot)), index + 5)
+            }
+            Opcode::C_SET_LOCAL => {
+                let slot = parse_u32(Opcode::C_SET_GLOBAL)?;
+                (Opcode::SetLocal(StackSlot(slot)), index + 5)
             }
             Opcode::C_RETURN => (Opcode::Return, index + 1),
             Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
@@ -120,6 +135,14 @@ impl Opcode {
                 chunk.emit_u8(Opcode::C_SET_GLOBAL);
                 chunk.emit_u32(handle.0);
             }
+            Opcode::GetLocal(handle) => {
+                chunk.emit_u8(Opcode::C_GET_LOCAL);
+                chunk.emit_u32(handle.0);
+            }
+            Opcode::SetLocal(handle) => {
+                chunk.emit_u8(Opcode::C_SET_LOCAL);
+                chunk.emit_u32(handle.0);
+            }
             Opcode::Return => chunk.emit_u8(Opcode::C_RETURN),
             Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
             Opcode::Divide => chunk.emit_u8(Opcode::C_DIVIDE),
@@ -156,6 +179,14 @@ impl Opcode {
                 buffer.push_str("sgl");
                 write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
                 chunk.constants.format_constant(*handle, buffer);
+            }
+            Opcode::GetLocal(handle) => {
+                buffer.push_str("glc");
+                write!(buffer, " {:<width$}#{}", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
+            }
+            Opcode::SetLocal(handle) => {
+                buffer.push_str("slc");
+                write!(buffer, " {:<width$}#{}", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
             }
             Opcode::Return => buffer.push_str("ret"),
             Opcode::Multiply => buffer.push_str("mul"),

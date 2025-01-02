@@ -7,6 +7,7 @@ use crate::{
     interpreter::SystemContext,
     resolver::ResolvedProgram,
     string::{InternStringHandle, StringInterner},
+    value::LoxValue,
 };
 use error::{VMError, VMRuntimeError, VMRuntimeErrorKind};
 use garbage::StringAllocator;
@@ -45,7 +46,7 @@ where
     }
 
     pub fn run(mut self, program: &ResolvedProgram, text: &str) -> Result<C, VMError> {
-        let compiler = Compiler;
+        let compiler = Compiler::new();
         let chunk = compiler.compile(program, text);
 
         println!("Compiled:\n{}", chunk.disassemble());
@@ -202,10 +203,43 @@ where
                         .into());
                     }
                 }
+                Opcode::GetLocal(slot) => {
+                    let value = self.get_stack(slot.0 as usize)?;
+                    self.stack.push(value.clone());
+                }
+                Opcode::SetLocal(slot) => {
+                    let value = self.peek()?;
+                    self.set_stack(value.clone(), slot.0 as usize)?;
+                }
             }
             self.ip = offset;
         }
         Ok(())
+    }
+
+    fn get_stack(&self, slot: usize) -> Result<&VMValue, VMError> {
+        let size = self.stack.len();
+        Ok(self
+            .stack
+            .get(slot)
+            .ok_or(VMError::InvalidSlot { slot, size })?)
+    }
+
+    fn set_stack(&mut self, value: VMValue, slot: usize) -> Result<(), VMError> {
+        let size = self.stack.len();
+        *self
+            .stack
+            .get_mut(slot)
+            .ok_or(VMError::InvalidSlot { slot, size })? = value;
+        Ok(())
+    }
+
+    fn peek(&self) -> Result<&VMValue, VMError> {
+        let value = self.stack.last().ok_or(VMError::MissingStackOperands {
+            expected: 1,
+            actual: 0,
+        })?;
+        Ok(value)
     }
 
     fn pop_unary_operand(&mut self) -> Result<VMValue, VMError> {
