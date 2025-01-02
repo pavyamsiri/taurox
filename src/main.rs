@@ -32,6 +32,11 @@ pub enum TauroxCommand {
         #[clap(long = "format", value_enum, default_value = "basic")]
         format: ProgramFormat,
     },
+    Compile {
+        path: PathBuf,
+        #[clap(long = "format", value_enum, default_value = "basic")]
+        format: ProgramFormat,
+    },
 }
 
 #[derive(Debug, Clone, ValueEnum)]
@@ -108,6 +113,24 @@ fn taurox_main() -> Result<ExitCode> {
             eprintln!("Running {:?}...", path);
             let src = read_to_string(&path)?;
             let res = run(&src, &path, &format);
+            match res {
+                Ok(_) => {}
+                Err(ProgramError::CompileError) => {
+                    return Ok(ExitCode::from(65));
+                }
+                Err(ProgramError::AnalysisError) => {
+                    return Ok(ExitCode::from(67));
+                }
+                Err(ProgramError::RuntimeError) => {
+                    return Ok(ExitCode::from(70));
+                }
+            }
+        }
+
+        TauroxCommand::Compile { path, format } => {
+            eprintln!("Compiling {:?}...", path);
+            let src = read_to_string(&path)?;
+            let res = compile(&src, &path, &format);
             match res {
                 Ok(_) => {}
                 Err(ProgramError::CompileError) => {
@@ -324,4 +347,78 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
             Err(ProgramError::RuntimeError)
         }
     }
+}
+
+fn compile(
+    src: &str,
+    path: &Path,
+    format: &ProgramFormat,
+) -> std::result::Result<(), ProgramError> {
+    use taurox::compiler::{Chunk, Compiler};
+    use taurox::interpreter::{context::StdioContext, TreeWalkInterpreter};
+    use taurox::parser::{
+        formatter::{
+            BasicParserFormatter, DebugParserFormatter, NystromParserFormatter, ParserFormatter,
+            PrettyParserFormatter,
+        },
+        Parser,
+    };
+    use taurox::resolver::{
+        formatter::{
+            BasicResolverFormatter, DebugResolverFormatter, NystromResolverFormatter,
+            PrettyResolverFormatter, ResolverFormatter,
+        },
+        Resolver,
+    };
+    use taurox::value::formatter::{
+        BasicValueFormatter, DebugValueFormatter, NystromValueFormatter, PrettyValueFormatter,
+        ValueFormatter,
+    };
+
+    let parser_formatter: Box<dyn ParserFormatter> = match format {
+        ProgramFormat::Debug => Box::new(DebugParserFormatter {}),
+        ProgramFormat::Basic => Box::new(BasicParserFormatter::new(src)),
+        ProgramFormat::Pretty => Box::new(PrettyParserFormatter::new(src, path)),
+        ProgramFormat::Nystrom => Box::new(NystromParserFormatter::new(src)),
+    };
+    let resolver_formatter: Box<dyn ResolverFormatter> = match format {
+        ProgramFormat::Debug => Box::new(DebugResolverFormatter {}),
+        ProgramFormat::Basic => Box::new(BasicResolverFormatter::new(src)),
+        ProgramFormat::Pretty => Box::new(PrettyResolverFormatter::new(src, path)),
+        ProgramFormat::Nystrom => Box::new(NystromResolverFormatter::new(src)),
+    };
+    let value_formatter: Box<dyn ValueFormatter> = match format {
+        ProgramFormat::Debug => Box::new(DebugValueFormatter {}),
+        ProgramFormat::Basic => Box::new(BasicValueFormatter::new(src)),
+        ProgramFormat::Pretty => Box::new(PrettyValueFormatter::new(src, path)),
+        ProgramFormat::Nystrom => Box::new(NystromValueFormatter::new(src)),
+    };
+
+    let parser = Parser::new(src, path);
+    let program = match parser.parse() {
+        Ok(program) => program,
+        Err(errors) => {
+            for e in errors {
+                eprintln!("{}", parser_formatter.format_error(&e));
+            }
+            return Err(ProgramError::CompileError);
+        }
+    };
+
+    // Static analysis
+    let resolver = Resolver::new();
+    let program = match resolver.resolve(program) {
+        Ok(r) => r,
+        Err(errors) => {
+            for e in errors {
+                eprintln!("{}", resolver_formatter.format_error(&e));
+            }
+            return Err(ProgramError::AnalysisError);
+        }
+    };
+
+    let chunk = Compiler::compile(&program, src);
+    println!("{}", chunk.disassemble());
+
+    Ok(())
 }
