@@ -1,3 +1,7 @@
+pub mod error;
+
+use error::VMError;
+
 use crate::{
     compiler::{Chunk, Compiler, Opcode},
     interpreter::SystemContext,
@@ -28,7 +32,7 @@ where
         }
     }
 
-    pub fn run(mut self, program: &ResolvedProgram, text: &str) -> Result<C, RuntimeError> {
+    pub fn run(mut self, program: &ResolvedProgram, text: &str) -> Result<C, VMError> {
         let compiler = Compiler;
         let chunk = compiler.compile(program, text);
 
@@ -44,7 +48,7 @@ impl<C> VirtualMachine<C>
 where
     C: SystemContext,
 {
-    fn interpret_chunk(&mut self, chunk: &Chunk) -> Result<(), RuntimeError> {
+    fn interpret_chunk(&mut self, chunk: &Chunk) -> Result<(), VMError> {
         loop {
             let (inst, offset) = match chunk.decode_at(self.ip) {
                 Ok(Some(v)) => v,
@@ -55,7 +59,7 @@ where
                     eprintln!("SEGFAULT AT IP = {} due to {e}", self.ip);
                     eprintln!("{}", chunk.disassemble());
                     eprintln!("{:?}", chunk.get_data());
-                    panic!("SEGFAULT");
+                    return Err(e.into());
                 }
             };
 
@@ -70,9 +74,7 @@ where
                     break;
                 }
                 Opcode::Multiply => {
-                    let (lhs, rhs) = self
-                        .pop_binary_operands()
-                        .expect("Not enough values on the stack!");
+                    let (lhs, rhs) = self.pop_binary_operands()?;
                     self.stack
                         .push(lhs.multiply(&rhs).map_err(|kind| RuntimeError {
                             kind,
@@ -83,9 +85,7 @@ where
                         })?);
                 }
                 Opcode::Divide => {
-                    let (lhs, rhs) = self
-                        .pop_binary_operands()
-                        .expect("Not enough values on the stack!");
+                    let (lhs, rhs) = self.pop_binary_operands()?;
                     self.stack
                         .push(lhs.divide(&rhs).map_err(|kind| RuntimeError {
                             kind,
@@ -96,9 +96,7 @@ where
                         })?);
                 }
                 Opcode::Add => {
-                    let (lhs, rhs) = self
-                        .pop_binary_operands()
-                        .expect("Not enough values on the stack!");
+                    let (lhs, rhs) = self.pop_binary_operands()?;
                     self.stack.push(lhs.add(&rhs).map_err(|kind| RuntimeError {
                         kind,
                         span: Span {
@@ -108,9 +106,7 @@ where
                     })?);
                 }
                 Opcode::Subtract => {
-                    let (lhs, rhs) = self
-                        .pop_binary_operands()
-                        .expect("Not enough values on the stack!");
+                    let (lhs, rhs) = self.pop_binary_operands()?;
                     self.stack
                         .push(lhs.subtract(&rhs).map_err(|kind| RuntimeError {
                             kind,
@@ -121,7 +117,7 @@ where
                         })?);
                 }
                 Opcode::Negate => {
-                    let operand = self.stack.pop().expect("Not enough values on the stack");
+                    let operand = self.pop_unary_operand()?;
                     self.stack
                         .push(operand.numeric_negate().map_err(|kind| RuntimeError {
                             kind,
@@ -132,19 +128,15 @@ where
                         })?);
                 }
                 Opcode::Not => {
-                    let operand = self.stack.pop().expect("Not enough values on the stack");
+                    let operand = self.pop_unary_operand()?;
                     self.stack.push(LoxValue::Bool(operand.logical_not()));
                 }
                 Opcode::Equals => {
-                    let (lhs, rhs) = self
-                        .pop_binary_operands()
-                        .expect("Not enough values on the stack!");
+                    let (lhs, rhs) = self.pop_binary_operands()?;
                     self.stack.push(LoxValue::Bool(lhs.is_equal(&rhs)));
                 }
                 Opcode::LessThan => {
-                    let (lhs, rhs) = self
-                        .pop_binary_operands()
-                        .expect("Not enough values on the stack!");
+                    let (lhs, rhs) = self.pop_binary_operands()?;
                     self.stack
                         .push(lhs.less_than(&rhs).map_err(|kind| RuntimeError {
                             kind,
@@ -155,9 +147,7 @@ where
                         })?);
                 }
                 Opcode::GreaterThan => {
-                    let (lhs, rhs) = self
-                        .pop_binary_operands()
-                        .expect("Not enough values on the stack!");
+                    let (lhs, rhs) = self.pop_binary_operands()?;
                     self.stack
                         .push(lhs.greater_than(&rhs).map_err(|kind| RuntimeError {
                             kind,
@@ -182,9 +172,23 @@ where
         buffer
     }
 
-    fn pop_binary_operands(&mut self) -> Option<(LoxValue, LoxValue)> {
-        let rhs = self.stack.pop()?;
-        let lhs = self.stack.pop()?;
-        Some((lhs, rhs))
+    fn pop_unary_operand(&mut self) -> Result<LoxValue, VMError> {
+        let value = self.stack.pop().ok_or(VMError::MissingStackOperands {
+            expected: 1,
+            actual: 0,
+        })?;
+        Ok(value)
+    }
+
+    fn pop_binary_operands(&mut self) -> Result<(LoxValue, LoxValue), VMError> {
+        let rhs = self.stack.pop().ok_or(VMError::MissingStackOperands {
+            expected: 2,
+            actual: 0,
+        })?;
+        let lhs = self.stack.pop().ok_or(VMError::MissingStackOperands {
+            expected: 2,
+            actual: 1,
+        })?;
+        Ok((lhs, rhs))
     }
 }

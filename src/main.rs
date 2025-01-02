@@ -355,6 +355,7 @@ fn compile(
     format: &ProgramFormat,
 ) -> std::result::Result<(), ProgramError> {
     use taurox::interpreter::context::StdioContext;
+    use taurox::machine::error::VMError;
     use taurox::machine::VirtualMachine;
     use taurox::parser::{
         formatter::{
@@ -420,8 +421,12 @@ fn compile(
     let vm = VirtualMachine::new(StdioContext);
     match vm.run(&program, src) {
         Ok(_) => Ok(()),
-        Err(e) => {
+        Err(VMError::Runtime(e)) => {
             eprintln!("{}", value_formatter.format_error(&e));
+            Err(ProgramError::RuntimeError)
+        }
+        Err(e) => {
+            eprintln!("{e}");
             Err(ProgramError::RuntimeError)
         }
     }
