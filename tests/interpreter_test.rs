@@ -6,10 +6,7 @@ use std::{
 
 use color_eyre::{eyre::Context, Result};
 use taurox::{
-    interpreter::{
-        context::BufferedContext, Interpreter, ProgramState, TreeWalkInterpreter,
-        TreeWalkStatementInterpreter,
-    },
+    interpreter::{context::BufferedContext, TreeWalkInterpreter},
     parser::{
         formatter::{NystromParserFormatter, ParserFormatter},
         Parser,
@@ -194,7 +191,6 @@ struct TestCase {
 impl TestCase {
     pub fn check(&self) {
         let parser = Parser::new(&self.source, self.name.as_ref());
-        let resolver = Resolver::new();
 
         let parser_formatter = NystromParserFormatter::new(&self.source);
         let resolver_formatter = NystromResolverFormatter::new(&self.source);
@@ -219,7 +215,8 @@ impl TestCase {
             }
         };
 
-        let resolution = match resolver.resolve_program(&program) {
+        let resolver = Resolver::new();
+        let program = match resolver.resolve(program) {
             Ok(r) => r,
             Err(errors) => {
                 let mut buffer = String::new();
@@ -238,28 +235,20 @@ impl TestCase {
             }
         };
 
-        let mut interpreter =
-            TreeWalkInterpreter::<TreeWalkStatementInterpreter, BufferedContext>::new(
-                program, resolution,
-            );
-        let mut context = BufferedContext::new();
-        loop {
-            match interpreter.step(&mut context) {
-                Ok(state) => match state {
-                    ProgramState::Run => {}
-                    ProgramState::Terminate | ProgramState::Return(_) => break,
-                },
-                Err(e) => {
-                    let msg = value_formatter.format_error(&e);
-                    assert_eq!(
-                        self.runtime_errors, msg,
-                        "Failed test {} at runtime [expected vs actual].",
-                        self.name,
-                    );
-                    return;
-                }
+        let context = BufferedContext::new();
+        let interpreter = TreeWalkInterpreter::<BufferedContext>::new(context);
+        let context = match interpreter.run(&program) {
+            Ok(context) => context,
+            Err(e) => {
+                let msg = value_formatter.format_error(&e);
+                assert_eq!(
+                    self.runtime_errors, msg,
+                    "Failed test {} at runtime [expected vs actual].",
+                    self.name,
+                );
+                return;
             }
-        }
+        };
         let msg = context.into_data();
         assert_eq!(
             self.output, msg,

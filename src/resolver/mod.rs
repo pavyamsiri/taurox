@@ -7,9 +7,11 @@ use crate::{
         expression::{
             Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
         },
+        program::ProgramIterator,
         statement::{
-            BlockStatement, ClassDecl, Declaration, ForStatement, FunctionDecl, IfStatement,
-            Initializer, NonDeclaration, ReturnStatement, Statement, VariableDecl, WhileStatement,
+            BlockStatement, ClassDecl, ExpressionStatement, ForStatement, FunctionDecl,
+            IfStatement, Initializer, NonDeclaration, PrintStatement, ReturnStatement, Statement,
+            VariableDecl, WhileStatement,
         },
         Program,
     },
@@ -19,6 +21,36 @@ pub use error::{ResolutionError, ResolutionErrorKind};
 use std::collections::HashMap;
 
 pub type ResolutionMap = HashMap<Ident, usize>;
+
+pub struct ResolvedProgram {
+    program: Program,
+    resolution: ResolutionMap,
+}
+
+impl ResolvedProgram {
+    pub fn empty() -> Self {
+        Self {
+            program: Program::empty(),
+            resolution: HashMap::new(),
+        }
+    }
+
+    pub fn iter<'a>(&'a self) -> ProgramIterator<'a> {
+        self.program.iter()
+    }
+
+    pub fn get_resolution(&self) -> &ResolutionMap {
+        &self.resolution
+    }
+}
+
+impl std::ops::Deref for ResolvedProgram {
+    type Target = Program;
+
+    fn deref(&self) -> &Self::Target {
+        &self.program
+    }
+}
 
 #[derive(Debug)]
 enum Resolution {
@@ -74,22 +106,19 @@ impl Resolver {
         }
     }
 
-    pub fn resolve_program(
-        mut self,
-        program: &Program,
-    ) -> Result<ResolutionMap, Vec<ResolutionError>> {
+    pub fn resolve(mut self, program: Program) -> Result<ResolvedProgram, Vec<ResolutionError>> {
         let mut errors = Vec::new();
-        for index in 0..program.len() {
-            let statement = program
-                .get_statement(index)
-                .expect("Iterating over valid indices.");
-            match self.resolve_statement(statement) {
+        for stmt in program.iter() {
+            match self.resolve_stmt(&program, stmt) {
                 Ok(_) => {}
                 Err(e) => errors.push(e),
             }
         }
         if errors.is_empty() {
-            Ok(self.resolution)
+            Ok(ResolvedProgram {
+                program,
+                resolution: self.resolution,
+            })
         } else {
             Err(errors)
         }
@@ -97,21 +126,31 @@ impl Resolver {
     pub fn resolve_expression_and_consume(
         mut self,
         expr: &Expression,
-    ) -> Result<ResolutionMap, ResolutionError> {
+    ) -> Result<ResolvedProgram, ResolutionError> {
         self.resolve_expression(expr)?;
-        Ok(self.resolution)
+        Ok(ResolvedProgram {
+            program: Program::empty(),
+            resolution: self.resolution,
+        })
     }
 
-    fn resolve_statement(&mut self, statement: &Statement) -> Result<(), ResolutionError> {
+    fn resolve_stmt<'stmt>(
+        &mut self,
+        program: &'stmt Program,
+        statement: Statement<'stmt>,
+    ) -> Result<(), ResolutionError> {
         match statement {
-            Statement::Declaration(declaration) => {
-                self.resolve_declaration(declaration)?;
-            }
-            Statement::NonDeclaration(non_declaration) => {
-                self.resolve_non_declaration(non_declaration)?;
-            }
+            Statement::VariableDecl(decl) => self.resolve_variable_decl(program, decl),
+            Statement::FunctionDecl(decl) => self.resolve_function_decl(program, decl),
+            Statement::ClassDecl(decl) => self.resolve_class_decl(program, decl),
+            Statement::Expression(stmt) => self.resolve_expression_stmt(program, stmt),
+            Statement::Print(stmt) => self.resolve_print_stmt(program, stmt),
+            Statement::Block(stmt) => self.resolve_block_stmt(program, stmt),
+            Statement::If(stmt) => self.resolve_if_stmt(program, stmt),
+            Statement::While(stmt) => self.resolve_while_stmt(program, stmt),
+            Statement::For(stmt) => self.resolve_for_stmt(program, stmt),
+            Statement::Return(stmt) => self.resolve_return_stmt(program, stmt),
         }
-        Ok(())
     }
 }
 
@@ -188,22 +227,12 @@ impl Resolver {
 
 // Implementation
 impl Resolver {
-    fn resolve_declaration(&mut self, decl: &Declaration) -> Result<(), ResolutionError> {
-        match &decl {
-            Declaration::Variable(decl) => {
-                self.resolve_variable_declaration(decl)?;
-            }
-            Declaration::Function(decl) => {
-                self.resolve_function_declaration(decl)?;
-            }
-            Declaration::Class(decl) => {
-                self.resolve_class_declaration(decl)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn resolve_variable_declaration(&mut self, decl: &VariableDecl) -> Result<(), ResolutionError> {
+    fn resolve_variable_decl(
+        &mut self,
+        program: &Program,
+        decl: &VariableDecl,
+    ) -> Result<(), ResolutionError> {
+        let _ = program;
         self.declare(&decl.name, &decl.span)?;
         if let Some(initial) = &decl.initial {
             self.resolve_expression(initial)?;
@@ -212,15 +241,22 @@ impl Resolver {
         Ok(())
     }
 
-    fn resolve_function_declaration(&mut self, decl: &FunctionDecl) -> Result<(), ResolutionError> {
+    fn resolve_function_decl(
+        &mut self,
+        program: &Program,
+        decl: &FunctionDecl,
+    ) -> Result<(), ResolutionError> {
         self.declare(&decl.name, &decl.span)?;
         self.define(&decl.name, &decl.span);
-        self.resolve_function(&decl.parameters, &decl.body, FunctionEnvironment::Function)?;
-
+        self.resolve_function(program, decl, FunctionEnvironment::Function)?;
         Ok(())
     }
 
-    fn resolve_class_declaration(&mut self, decl: &ClassDecl) -> Result<(), ResolutionError> {
+    fn resolve_class_decl(
+        &mut self,
+        program: &Program,
+        decl: &ClassDecl,
+    ) -> Result<(), ResolutionError> {
         let enclosing = self.class;
         self.class = ClassEnvironment::Class;
 
@@ -266,7 +302,7 @@ impl Resolver {
             } else {
                 FunctionEnvironment::Method
             };
-            self.resolve_function(&decl.parameters, &decl.body, function_type)?
+            self.resolve_function(program, decl, function_type)?
         }
         self.exit_scope();
 
@@ -283,19 +319,22 @@ impl Resolver {
 
     fn resolve_function(
         &mut self,
-        parameters: &[Ident],
-        body: &BlockStatement,
+        program: &Program,
+        decl: &FunctionDecl,
         environment: FunctionEnvironment,
     ) -> Result<(), ResolutionError> {
+        const MSG: &'static str = "[Resolve Function]: All handles are valid.";
         let enclosing = self.function;
         self.function = environment;
         self.enter_scope();
-        for param in parameters {
+        for param in decl.parameters.iter() {
             self.declare(param, &param.span)?;
             self.define(param, &param.span);
         }
-        for statement in body.iter() {
-            self.resolve_statement(statement)?;
+        let body = program.get_block_stmt(decl.body).expect(MSG);
+        for stmt in body.iter() {
+            let stmt = program.get_statement(stmt).expect(MSG);
+            self.resolve_stmt(program, stmt)?;
         }
         self.exit_scope();
         self.function = enclosing;
@@ -305,56 +344,99 @@ impl Resolver {
 
 // Non-declarations
 impl Resolver {
-    fn resolve_non_declaration(&mut self, stmt: &NonDeclaration) -> Result<(), ResolutionError> {
-        match &stmt {
-            NonDeclaration::Expression(stmt) => self.resolve_expression(&stmt.expr)?,
-            NonDeclaration::Print(stmt) => self.resolve_expression(&stmt.expr)?,
-            NonDeclaration::Block(block) => {
-                self.enter_scope();
-                for stmt in block.iter() {
-                    self.resolve_statement(stmt)?;
-                }
-                self.exit_scope();
-            }
-            NonDeclaration::If(stmt) => {
-                self.resolve_if_statement(stmt)?;
-            }
-            NonDeclaration::While(stmt) => {
-                self.resolve_while_statement(stmt)?;
-            }
-            NonDeclaration::For(stmt) => {
-                self.resolve_for_statement(stmt)?;
-            }
-            NonDeclaration::Return(stmt) => {
-                self.resolve_return_statement(stmt)?;
-            }
+    fn resolve_non_declaration<'stmt>(
+        &mut self,
+        program: &Program,
+        stmt: NonDeclaration<'stmt>,
+    ) -> Result<(), ResolutionError> {
+        match stmt {
+            NonDeclaration::Expression(stmt) => self.resolve_expression_stmt(program, stmt),
+            NonDeclaration::Print(stmt) => self.resolve_print_stmt(program, stmt),
+            NonDeclaration::Block(stmt) => self.resolve_block_stmt(program, stmt),
+            NonDeclaration::If(stmt) => self.resolve_if_stmt(program, stmt),
+            NonDeclaration::While(stmt) => self.resolve_while_stmt(program, stmt),
+            NonDeclaration::For(stmt) => self.resolve_for_stmt(program, stmt),
+            NonDeclaration::Return(stmt) => self.resolve_return_stmt(program, stmt),
         }
+    }
+
+    fn resolve_expression_stmt(
+        &mut self,
+        program: &Program,
+        stmt: &ExpressionStatement,
+    ) -> Result<(), ResolutionError> {
+        let _ = program;
+        self.resolve_expression(&stmt.expr)?;
         Ok(())
     }
 
-    fn resolve_if_statement(&mut self, stmt: &IfStatement) -> Result<(), ResolutionError> {
-        self.resolve_expression(&stmt.condition)?;
-        self.resolve_statement(&stmt.success)?;
-        if let Some(failure) = &stmt.failure.as_ref() {
-            self.resolve_statement(failure)?;
-        }
+    fn resolve_print_stmt(
+        &mut self,
+        program: &Program,
+        stmt: &PrintStatement,
+    ) -> Result<(), ResolutionError> {
+        let _ = program;
+        self.resolve_expression(&stmt.expr)?;
         Ok(())
     }
 
-    fn resolve_while_statement(&mut self, stmt: &WhileStatement) -> Result<(), ResolutionError> {
-        self.resolve_expression(&stmt.condition)?;
-        self.resolve_non_declaration(&stmt.body)?;
-        Ok(())
-    }
-
-    fn resolve_for_statement(&mut self, stmt: &ForStatement) -> Result<(), ResolutionError> {
+    fn resolve_block_stmt(
+        &mut self,
+        program: &Program,
+        block: &BlockStatement,
+    ) -> Result<(), ResolutionError> {
+        const MSG: &'static str = "[Resolve Block]: All handles are valid.";
         self.enter_scope();
-        if let Some(initializer) = &stmt.initializer {
+        for stmt in block.iter() {
+            let stmt = program.get_statement(stmt).expect(MSG);
+            self.resolve_stmt(program, stmt)?;
+        }
+        self.exit_scope();
+        Ok(())
+    }
+
+    fn resolve_if_stmt(
+        &mut self,
+        program: &Program,
+        stmt: &IfStatement,
+    ) -> Result<(), ResolutionError> {
+        const MSG: &'static str = "[Resolve If]: All handles are valid.";
+        self.resolve_expression(&stmt.condition)?;
+        let success = program.get_statement(stmt.success).expect(MSG);
+        self.resolve_stmt(program, success)?;
+        if let Some(failure) = stmt.failure {
+            let failure = program.get_statement(failure).expect(MSG);
+            self.resolve_stmt(program, failure)?;
+        }
+        Ok(())
+    }
+
+    fn resolve_while_stmt(
+        &mut self,
+        program: &Program,
+        stmt: &WhileStatement,
+    ) -> Result<(), ResolutionError> {
+        const MSG: &'static str = "[Resolve While]: All handles are valid.";
+        self.resolve_expression(&stmt.condition)?;
+        let body = program.get_non_declaration(stmt.body).expect(MSG);
+        self.resolve_non_declaration(program, body)
+    }
+
+    fn resolve_for_stmt(
+        &mut self,
+        program: &Program,
+        stmt: &ForStatement,
+    ) -> Result<(), ResolutionError> {
+        const MSG: &'static str = "[Resolve For]: All handles are valid.";
+        self.enter_scope();
+        if let Some(ref initializer) = stmt.initializer {
             match initializer {
                 Initializer::VariableDecl(decl) => {
-                    self.resolve_variable_declaration(decl)?;
+                    let decl = program.get_variable_decl(*decl).expect(MSG);
+                    self.resolve_variable_decl(program, decl)?;
                 }
                 Initializer::Expression(stmt) => {
+                    let stmt = program.get_expression_stmt(*stmt).expect(MSG);
                     self.resolve_expression(&stmt.expr)?;
                 }
             }
@@ -365,12 +447,18 @@ impl Resolver {
         if let Some(increment) = &stmt.increment {
             self.resolve_expression(increment)?;
         }
-        self.resolve_non_declaration(&stmt.body)?;
+        let body = program.get_non_declaration(stmt.body).expect(MSG);
+        self.resolve_non_declaration(program, body)?;
         self.exit_scope();
         Ok(())
     }
 
-    fn resolve_return_statement(&mut self, stmt: &ReturnStatement) -> Result<(), ResolutionError> {
+    fn resolve_return_stmt(
+        &mut self,
+        program: &Program,
+        stmt: &ReturnStatement,
+    ) -> Result<(), ResolutionError> {
+        let _ = program;
         if matches!(self.function, FunctionEnvironment::None) {
             return Err(ResolutionError {
                 kind: ResolutionErrorKind::NonFunctionReturn,

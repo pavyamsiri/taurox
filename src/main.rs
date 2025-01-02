@@ -192,7 +192,7 @@ enum ProgramError {
 fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result<(), ProgramError> {
     use taurox::environment::SharedEnvironment;
     use taurox::interpreter::context::StdioContext;
-    use taurox::interpreter::{StatementInterpreter, TreeWalkStatementInterpreter};
+    use taurox::interpreter::TreeWalkStatementInterpreter;
     use taurox::parser::{
         formatter::{
             DebugExpressionFormatter, ExpressionFormatter, PrettyExpressionFormatter,
@@ -230,7 +230,7 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
 
     let mut environment = SharedEnvironment::new();
     let resolver = Resolver::new();
-    let resolution = match resolver.resolve_expression_and_consume(&expression) {
+    let program = match resolver.resolve_expression_and_consume(&expression) {
         Ok(r) => r,
         Err(e) => {
             eprintln!("{e}");
@@ -239,14 +239,13 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
     };
     let interpreter = TreeWalkStatementInterpreter;
     let mut context = StdioContext;
-    let result =
-        match interpreter.evaluate(&expression, &mut environment, &mut context, &resolution) {
-            Ok(result) => result,
-            Err(e) => {
-                eprintln!("{}", value_formatter.format_error(&e));
-                return Err(ProgramError::RuntimeError);
-            }
-        };
+    let result = match interpreter.evaluate(&program, &mut environment, &mut context, &expression) {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("{}", value_formatter.format_error(&e));
+            return Err(ProgramError::RuntimeError);
+        }
+    };
 
     println!("{}", result);
 
@@ -254,10 +253,7 @@ fn evaluate(src: &str, path: &Path, format: &ValueFormat) -> std::result::Result
 }
 
 fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<(), ProgramError> {
-    use taurox::interpreter::ProgramState;
-    use taurox::interpreter::{
-        context::StdioContext, Interpreter, TreeWalkInterpreter, TreeWalkStatementInterpreter,
-    };
+    use taurox::interpreter::{context::StdioContext, TreeWalkInterpreter};
     use taurox::parser::{
         formatter::{
             BasicParserFormatter, DebugParserFormatter, NystromParserFormatter, ParserFormatter,
@@ -309,7 +305,7 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
 
     // Static analysis
     let resolver = Resolver::new();
-    let resolution = match resolver.resolve_program(&program) {
+    let program = match resolver.resolve(program) {
         Ok(r) => r,
         Err(errors) => {
             for e in errors {
@@ -319,21 +315,13 @@ fn run(src: &str, path: &Path, format: &ProgramFormat) -> std::result::Result<()
         }
     };
 
-    let mut interpreter =
-        TreeWalkInterpreter::<TreeWalkStatementInterpreter, StdioContext>::new(program, resolution);
-    let mut context = StdioContext;
-    loop {
-        match interpreter.step(&mut context) {
-            Ok(state) => match state {
-                ProgramState::Run => {}
-                ProgramState::Terminate | ProgramState::Return(_) => break,
-            },
-            Err(e) => {
-                eprintln!("{}", value_formatter.format_error(&e));
-                return Err(ProgramError::RuntimeError);
-            }
+    let context = StdioContext;
+    let interpreter = TreeWalkInterpreter::<StdioContext>::new(context);
+    match interpreter.run(&program) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!("{}", value_formatter.format_error(&e));
+            Err(ProgramError::RuntimeError)
         }
     }
-
-    Ok(())
 }

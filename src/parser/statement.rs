@@ -1,19 +1,21 @@
-use super::expression::Expression;
+use super::{
+    expression::Expression,
+    program::{BlockStmtRef, ExpressionStmtRef, NonDeclarationRef, StatementRef, VariableDeclRef},
+};
 use crate::{lexer::Span, string::Ident};
 
 #[derive(Debug, Clone)]
-pub enum Statement {
-    Declaration(Declaration),
-    NonDeclaration(NonDeclaration),
-}
-
-impl Statement {
-    pub fn get_span(&self) -> Span {
-        match self {
-            Statement::Declaration(decl) => decl.get_span(),
-            Statement::NonDeclaration(stmt) => stmt.get_span(),
-        }
-    }
+pub enum Statement<'a> {
+    VariableDecl(&'a VariableDecl),
+    FunctionDecl(&'a FunctionDecl),
+    ClassDecl(&'a ClassDecl),
+    Expression(&'a ExpressionStatement),
+    Print(&'a PrintStatement),
+    Block(&'a BlockStatement),
+    If(&'a IfStatement),
+    While(&'a WhileStatement),
+    For(&'a ForStatement),
+    Return(&'a ReturnStatement),
 }
 
 // Declarations
@@ -29,7 +31,7 @@ pub struct VariableDecl {
 pub struct FunctionDecl {
     pub name: Ident,
     pub parameters: Vec<Ident>,
-    pub body: BlockStatement,
+    pub body: BlockStmtRef,
     pub span: Span,
 }
 
@@ -83,7 +85,7 @@ pub struct PrintStatement {
 
 #[derive(Debug, Clone)]
 pub struct BlockStatement {
-    pub body: Vec<Statement>,
+    pub body: Vec<StatementRef>,
     pub span: Span,
 }
 
@@ -102,27 +104,27 @@ pub struct BlockStatementIterator<'a> {
 }
 
 impl<'a> std::iter::Iterator for BlockStatementIterator<'a> {
-    type Item = &'a Statement;
+    type Item = StatementRef;
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = self.block.body.get(self.index);
         self.index += 1;
-        value
+        value.cloned()
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct IfStatement {
     pub condition: Expression,
-    pub success: Box<Statement>,
-    pub failure: Box<Option<Statement>>,
+    pub success: StatementRef,
+    pub failure: Option<StatementRef>,
     pub span: Span,
 }
 
 #[derive(Debug, Clone)]
 pub struct WhileStatement {
     pub condition: Expression,
-    pub body: Box<NonDeclaration>,
+    pub body: NonDeclarationRef,
     pub span: Span,
 }
 
@@ -131,7 +133,7 @@ pub struct ForStatement {
     pub initializer: Option<Initializer>,
     pub condition: Option<Expression>,
     pub increment: Option<Expression>,
-    pub body: Box<NonDeclaration>,
+    pub body: NonDeclarationRef,
     pub span: Span,
 }
 
@@ -143,22 +145,22 @@ pub struct ReturnStatement {
 
 #[derive(Debug, Clone)]
 pub enum Initializer {
-    VariableDecl(VariableDecl),
-    Expression(ExpressionStatement),
+    VariableDecl(VariableDeclRef),
+    Expression(ExpressionStmtRef),
 }
 
 #[derive(Debug, Clone)]
-pub enum NonDeclaration {
-    Expression(ExpressionStatement),
-    Print(PrintStatement),
-    Block(BlockStatement),
-    If(IfStatement),
-    While(WhileStatement),
-    For(ForStatement),
-    Return(ReturnStatement),
+pub enum NonDeclaration<'a> {
+    Expression(&'a ExpressionStatement),
+    Print(&'a PrintStatement),
+    Block(&'a BlockStatement),
+    If(&'a IfStatement),
+    While(&'a WhileStatement),
+    For(&'a ForStatement),
+    Return(&'a ReturnStatement),
 }
 
-impl NonDeclaration {
+impl<'a> NonDeclaration<'a> {
     pub const fn get_span(&self) -> Span {
         match self {
             NonDeclaration::Expression(stmt) => stmt.span,
@@ -172,7 +174,7 @@ impl NonDeclaration {
     }
 }
 
-impl std::fmt::Display for NonDeclaration {
+impl<'a> std::fmt::Display for NonDeclaration<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             NonDeclaration::Expression(_) => write!(f, "EXPR"),

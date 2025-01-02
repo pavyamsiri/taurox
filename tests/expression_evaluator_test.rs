@@ -5,7 +5,7 @@ use std::{
 };
 use taurox::{
     environment::SharedEnvironment,
-    interpreter::{context::BufferedContext, StatementInterpreter, TreeWalkStatementInterpreter},
+    interpreter::{context::BufferedContext, TreeWalkStatementInterpreter},
     parser::{
         formatter::{ExpressionFormatter, SExpressionFormatter},
         Parser,
@@ -33,7 +33,7 @@ fn check(input: &str, expected: &str, test_name: &str) {
     };
 
     let resolver = Resolver::new();
-    let resolution = match resolver.resolve_expression_and_consume(&expr) {
+    let program = match resolver.resolve_expression_and_consume(&expr) {
         Ok(r) => r,
         Err(e) => {
             let actual = format!("{}", e);
@@ -45,7 +45,7 @@ fn check(input: &str, expected: &str, test_name: &str) {
     let mut environment = SharedEnvironment::new();
     let interpreter = TreeWalkStatementInterpreter;
     let mut context = BufferedContext::new();
-    let actual = match interpreter.evaluate(&expr, &mut environment, &mut context, &resolution) {
+    let actual = match interpreter.evaluate(&program, &mut environment, &mut context, &expr) {
         Ok(v) => {
             format!("{}", value_formatter.format(&v))
         }

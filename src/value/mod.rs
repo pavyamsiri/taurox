@@ -2,7 +2,7 @@ pub mod error;
 pub mod formatter;
 
 use super::environment::SharedEnvironment;
-use crate::{parser::statement::BlockStatement, string::Ident};
+use crate::{parser::program::BlockStmtRef, string::Ident};
 use compact_str::{CompactString, CompactStringExt};
 use error::{RuntimeError, RuntimeErrorKind};
 use std::{
@@ -20,7 +20,7 @@ pub trait NativeFunction: std::fmt::Debug + Send + Sync {
 pub struct Function {
     pub name: Ident,
     pub parameters: Vec<Ident>,
-    pub body: BlockStatement,
+    pub body: BlockStmtRef,
     pub closure: SharedEnvironment,
     pub is_constructor: bool,
 }

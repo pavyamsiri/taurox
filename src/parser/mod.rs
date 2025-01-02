@@ -1,6 +1,7 @@
 mod error;
 pub mod expression;
 pub mod formatter;
+pub mod program;
 pub mod statement;
 
 use crate::{
@@ -16,34 +17,20 @@ use expression::{
     IncompleteExpression, InfixAssignmentOperator, InfixOperator, InfixShortCircuitOperator,
     PostfixOperator, PrefixOperator,
 };
+pub use program::Program;
+use program::{
+    BlockStmtRef, ClassDeclRef, DeclarationRef, ExpressionStmtRef, ForStmtRef, FunctionDeclRef,
+    IfStmtRef, IncompleteProgram, NonDeclarationRef, PrintStmtRef, ReturnStmtRef, StatementRef,
+    VariableDeclRef, WhileStmtRef,
+};
 use statement::{
-    BlockStatement, ClassDecl, Declaration, ExpressionStatement, ForStatement, FunctionDecl,
-    IfStatement, Initializer, NonDeclaration, PrintStatement, ReturnStatement, Statement,
-    VariableDecl, WhileStatement,
+    BlockStatement, ClassDecl, ExpressionStatement, ForStatement, FunctionDecl, IfStatement,
+    Initializer, PrintStatement, ReturnStatement, VariableDecl, WhileStatement,
 };
 use std::path::Path;
 
 /// Only allow up to 255 parameters
 const MAX_PARAMETERS: usize = 255;
-
-#[derive(Debug)]
-pub struct Program {
-    statements: Vec<Statement>,
-}
-
-impl Program {
-    pub fn get_statement(&self, index: usize) -> Option<&Statement> {
-        self.statements.get(index)
-    }
-
-    pub fn as_slice(&self) -> &[Statement] {
-        &self.statements
-    }
-
-    pub fn len(&self) -> usize {
-        self.statements.len()
-    }
-}
 
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
@@ -74,12 +61,13 @@ impl<'src> Parser<'src> {
 // Parse program
 impl<'src> Parser<'src> {
     pub fn parse(mut self) -> Result<Program, Vec<ParserError>> {
+        let mut program = IncompleteProgram::new();
         let mut statements = Vec::new();
 
         loop {
-            match self.parse_statement() {
-                Ok(Some(statement)) => {
-                    statements.push(statement);
+            match self.parse_statement(&mut program) {
+                Ok(Some(stmt)) => {
+                    statements.push(stmt);
                 }
                 Ok(None) => {
                     break;
@@ -94,7 +82,7 @@ impl<'src> Parser<'src> {
         }
 
         if self.expression_reports.is_empty() && self.statement_reports.is_empty() {
-            Ok(Program { statements })
+            Ok(program.finish(statements))
         } else {
             self.statement_reports
                 .extend(self.expression_reports.into_iter().map(|v| v.into()));
@@ -138,22 +126,28 @@ impl<'src> Parser<'src> {
 
 // Parse statements
 impl<'src> Parser<'src> {
-    pub fn parse_statement(&mut self) -> Result<Option<Statement>, ParserError> {
-        if let Some(decl) = self.parse_declaration()? {
-            Ok(Some(Statement::Declaration(decl)))
-        } else if let Some(stmt) = self.parse_non_declaration()? {
-            Ok(Some(Statement::NonDeclaration(stmt)))
+    pub fn parse_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<Option<StatementRef>, ParserError> {
+        if let Some(decl) = self.parse_declaration(program)? {
+            Ok(Some(decl.into()))
+        } else if let Some(stmt) = self.parse_non_declaration(program)? {
+            Ok(Some(stmt.into()))
         } else {
             Ok(None)
         }
     }
 
-    fn parse_declaration(&mut self) -> Result<Option<Declaration>, ParserError> {
+    fn parse_declaration(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<Option<DeclarationRef>, ParserError> {
         let first = self.peek();
         let decl = match first.kind {
-            TokenKind::KeywordVar => Declaration::Variable(self.parse_variable_declaration()?),
-            TokenKind::KeywordFun => Declaration::Function(self.parse_function_declaration()?),
-            TokenKind::KeywordClass => Declaration::Class(self.parse_class_declaration()?),
+            TokenKind::KeywordVar => self.parse_variable_declaration(program)?.into(),
+            TokenKind::KeywordFun => self.parse_function_declaration(program)?.into(),
+            TokenKind::KeywordClass => self.parse_class_declaration(program)?.into(),
             _ => {
                 return Ok(None);
             }
@@ -161,43 +155,56 @@ impl<'src> Parser<'src> {
         Ok(Some(decl))
     }
 
-    fn parse_non_declaration(&mut self) -> Result<Option<NonDeclaration>, ParserError> {
+    fn parse_non_declaration(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<Option<NonDeclarationRef>, ParserError> {
         let first = self.peek();
-        let stmt = match first.kind {
-            TokenKind::KeywordPrint => NonDeclaration::Print(self.parse_print_statement()?),
-            TokenKind::LeftBrace => NonDeclaration::Block(self.parse_block_statement()?),
-            TokenKind::KeywordIf => NonDeclaration::If(self.parse_if_statement()?),
-            TokenKind::KeywordWhile => NonDeclaration::While(self.parse_while_statement()?),
-            TokenKind::KeywordFor => NonDeclaration::For(self.parse_for_statement()?),
-            TokenKind::KeywordReturn => NonDeclaration::Return(self.parse_return_statement()?),
+        let stmt: NonDeclarationRef = match first.kind {
+            TokenKind::KeywordPrint => self.parse_print_statement(program)?.into(),
+            TokenKind::LeftBrace => self.parse_block_statement(program)?.into(),
+            TokenKind::KeywordIf => self.parse_if_statement(program)?.into(),
+            TokenKind::KeywordWhile => self.parse_while_statement(program)?.into(),
+            TokenKind::KeywordFor => self.parse_for_statement(program)?.into(),
+            TokenKind::KeywordReturn => self.parse_return_statement(program)?.into(),
             TokenKind::Eof => {
                 return Ok(None);
             }
-            _ => NonDeclaration::Expression(self.parse_expression_statement()?),
+            _ => self.parse_expression_statement(program)?.into(),
         };
         Ok(Some(stmt))
     }
 
-    fn parse_expression_statement(&mut self) -> Result<ExpressionStatement, ParserError> {
+    fn parse_expression_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<ExpressionStmtRef, ParserError> {
         let expr = self.parse_expression()?;
         let rightmost = self.expect_or(TokenKind::Semicolon, |token| {
             StatementParserError::NoSemicolonAfterExpr(token).into()
         })?;
         let span = expr.get_span().merge(&rightmost.span);
-        Ok(ExpressionStatement { expr, span })
+        let stmt = ExpressionStatement { expr, span };
+        Ok(program.push_expression_stmt(stmt))
     }
 
-    fn parse_print_statement(&mut self) -> Result<PrintStatement, ParserError> {
+    fn parse_print_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<PrintStmtRef, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordPrint)?;
         let expr = self.parse_expression()?;
         let rightmost = self.expect(TokenKind::Semicolon)?;
 
         let span = leftmost.span.merge(&rightmost.span);
         let stmt = PrintStatement { expr, span };
-        Ok(stmt)
+        Ok(program.push_print_stmt(stmt))
     }
 
-    fn parse_variable_declaration(&mut self) -> Result<VariableDecl, ParserError> {
+    fn parse_variable_declaration(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<VariableDeclRef, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordVar)?;
         let name =
             self.expect_ident_or(|token| StatementParserError::InvalidVariableName(token).into())?;
@@ -216,18 +223,25 @@ impl<'src> Parser<'src> {
             span,
         };
 
-        Ok(decl)
+        Ok(program.push_variable_decl(decl))
     }
 
-    fn parse_function_declaration(&mut self) -> Result<FunctionDecl, ParserError> {
+    fn parse_function_declaration(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<FunctionDeclRef, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordFun)?;
-        let mut decl = self.try_parse_function()?;
+        let mut decl = self.try_parse_function(program)?;
         decl.span = decl.span.merge(&leftmost.span);
 
-        Ok(decl)
+        Ok(program.push_function_decl(decl))
     }
 
-    fn try_parse_function(&mut self) -> Result<FunctionDecl, ParserError> {
+    fn try_parse_function(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<FunctionDecl, ParserError> {
+        const MSG: &'static str = "[Parse Function]: All handles are valid.";
         let name = self.expect_ident()?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
@@ -274,12 +288,15 @@ impl<'src> Parser<'src> {
         let block = {
             let next_token = self.peek();
             match next_token.kind {
-                TokenKind::LeftBrace => self.parse_block_statement(),
+                TokenKind::LeftBrace => self.parse_block_statement(program),
                 _ => Err(StatementParserError::NonBlock(next_token).into()),
             }?
         };
 
-        let span = name.span.merge(&block.span);
+        let rightmost = program
+            .get_span(Into::<NonDeclarationRef>::into(block).into())
+            .expect(MSG);
+        let span = name.span.merge(&rightmost);
         let decl = FunctionDecl {
             name,
             parameters,
@@ -289,7 +306,10 @@ impl<'src> Parser<'src> {
         Ok(decl)
     }
 
-    fn parse_class_declaration(&mut self) -> Result<ClassDecl, ParserError> {
+    fn parse_class_declaration(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<ClassDeclRef, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordClass)?;
         let name = self.expect_ident()?;
 
@@ -310,7 +330,7 @@ impl<'src> Parser<'src> {
                     break 'block rightmost;
                 }
                 None => {
-                    let func = self.try_parse_function()?;
+                    let func = self.try_parse_function(program)?;
                     methods.push(func);
                 }
             }
@@ -323,9 +343,13 @@ impl<'src> Parser<'src> {
             super_class,
             span,
         };
-        Ok(decl)
+
+        Ok(program.push_class_decl(decl))
     }
-    fn parse_block_statement(&mut self) -> Result<BlockStatement, ParserError> {
+    fn parse_block_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<BlockStmtRef, ParserError> {
         let leftmost = self.expect(TokenKind::LeftBrace)?;
         let mut statements = Vec::new();
 
@@ -334,7 +358,9 @@ impl<'src> Parser<'src> {
             rightmost
         } else {
             let rightmost = 'stmts: loop {
-                let statement = self.parse_statement()?.ok_or(self.create_eof_error())?;
+                let statement = self
+                    .parse_statement(program)?
+                    .ok_or(self.create_eof_error())?;
                 statements.push(statement);
                 if let Some(rightmost) = self.eat_if(TokenKind::RightBrace)? {
                     break 'stmts rightmost;
@@ -347,20 +373,28 @@ impl<'src> Parser<'src> {
             body: statements,
             span,
         };
-        Ok(stmt)
+        Ok(program.push_block_stmt(stmt))
     }
 
-    fn parse_if_statement(&mut self) -> Result<IfStatement, ParserError> {
+    fn parse_if_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<IfStmtRef, ParserError> {
+        const MSG: &'static str = "[Parse If]: All handles are valid.";
         let leftmost = self.expect(TokenKind::KeywordIf)?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
-        let success = self.parse_statement()?.ok_or(self.create_eof_error())?;
-        let mut rightmost = success.get_span();
+        let success = self
+            .parse_statement(program)?
+            .ok_or(self.create_eof_error())?;
+        let mut rightmost = program.get_span(success).expect(MSG);
 
         let failure = if let Some(_) = self.eat_if(TokenKind::KeywordElse)? {
-            let stmt = self.parse_statement()?.ok_or(self.create_eof_error())?;
-            rightmost = stmt.get_span();
+            let stmt = self
+                .parse_statement(program)?
+                .ok_or(self.create_eof_error())?;
+            rightmost = program.get_span(stmt).expect(MSG);
             Some(stmt)
         } else {
             None
@@ -369,30 +403,39 @@ impl<'src> Parser<'src> {
         let span = leftmost.span.merge(&rightmost);
         let stmt = IfStatement {
             condition,
-            success: Box::new(success),
-            failure: Box::new(failure),
+            success,
+            failure,
             span,
         };
-        Ok(stmt)
+        Ok(program.push_if_stmt(stmt))
     }
 
-    fn parse_while_statement(&mut self) -> Result<WhileStatement, ParserError> {
+    fn parse_while_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<WhileStmtRef, ParserError> {
+        const MSG: &'static str = "[Parse While]: All handles are valid";
         let leftmost = self.expect(TokenKind::KeywordWhile)?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
         let condition = self.parse_expression()?;
         let _ = self.expect(TokenKind::RightParenthesis)?;
         // Parse body
-        let body = self.expect_non_declaration()?;
-        let span = leftmost.span.merge(&body.get_span());
+        let body = self.expect_non_declaration(program)?;
+        let rightmost = program.get_span(body.into()).expect(MSG);
+        let span = leftmost.span.merge(&rightmost);
         let stmt = WhileStatement {
             condition,
-            body: Box::new(body),
+            body,
             span,
         };
-        Ok(stmt)
+        Ok(program.push_while_stmt(stmt))
     }
 
-    fn parse_for_statement(&mut self) -> Result<ForStatement, ParserError> {
+    fn parse_for_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<ForStmtRef, ParserError> {
+        const MSG: &'static str = "[Parse For]: All handles are valid";
         let leftmost = self.expect(TokenKind::KeywordFor)?;
         let _ = self.expect(TokenKind::LeftParenthesis)?;
 
@@ -406,9 +449,11 @@ impl<'src> Parser<'src> {
                 let token = self.peek();
                 match token.kind {
                     TokenKind::KeywordVar => Some(Initializer::VariableDecl(
-                        self.parse_variable_declaration()?,
+                        self.parse_variable_declaration(program)?,
                     )),
-                    _ => Some(Initializer::Expression(self.parse_expression_statement()?)),
+                    _ => Some(Initializer::Expression(
+                        self.parse_expression_statement(program)?,
+                    )),
                 }
             }
         };
@@ -440,18 +485,19 @@ impl<'src> Parser<'src> {
         };
 
         // Parse body
-        let body = self.expect_non_declaration()?;
-        let span = leftmost.span.merge(&body.get_span());
+        let body = self.expect_non_declaration(program)?;
+        let rightmost = program.get_span(body.into()).expect(MSG);
+        let span = leftmost.span.merge(&rightmost);
 
         let stmt = ForStatement {
             initializer,
             condition,
             increment,
-            body: Box::new(body),
+            body,
             span,
         };
 
-        Ok(stmt)
+        Ok(program.push_for_stmt(stmt))
     }
 }
 enum PrattParseOutcome {
@@ -1028,14 +1074,17 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn expect_non_declaration(&mut self) -> Result<NonDeclaration, ParserError> {
+    fn expect_non_declaration(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<NonDeclarationRef, ParserError> {
         let next = self.peek();
         let stmt = match next.kind {
             TokenKind::KeywordVar | TokenKind::KeywordClass | TokenKind::KeywordFun => {
                 return Err(StatementParserError::InvalidNonDeclaration(next).into());
             }
             _ => self
-                .parse_non_declaration()?
+                .parse_non_declaration(program)?
                 .ok_or(self.create_eof_error())?,
         };
         Ok(stmt)
@@ -1051,7 +1100,10 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_return_statement(&mut self) -> Result<ReturnStatement, ParserError> {
+    fn parse_return_statement(
+        &mut self,
+        program: &mut IncompleteProgram,
+    ) -> Result<ReturnStmtRef, ParserError> {
         let leftmost = self.expect(TokenKind::KeywordReturn)?;
 
         let (value, rightmost) = if let Some(rightmost) = self.eat_if(TokenKind::Semicolon)? {
@@ -1064,6 +1116,6 @@ impl<'src> Parser<'src> {
 
         let span = leftmost.span.merge(&rightmost.span);
         let stmt = ReturnStatement { value, span };
-        Ok(stmt)
+        Ok(program.push_return_stmt(stmt))
     }
 }
