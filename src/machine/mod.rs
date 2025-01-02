@@ -49,7 +49,16 @@ where
         let chunk = compiler.compile(program, text);
 
         println!("Compiled:\n{}", chunk.disassemble());
-        self.interpret_chunk(&chunk)?;
+        match self.interpret_chunk(&chunk) {
+            Ok(_) => {}
+            Err(e) => {
+                self.trace_stack();
+                println!("GLOBALS\n{}", self.print_globals());
+                println!("STACK\n{}", self.print_stack());
+                println!("MEMORY\n{}", self.print_memory());
+                return Err(e);
+            }
+        }
         self.trace_stack();
         println!("GLOBALS\n{}", self.print_globals());
         println!("STACK\n{}", self.print_stack());
@@ -175,6 +184,23 @@ where
                         span,
                     })?;
                     self.stack.push(value.clone());
+                }
+                Opcode::SetGlobal(handle) => {
+                    let identifier = chunk
+                        .get_string_through_ref(handle)
+                        .expect("Compiled chunks should have valid constant handles.");
+                    let value = self.pop_unary_operand()?;
+                    let handle = self.interner.intern(identifier);
+                    if self.globals.contains_key(&handle) {
+                        self.globals.insert(handle, value.clone());
+                        self.stack.push(value);
+                    } else {
+                        return Err(VMRuntimeError {
+                            kind: VMRuntimeErrorKind::InvalidAccess(identifier.into()),
+                            span,
+                        }
+                        .into());
+                    }
                 }
             }
             self.ip = offset;

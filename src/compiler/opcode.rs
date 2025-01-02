@@ -31,6 +31,7 @@ pub enum Opcode {
     Pop,
     DefineGlobal(ConstRef),
     GetGlobal(ConstRef),
+    SetGlobal(ConstRef),
 }
 
 impl Opcode {
@@ -50,6 +51,7 @@ impl Opcode {
     const C_POP: u8 = 0x0D;
     const C_DEFINE_GLOBAL: u8 = 0x0E;
     const C_GET_GLOBAL: u8 = 0x0F;
+    const C_SET_GLOBAL: u8 = 0x10;
 
     pub fn decode_at(data: &[u8], index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
         let Some(first) = data.get(index) else {
@@ -76,6 +78,10 @@ impl Opcode {
             Opcode::C_GET_GLOBAL => {
                 let handle = parse_u32(Opcode::C_GET_GLOBAL)?;
                 (Opcode::GetGlobal(ConstRef(handle)), index + 5)
+            }
+            Opcode::C_SET_GLOBAL => {
+                let handle = parse_u32(Opcode::C_SET_GLOBAL)?;
+                (Opcode::SetGlobal(ConstRef(handle)), index + 5)
             }
             Opcode::C_RETURN => (Opcode::Return, index + 1),
             Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
@@ -110,6 +116,10 @@ impl Opcode {
                 chunk.emit_u8(Opcode::C_GET_GLOBAL);
                 chunk.emit_u32(handle.0);
             }
+            Opcode::SetGlobal(handle) => {
+                chunk.emit_u8(Opcode::C_SET_GLOBAL);
+                chunk.emit_u32(handle.0);
+            }
             Opcode::Return => chunk.emit_u8(Opcode::C_RETURN),
             Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
             Opcode::Divide => chunk.emit_u8(Opcode::C_DIVIDE),
@@ -139,6 +149,11 @@ impl Opcode {
             }
             Opcode::GetGlobal(handle) => {
                 buffer.push_str("ggl");
+                write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
+                chunk.constants.format_constant(*handle, buffer);
+            }
+            Opcode::SetGlobal(handle) => {
+                buffer.push_str("sgl");
                 write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
                 chunk.constants.format_constant(*handle, buffer);
             }

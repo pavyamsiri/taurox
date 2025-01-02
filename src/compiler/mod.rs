@@ -147,6 +147,13 @@ impl<'src> IncompleteChunk<'src> {
         Opcode::GetGlobal(handle).encode(self);
     }
 
+    pub fn emit_set_global(&mut self, span: Span, identifier: &str) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        let handle = self.constants.push_str(identifier);
+        Opcode::SetGlobal(handle).encode(self);
+    }
+
     pub fn emit_string_literal(&mut self, span: Span, text: &str) {
         self.starts.push(self.data.len());
         self.spans.push(span);
@@ -429,7 +436,11 @@ impl Compiler {
                     }
                 }
             }
-            ExpressionNode::InfixAssignment { lhs, rhs } => todo!(),
+            ExpressionNode::InfixAssignment { lhs, rhs } => {
+                self.compile_expression_node(program, chunk, expr, *rhs);
+                // TODO(pavyamsiri): Only globals are supported right now.
+                chunk.emit_set_global(span, &lhs.name);
+            }
             ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
                 todo!()
             }
