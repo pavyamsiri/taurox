@@ -140,6 +140,15 @@ where
                             .map_err(|kind| VMRuntimeError { kind, span })?,
                     );
                 }
+                Opcode::Print => {
+                    let expr = self.pop_unary_operand()?;
+                    let mut buffer = String::new();
+                    self.format_value(&expr, &mut buffer);
+                    self.context.writeln(&buffer);
+                }
+                Opcode::Pop => {
+                    let _ = self.pop_unary_operand()?;
+                }
             }
             self.ip = offset;
         }
@@ -242,7 +251,7 @@ where
         let mut buffer = String::new();
         for (index, value) in self.stack.iter().enumerate().rev() {
             write!(buffer, "{INDENT}{index:02}: ").expect(WRITE_FMT_MSG);
-            self.format_value(value, &mut buffer);
+            self.debug_format_value(value, &mut buffer);
             buffer.push('\n');
         }
         buffer
@@ -263,7 +272,7 @@ where
         buffer
     }
 
-    fn format_value(&self, value: &VMValue, buffer: &mut String) {
+    fn debug_format_value(&self, value: &VMValue, buffer: &mut String) {
         match value {
             VMValue::String(handle) => {
                 let value = self
@@ -271,6 +280,21 @@ where
                     .get(*handle)
                     .unwrap_or("INVALID_STRING_HANDLE");
                 write!(buffer, "\"{value}\"").expect(WRITE_FMT_MSG);
+            }
+            value => {
+                write!(buffer, "{value}").expect(WRITE_FMT_MSG);
+            }
+        }
+    }
+
+    fn format_value(&self, value: &VMValue, buffer: &mut String) {
+        match value {
+            VMValue::String(handle) => {
+                let value = self
+                    .string_allocator
+                    .get(*handle)
+                    .unwrap_or("INVALID_STRING_HANDLE");
+                write!(buffer, "{value}").expect(WRITE_FMT_MSG);
             }
             value => {
                 write!(buffer, "{value}").expect(WRITE_FMT_MSG);

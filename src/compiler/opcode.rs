@@ -27,6 +27,8 @@ pub enum Opcode {
     Equals,
     LessThan,
     GreaterThan,
+    Print,
+    Pop,
 }
 
 impl Opcode {
@@ -42,6 +44,8 @@ impl Opcode {
     const C_EQUAL: u8 = 0x09;
     const C_LESS_THAN: u8 = 0x0A;
     const C_GREATER_THAN: u8 = 0x0B;
+    const C_PRINT: u8 = 0x0C;
+    const C_POP: u8 = 0x0D;
 
     pub fn decode_at(data: &[u8], index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
         let Some(first) = data.get(index) else {
@@ -49,16 +53,6 @@ impl Opcode {
         };
 
         let (opcode, rest) = match *first {
-            Opcode::C_RETURN => (Opcode::Return, index + 1),
-            Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
-            Opcode::C_DIVIDE => (Opcode::Divide, index + 1),
-            Opcode::C_ADD => (Opcode::Add, index + 1),
-            Opcode::C_SUBTRACT => (Opcode::Subtract, index + 1),
-            Opcode::C_NEGATE => (Opcode::Negate, index + 1),
-            Opcode::C_NOT => (Opcode::Not, index + 1),
-            Opcode::C_EQUAL => (Opcode::Equals, index + 1),
-            Opcode::C_LESS_THAN => (Opcode::LessThan, index + 1),
-            Opcode::C_GREATER_THAN => (Opcode::GreaterThan, index + 1),
             Opcode::C_CONST => {
                 let handle_bytes = &data[index + 1..(index + 5)];
                 let [first, second, third, fourth] = handle_bytes else {
@@ -69,6 +63,18 @@ impl Opcode {
                 let handle = u32::from_le_bytes([*first, *second, *third, *fourth]);
                 (Opcode::Const(ConstRef(handle)), index + 5)
             }
+            Opcode::C_RETURN => (Opcode::Return, index + 1),
+            Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
+            Opcode::C_DIVIDE => (Opcode::Divide, index + 1),
+            Opcode::C_ADD => (Opcode::Add, index + 1),
+            Opcode::C_SUBTRACT => (Opcode::Subtract, index + 1),
+            Opcode::C_NEGATE => (Opcode::Negate, index + 1),
+            Opcode::C_NOT => (Opcode::Not, index + 1),
+            Opcode::C_EQUAL => (Opcode::Equals, index + 1),
+            Opcode::C_LESS_THAN => (Opcode::LessThan, index + 1),
+            Opcode::C_GREATER_THAN => (Opcode::GreaterThan, index + 1),
+            Opcode::C_PRINT => (Opcode::Print, index + 1),
+            Opcode::C_POP => (Opcode::Pop, index + 1),
             opcode => {
                 return Err(DecodeError::InvalidOpcode { value: opcode });
             }
@@ -92,6 +98,8 @@ impl Opcode {
             Opcode::Equals => chunk.emit_u8(Opcode::C_EQUAL),
             Opcode::LessThan => chunk.emit_u8(Opcode::C_LESS_THAN),
             Opcode::GreaterThan => chunk.emit_u8(Opcode::C_GREATER_THAN),
+            Opcode::Print => chunk.emit_u8(Opcode::C_PRINT),
+            Opcode::Pop => chunk.emit_u8(Opcode::C_POP),
         }
     }
 
@@ -112,6 +120,8 @@ impl Opcode {
             Opcode::Equals => buffer.push_str("eq"),
             Opcode::LessThan => buffer.push_str("lt"),
             Opcode::GreaterThan => buffer.push_str("gt"),
+            Opcode::Print => buffer.push_str("print"),
+            Opcode::Pop => buffer.push_str("pop"),
         }
     }
 }

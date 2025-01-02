@@ -6,7 +6,7 @@ use crate::parser::expression::{
     Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
     InfixOperator, PrefixOperator,
 };
-use crate::parser::statement::{ExpressionStatement, Statement};
+use crate::parser::statement::{ExpressionStatement, PrintStatement, Statement};
 use crate::resolver::ResolvedProgram;
 use crate::string::IdentName;
 use constant::InternStringHandle;
@@ -113,6 +113,18 @@ impl<'src> IncompleteChunk<'src> {
         self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::GreaterThan.encode(self);
+    }
+
+    pub fn emit_print(&mut self, span: Span) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        Opcode::Print.encode(self);
+    }
+
+    pub fn emit_pop(&mut self, span: Span) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        Opcode::Pop.encode(self);
     }
 
     pub fn emit_constant(&mut self, span: Span, value: LoxConstant) {
@@ -291,7 +303,7 @@ impl Compiler {
             Statement::FunctionDecl(_) => todo!(),
             Statement::ClassDecl(_) => todo!(),
             Statement::Expression(stmt) => self.compile_expression_stmt(program, chunk, stmt),
-            Statement::Print(_) => todo!(),
+            Statement::Print(stmt) => self.compile_print_stmt(program, chunk, stmt),
             Statement::Block(_) => todo!(),
             Statement::If(_) => todo!(),
             Statement::While(_) => todo!(),
@@ -307,6 +319,17 @@ impl Compiler {
         stmt: &ExpressionStatement,
     ) {
         self.compile_expression(program, chunk, &stmt.expr);
+        chunk.emit_pop(stmt.span);
+    }
+
+    fn compile_print_stmt(
+        &self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        stmt: &PrintStatement,
+    ) {
+        self.compile_expression(program, chunk, &stmt.expr);
+        chunk.emit_print(stmt.span);
     }
 }
 
