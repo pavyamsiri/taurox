@@ -1,22 +1,21 @@
 pub mod error;
-
-use error::VMError;
+pub mod value;
 
 use crate::{
     compiler::{Chunk, Compiler, Opcode},
     interpreter::SystemContext,
-    lexer::Span,
     resolver::ResolvedProgram,
-    value::{error::RuntimeError, LoxValue},
 };
+use error::{VMError, VMRuntimeError};
 use std::fmt::Write;
+use value::VMValue;
 
 const WRITE_FMT_MSG: &'static str =
     "Encountered an error while attempting to write format string to buffer.";
 
 pub struct VirtualMachine<C: SystemContext> {
     ip: usize,
-    stack: Vec<LoxValue>,
+    stack: Vec<VMValue>,
     context: C,
 }
 
@@ -36,8 +35,8 @@ where
         let compiler = Compiler;
         let chunk = compiler.compile(program, text);
 
+        println!("Compiled:\n{}", chunk.disassemble());
         self.interpret_chunk(&chunk)?;
-        println!("{}", chunk.disassemble());
         println!("STACK\n{}", self.print_stack());
 
         Ok(self.context)
@@ -50,7 +49,7 @@ where
 {
     fn interpret_chunk(&mut self, chunk: &Chunk) -> Result<(), VMError> {
         loop {
-            let (inst, offset) = match chunk.decode_at(self.ip) {
+            let (inst, offset, span) = match chunk.decode_at(self.ip) {
                 Ok(Some(v)) => v,
                 Ok(None) => {
                     break;
@@ -75,87 +74,61 @@ where
                 }
                 Opcode::Multiply => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack
-                        .push(lhs.multiply(&rhs).map_err(|kind| RuntimeError {
-                            kind,
-                            span: Span {
-                                start: 0.into(),
-                                length: 0.into(),
-                            },
-                        })?);
+                    self.stack.push(
+                        lhs.multiply(&rhs)
+                            .map_err(|kind| VMRuntimeError { kind, span })?,
+                    );
                 }
                 Opcode::Divide => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack
-                        .push(lhs.divide(&rhs).map_err(|kind| RuntimeError {
-                            kind,
-                            span: Span {
-                                start: 0.into(),
-                                length: 0.into(),
-                            },
-                        })?);
+                    self.stack.push(
+                        lhs.divide(&rhs)
+                            .map_err(|kind| VMRuntimeError { kind, span })?,
+                    );
                 }
                 Opcode::Add => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack.push(lhs.add(&rhs).map_err(|kind| RuntimeError {
-                        kind,
-                        span: Span {
-                            start: 0.into(),
-                            length: 0.into(),
-                        },
-                    })?);
+                    self.stack.push(
+                        lhs.add(&rhs)
+                            .map_err(|kind| VMRuntimeError { kind, span })?,
+                    );
                 }
                 Opcode::Subtract => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack
-                        .push(lhs.subtract(&rhs).map_err(|kind| RuntimeError {
-                            kind,
-                            span: Span {
-                                start: 0.into(),
-                                length: 0.into(),
-                            },
-                        })?);
+                    self.stack.push(
+                        lhs.subtract(&rhs)
+                            .map_err(|kind| VMRuntimeError { kind, span })?,
+                    );
                 }
                 Opcode::Negate => {
                     let operand = self.pop_unary_operand()?;
-                    self.stack
-                        .push(operand.numeric_negate().map_err(|kind| RuntimeError {
-                            kind,
-                            span: Span {
-                                start: 0.into(),
-                                length: 0.into(),
-                            },
-                        })?);
+                    self.stack.push(
+                        operand
+                            .numeric_negate()
+                            .map_err(|kind| VMRuntimeError { kind, span })?,
+                    );
                 }
                 Opcode::Not => {
                     let operand = self.pop_unary_operand()?;
-                    self.stack.push(LoxValue::Bool(operand.logical_not()));
+                    self.stack.push(VMValue::Bool(operand.logical_not()));
                 }
                 Opcode::Equals => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack.push(LoxValue::Bool(lhs.is_equal(&rhs)));
+                    self.stack.push(VMValue::Bool(lhs.is_equal(&rhs)));
                 }
                 Opcode::LessThan => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack
-                        .push(lhs.less_than(&rhs).map_err(|kind| RuntimeError {
-                            kind,
-                            span: Span {
-                                start: 0.into(),
-                                length: 0.into(),
-                            },
-                        })?);
+                    self.stack.push(
+                        lhs.less_than(&rhs)
+                            .map_err(|kind| VMRuntimeError { kind, span })?,
+                    );
                 }
                 Opcode::GreaterThan => {
                     let (lhs, rhs) = self.pop_binary_operands()?;
-                    self.stack
-                        .push(lhs.greater_than(&rhs).map_err(|kind| RuntimeError {
-                            kind,
-                            span: Span {
-                                start: 0.into(),
-                                length: 0.into(),
-                            },
-                        })?);
+                    self.stack.push(
+                        lhs.greater_than(&rhs)
+                            .map_err(|kind| VMRuntimeError { kind, span })?,
+                    );
                 }
             }
             self.ip = offset;
@@ -172,7 +145,7 @@ where
         buffer
     }
 
-    fn pop_unary_operand(&mut self) -> Result<LoxValue, VMError> {
+    fn pop_unary_operand(&mut self) -> Result<VMValue, VMError> {
         let value = self.stack.pop().ok_or(VMError::MissingStackOperands {
             expected: 1,
             actual: 0,
@@ -180,7 +153,7 @@ where
         Ok(value)
     }
 
-    fn pop_binary_operands(&mut self) -> Result<(LoxValue, LoxValue), VMError> {
+    fn pop_binary_operands(&mut self) -> Result<(VMValue, VMValue), VMError> {
         let rhs = self.stack.pop().ok_or(VMError::MissingStackOperands {
             expected: 2,
             actual: 0,

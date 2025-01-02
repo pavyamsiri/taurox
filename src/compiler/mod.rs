@@ -23,6 +23,7 @@ pub struct IncompleteChunk<'src> {
     data: Vec<u8>,
     spans: Vec<Span>,
     constants: ConstantPool,
+    starts: Vec<usize>,
 }
 
 impl<'src> IncompleteChunk<'src> {
@@ -35,6 +36,7 @@ impl<'src> IncompleteChunk<'src> {
             data: Vec::new(),
             spans: Vec::new(),
             constants: ConstantPool::new(),
+            starts: Vec::new(),
         }
     }
 
@@ -52,58 +54,69 @@ impl<'src> IncompleteChunk<'src> {
     }
 
     pub fn emit_return(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Return.encode(self);
     }
 
     pub fn emit_multiply(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Multiply.encode(self);
     }
 
     pub fn emit_divide(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Divide.encode(self);
     }
 
     pub fn emit_add(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Add.encode(self);
     }
 
     pub fn emit_subtract(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Subtract.encode(self);
     }
 
     pub fn emit_negate(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Negate.encode(self);
     }
 
     pub fn emit_not(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Not.encode(self);
     }
 
     pub fn emit_equals(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::Equals.encode(self);
     }
 
     pub fn emit_less_than(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::LessThan.encode(self);
     }
 
     pub fn emit_greater_than(&mut self, span: Span) {
+        self.starts.push(self.data.len());
         self.spans.push(span);
         Opcode::GreaterThan.encode(self);
     }
 
     pub fn emit_constant(&mut self, span: Span, value: LoxConstant) {
-        let handle = self.constants.push_constant(value);
+        self.starts.push(self.data.len());
         self.spans.push(span);
+        let handle = self.constants.push_constant(value);
         Opcode::Const(handle).encode(self);
     }
 
@@ -115,6 +128,7 @@ impl<'src> IncompleteChunk<'src> {
             constants: self.constants,
             text: &self.text,
             line_breaks: self.line_breaks,
+            starts: self.starts.into(),
         }
     }
 }
@@ -125,30 +139,31 @@ pub struct Chunk<'src> {
     line_breaks: LineBreaks,
     data: Arc<[u8]>,
     spans: Arc<[Span]>,
+    starts: Arc<[usize]>,
     constants: ConstantPool,
 }
 
 struct OpcodeIterator<'a, 'src> {
     text: &'src str,
+    starts: &'a [usize],
     line_breaks: &'a LineBreaks,
     data: &'a [u8],
     index: usize,
 }
 
 impl<'a, 'src> std::iter::Iterator for OpcodeIterator<'a, 'src> {
-    type Item = (usize, Opcode);
+    type Item = (Option<Opcode>, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let value = Opcode::decode(&self.data);
-        if let Ok(Some((opcode, rest))) = value {
-            // Should not underflow because `rest.len()` is at most `self.data.len()`.
-            let offset = self.index;
-            self.index += self.data.len() - rest.len();
-            self.data = rest;
-            Some((offset, opcode))
-        } else {
-            None
-        }
+        let start = *self.starts.get(self.index)?;
+        let value: Option<(Option<Opcode>, usize)> = match Opcode::decode_at(&self.data, start) {
+            Ok(Some((opcode, _))) => Some((Some(opcode), start)),
+            Ok(None) => None,
+            Err(_) => Some((None, start)),
+        };
+
+        self.index += 1;
+        value
     }
 }
 
@@ -159,17 +174,36 @@ impl<'src> Chunk<'src> {
             index: 0,
             text: &self.text,
             line_breaks: &self.line_breaks,
+            starts: &self.starts,
         }
     }
 
-    pub fn decode_at(&self, index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
-        let slice = &self.data[index..];
-        let (opcode, rest) = match Opcode::decode(&self.data[index..])? {
-            Some(s) => s,
-            None => return Ok(None),
-        };
-        let offset = slice.len() - rest.len() + index;
-        Ok(Some((opcode, offset)))
+    fn get_span(&self, index: usize) -> Option<Span> {
+        assert_eq!(
+            self.starts.len(),
+            self.spans.len(),
+            "The spans and starts should be the same size."
+        );
+        let span_index = self.starts.binary_search(&index).ok()?;
+        Some(
+            self.spans
+                .get(span_index)
+                .expect("Already checked that all `self.starts` indices are valid `self.spans` indices.")
+                .clone(),
+        )
+    }
+
+    pub fn decode_at(&self, index: usize) -> Result<Option<(Opcode, usize, Span)>, DecodeError> {
+        match Opcode::decode_at(&self.data, index) {
+            Ok(Some((opcode, next_offset))) if self.starts.contains(&index) => {
+                let span = self
+                    .get_span(index)
+                    .expect("`{index}` is a valid instruction start so its span must exist.");
+                Ok(Some((opcode, next_offset, span)))
+            }
+            Ok(_) => Ok(None),
+            Err(e) => Err(e),
+        }
     }
 
     pub fn get_data<'a>(&'a self) -> &'a [u8] {
@@ -188,7 +222,7 @@ impl<'src> Chunk<'src> {
         let mut buffer = String::new();
         write!(buffer, "Chunk <{}>:\n", self.name).expect(WRITE_FMT_MSG);
         let mut previous_line_number: Option<u32> = None;
-        for (instruction_index, (offset, opcode)) in self.iter().enumerate() {
+        for (instruction_index, (opcode, offset)) in self.iter().enumerate() {
             let span = self
                 .spans
                 .get(instruction_index)
@@ -206,7 +240,11 @@ impl<'src> Chunk<'src> {
                 write!(buffer, "{:>width$}{line_number} ", "L", width = num_digits)
                     .expect(WRITE_FMT_MSG);
             }
-            opcode.format(&mut buffer, self);
+            if let Some(opcode) = opcode {
+                opcode.format(&mut buffer, self);
+            } else {
+                buffer.push_str("invalid");
+            }
             buffer.push('\n');
 
             previous_line_number = Some(line_number);

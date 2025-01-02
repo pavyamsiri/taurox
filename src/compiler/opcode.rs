@@ -1,7 +1,7 @@
 use thiserror::Error;
 
 use super::{Chunk, IncompleteChunk};
-use crate::value::LoxValue;
+use crate::{machine::value::VMValue, value::LoxValue};
 use std::fmt::Write;
 
 const WRITE_FMT_MSG: &'static str =
@@ -42,9 +42,20 @@ impl From<&LoxConstant> for LoxValue {
     }
 }
 
+impl From<&LoxConstant> for VMValue {
+    fn from(value: &LoxConstant) -> Self {
+        match value {
+            LoxConstant::Number(value) => Self::Number(*value),
+            LoxConstant::Nil => Self::Nil,
+            LoxConstant::Bool(value) => Self::Bool(*value),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ConstRef(u32);
 
+#[derive(Debug)]
 pub struct ConstantPool {
     data: Vec<LoxConstant>,
 }
@@ -93,30 +104,31 @@ impl Opcode {
     const C_LESS_THAN: u8 = 0x0A;
     const C_GREATER_THAN: u8 = 0x0B;
 
-    pub fn decode(data: &[u8]) -> Result<Option<(Opcode, &[u8])>, DecodeError> {
-        let Some((first, rest)) = data.split_first() else {
+    pub fn decode_at(data: &[u8], index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
+        let Some(first) = data.get(index) else {
             return Ok(None);
         };
+
         let (opcode, rest) = match *first {
-            Opcode::C_RETURN => (Opcode::Return, rest),
-            Opcode::C_MULTIPLY => (Opcode::Multiply, rest),
-            Opcode::C_DIVIDE => (Opcode::Divide, rest),
-            Opcode::C_ADD => (Opcode::Add, rest),
-            Opcode::C_SUBTRACT => (Opcode::Subtract, rest),
-            Opcode::C_NEGATE => (Opcode::Negate, rest),
-            Opcode::C_NOT => (Opcode::Not, rest),
-            Opcode::C_EQUAL => (Opcode::Equals, rest),
-            Opcode::C_LESS_THAN => (Opcode::LessThan, rest),
-            Opcode::C_GREATER_THAN => (Opcode::GreaterThan, rest),
+            Opcode::C_RETURN => (Opcode::Return, index + 1),
+            Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
+            Opcode::C_DIVIDE => (Opcode::Divide, index + 1),
+            Opcode::C_ADD => (Opcode::Add, index + 1),
+            Opcode::C_SUBTRACT => (Opcode::Subtract, index + 1),
+            Opcode::C_NEGATE => (Opcode::Negate, index + 1),
+            Opcode::C_NOT => (Opcode::Not, index + 1),
+            Opcode::C_EQUAL => (Opcode::Equals, index + 1),
+            Opcode::C_LESS_THAN => (Opcode::LessThan, index + 1),
+            Opcode::C_GREATER_THAN => (Opcode::GreaterThan, index + 1),
             Opcode::C_CONST => {
-                let (handle_bytes, rest) = rest.split_at(4);
+                let handle_bytes = &data[index + 1..(index + 5)];
                 let [first, second, third, fourth] = handle_bytes else {
                     return Err(DecodeError::IncompleteOperand {
                         opcode: Opcode::C_CONST,
                     });
                 };
                 let handle = u32::from_le_bytes([*first, *second, *third, *fourth]);
-                (Opcode::Const(ConstRef(handle)), rest)
+                (Opcode::Const(ConstRef(handle)), index + 5)
             }
             opcode => {
                 return Err(DecodeError::InvalidOpcode { value: opcode });
