@@ -165,6 +165,17 @@ where
                     let handle = self.interner.intern(identifier);
                     self.globals.insert(handle, value);
                 }
+                Opcode::GetGlobal(handle) => {
+                    let identifier = chunk
+                        .get_string_through_ref(handle)
+                        .expect("Compiled chunks should have valid constant handles.");
+                    let handle = self.interner.intern(identifier);
+                    let value = self.globals.get(&handle).ok_or(VMRuntimeError {
+                        kind: VMRuntimeErrorKind::InvalidAccess(identifier.into()),
+                        span,
+                    })?;
+                    self.stack.push(value.clone());
+                }
             }
             self.ip = offset;
         }

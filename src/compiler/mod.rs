@@ -140,6 +140,13 @@ impl<'src> IncompleteChunk<'src> {
         Opcode::DefineGlobal(handle).encode(self);
     }
 
+    pub fn emit_get_global(&mut self, span: Span, identifier: &str) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        let handle = self.constants.push_str(identifier);
+        Opcode::GetGlobal(handle).encode(self);
+    }
+
     pub fn emit_string_literal(&mut self, span: Span, text: &str) {
         self.starts.push(self.data.len());
         self.spans.push(span);
@@ -449,7 +456,10 @@ impl Compiler {
             ExpressionAtomKind::Nil => {
                 chunk.emit_constant(span, LoxConstant::Nil);
             }
-            ExpressionAtomKind::Identifier(rc) => todo!(),
+            ExpressionAtomKind::Identifier(ident) => {
+                // TODO(pavyamsiri): All identifiers are implicit global gets which is wrong.
+                chunk.emit_get_global(span, ident);
+            }
             ExpressionAtomKind::StringLiteral(text) => {
                 chunk.emit_string_literal(span, &text);
             }

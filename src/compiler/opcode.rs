@@ -30,6 +30,7 @@ pub enum Opcode {
     Print,
     Pop,
     DefineGlobal(ConstRef),
+    GetGlobal(ConstRef),
 }
 
 impl Opcode {
@@ -48,6 +49,7 @@ impl Opcode {
     const C_PRINT: u8 = 0x0C;
     const C_POP: u8 = 0x0D;
     const C_DEFINE_GLOBAL: u8 = 0x0E;
+    const C_GET_GLOBAL: u8 = 0x0F;
 
     pub fn decode_at(data: &[u8], index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
         let Some(first) = data.get(index) else {
@@ -68,8 +70,12 @@ impl Opcode {
                 (Opcode::Const(ConstRef(handle)), index + 5)
             }
             Opcode::C_DEFINE_GLOBAL => {
-                let handle = parse_u32(Opcode::C_CONST)?;
+                let handle = parse_u32(Opcode::C_DEFINE_GLOBAL)?;
                 (Opcode::DefineGlobal(ConstRef(handle)), index + 5)
+            }
+            Opcode::C_GET_GLOBAL => {
+                let handle = parse_u32(Opcode::C_GET_GLOBAL)?;
+                (Opcode::GetGlobal(ConstRef(handle)), index + 5)
             }
             Opcode::C_RETURN => (Opcode::Return, index + 1),
             Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
@@ -100,6 +106,10 @@ impl Opcode {
                 chunk.emit_u8(Opcode::C_DEFINE_GLOBAL);
                 chunk.emit_u32(handle.0);
             }
+            Opcode::GetGlobal(handle) => {
+                chunk.emit_u8(Opcode::C_GET_GLOBAL);
+                chunk.emit_u32(handle.0);
+            }
             Opcode::Return => chunk.emit_u8(Opcode::C_RETURN),
             Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
             Opcode::Divide => chunk.emit_u8(Opcode::C_DIVIDE),
@@ -124,6 +134,11 @@ impl Opcode {
             }
             Opcode::DefineGlobal(handle) => {
                 buffer.push_str("dgl");
+                write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
+                chunk.constants.format_constant(*handle, buffer);
+            }
+            Opcode::GetGlobal(handle) => {
+                buffer.push_str("ggl");
                 write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
                 chunk.constants.format_constant(*handle, buffer);
             }
