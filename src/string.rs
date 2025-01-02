@@ -1,5 +1,9 @@
 use crate::lexer::Span;
-use std::rc::Rc;
+use std::{
+    collections::HashMap,
+    hash::{Hash, Hasher},
+    rc::Rc,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Ident {
@@ -14,3 +18,51 @@ impl std::fmt::Display for Ident {
 }
 
 pub type IdentName = Rc<str>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct InternStringHandle {
+    start: u32,
+    length: u32,
+}
+
+#[derive(Debug)]
+pub struct StringInterner {
+    handles: HashMap<u64, InternStringHandle>,
+    buffer: String,
+}
+
+impl StringInterner {
+    pub fn new() -> Self {
+        Self {
+            handles: HashMap::new(),
+            buffer: String::new(),
+        }
+    }
+
+    fn hash_string(text: &str) -> u64 {
+        let mut hasher = std::hash::DefaultHasher::new();
+        text.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    pub fn intern(&mut self, text: &str) -> InternStringHandle {
+        let key = Self::hash_string(text);
+        if let Some(handle) = self.handles.get(&key) {
+            *handle
+        } else {
+            // Intern string
+            let start = self.buffer.len() as u32;
+            let length = text.len() as u32;
+            let handle = InternStringHandle { start, length };
+            self.buffer.push_str(text);
+            self.handles.insert(key, handle);
+            handle
+        }
+    }
+
+    pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
+        let start = (handle.start) as usize;
+        let end = start + (handle.length as usize);
+        self.buffer.get(start..end)
+    }
+}

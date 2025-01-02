@@ -1,21 +1,15 @@
-use crate::{machine::value::VMValue, value::LoxValue};
-use std::fmt::Write;
-use std::{
-    collections::HashMap,
-    hash::{Hash, Hasher},
+use crate::{
+    machine::value::VMValue,
+    string::{InternStringHandle, StringInterner},
+    value::LoxValue,
 };
+use std::fmt::Write;
 
 const WRITE_FMT_MSG: &'static str =
     "Encountered an error while attempting to write format string to buffer.";
 
 #[derive(Debug, Clone, Copy)]
 pub struct ConstRef(pub u32);
-
-#[derive(Debug, Clone, Copy)]
-pub struct InternStringHandle {
-    start: u32,
-    length: u32,
-}
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoxConstant {
@@ -76,6 +70,14 @@ impl ConstantPool {
         self.data.get(handle.0 as usize)
     }
 
+    pub fn get_string_through_ref(&self, handle: ConstRef) -> Option<&str> {
+        let value = self.get(handle)?;
+        match value {
+            LoxConstant::String(handle) => self.get_string(*handle),
+            _ => None,
+        }
+    }
+
     pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
         self.interned_strings.get_string(handle)
     }
@@ -105,47 +107,5 @@ impl ConstantPool {
                 write!(buffer, "{value}").expect(WRITE_FMT_MSG);
             }
         }
-    }
-}
-
-#[derive(Debug)]
-struct StringInterner {
-    handles: HashMap<u64, InternStringHandle>,
-    buffer: String,
-}
-
-impl StringInterner {
-    pub fn new() -> Self {
-        Self {
-            handles: HashMap::new(),
-            buffer: String::new(),
-        }
-    }
-
-    fn hash_string(text: &str) -> u64 {
-        let mut hasher = std::hash::DefaultHasher::new();
-        text.hash(&mut hasher);
-        hasher.finish()
-    }
-
-    pub fn intern(&mut self, text: &str) -> InternStringHandle {
-        let key = Self::hash_string(text);
-        if let Some(handle) = self.handles.get(&key) {
-            *handle
-        } else {
-            // Intern string
-            let start = self.buffer.len() as u32;
-            let length = text.len() as u32;
-            let handle = InternStringHandle { start, length };
-            self.buffer.push_str(text);
-            self.handles.insert(key, handle);
-            handle
-        }
-    }
-
-    pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
-        let start = (handle.start) as usize;
-        let end = start + (handle.length as usize);
-        self.buffer.get(start..end)
     }
 }

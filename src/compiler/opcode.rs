@@ -29,6 +29,7 @@ pub enum Opcode {
     GreaterThan,
     Print,
     Pop,
+    DefineGlobal(ConstRef),
 }
 
 impl Opcode {
@@ -46,22 +47,29 @@ impl Opcode {
     const C_GREATER_THAN: u8 = 0x0B;
     const C_PRINT: u8 = 0x0C;
     const C_POP: u8 = 0x0D;
+    const C_DEFINE_GLOBAL: u8 = 0x0E;
 
     pub fn decode_at(data: &[u8], index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
         let Some(first) = data.get(index) else {
             return Ok(None);
         };
 
+        let parse_u32 = |code: u8| -> Result<u32, DecodeError> {
+            let handle_bytes = &data[index + 1..(index + 5)];
+            let [first, second, third, fourth] = handle_bytes else {
+                return Err(DecodeError::IncompleteOperand { opcode: code });
+            };
+            Ok(u32::from_le_bytes([*first, *second, *third, *fourth]))
+        };
+
         let (opcode, rest) = match *first {
             Opcode::C_CONST => {
-                let handle_bytes = &data[index + 1..(index + 5)];
-                let [first, second, third, fourth] = handle_bytes else {
-                    return Err(DecodeError::IncompleteOperand {
-                        opcode: Opcode::C_CONST,
-                    });
-                };
-                let handle = u32::from_le_bytes([*first, *second, *third, *fourth]);
+                let handle = parse_u32(Opcode::C_CONST)?;
                 (Opcode::Const(ConstRef(handle)), index + 5)
+            }
+            Opcode::C_DEFINE_GLOBAL => {
+                let handle = parse_u32(Opcode::C_CONST)?;
+                (Opcode::DefineGlobal(ConstRef(handle)), index + 5)
             }
             Opcode::C_RETURN => (Opcode::Return, index + 1),
             Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
@@ -88,6 +96,10 @@ impl Opcode {
                 chunk.emit_u8(Opcode::C_CONST);
                 chunk.emit_u32(handle.0);
             }
+            Opcode::DefineGlobal(handle) => {
+                chunk.emit_u8(Opcode::C_DEFINE_GLOBAL);
+                chunk.emit_u32(handle.0);
+            }
             Opcode::Return => chunk.emit_u8(Opcode::C_RETURN),
             Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
             Opcode::Divide => chunk.emit_u8(Opcode::C_DIVIDE),
@@ -107,6 +119,11 @@ impl Opcode {
         match self {
             Opcode::Const(handle) => {
                 buffer.push_str("ldc");
+                write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
+                chunk.constants.format_constant(*handle, buffer);
+            }
+            Opcode::DefineGlobal(handle) => {
+                buffer.push_str("dgl");
                 write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
                 chunk.constants.format_constant(*handle, buffer);
             }

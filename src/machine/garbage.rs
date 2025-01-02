@@ -97,6 +97,12 @@ impl StringAllocator {
         Some(value)
     }
 
+    pub fn debug_get(&self, handle: VMStringRef) -> Option<&str> {
+        const MSG: &'static str = "All string allocator arrays should have the same length.";
+        self.verify_integrity();
+        let value = self.data.get(handle.index as usize).expect(MSG);
+        Some(value)
+    }
     pub fn mark(&mut self, handles: &[VMStringRef]) {
         self.verify_integrity();
         // Mark everything as dead

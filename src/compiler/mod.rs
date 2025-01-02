@@ -6,10 +6,9 @@ use crate::parser::expression::{
     Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
     InfixOperator, PrefixOperator,
 };
-use crate::parser::statement::{ExpressionStatement, PrintStatement, Statement};
+use crate::parser::statement::{ExpressionStatement, PrintStatement, Statement, VariableDecl};
 use crate::resolver::ResolvedProgram;
-use crate::string::IdentName;
-use constant::InternStringHandle;
+use crate::string::{IdentName, InternStringHandle};
 pub use constant::{ConstRef, ConstantPool, LoxConstant};
 pub use opcode::{DecodeError, Opcode};
 use std::fmt::Write;
@@ -134,6 +133,13 @@ impl<'src> IncompleteChunk<'src> {
         Opcode::Const(handle).encode(self);
     }
 
+    pub fn emit_define_global(&mut self, span: Span, identifier: &str) {
+        self.starts.push(self.data.len());
+        self.spans.push(span);
+        let handle = self.constants.push_str(identifier);
+        Opcode::DefineGlobal(handle).encode(self);
+    }
+
     pub fn emit_string_literal(&mut self, span: Span, text: &str) {
         self.starts.push(self.data.len());
         self.spans.push(span);
@@ -235,6 +241,10 @@ impl<'src> Chunk<'src> {
         self.constants.get(handle)
     }
 
+    pub fn get_string_through_ref(&self, handle: ConstRef) -> Option<&str> {
+        self.constants.get_string_through_ref(handle)
+    }
+
     pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
         self.constants.get_string(handle)
     }
@@ -299,7 +309,7 @@ impl Compiler {
         stmt: Statement<'stmt>,
     ) {
         match stmt {
-            Statement::VariableDecl(_) => todo!(),
+            Statement::VariableDecl(decl) => self.compile_variable_decl(program, chunk, decl),
             Statement::FunctionDecl(_) => todo!(),
             Statement::ClassDecl(_) => todo!(),
             Statement::Expression(stmt) => self.compile_expression_stmt(program, chunk, stmt),
@@ -310,6 +320,21 @@ impl Compiler {
             Statement::For(_) => todo!(),
             Statement::Return(_) => todo!(),
         }
+    }
+
+    // TODO(pavyamsiri): Every variable is global right now.
+    fn compile_variable_decl(
+        &self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        decl: &VariableDecl,
+    ) {
+        if let Some(initial) = &decl.initial {
+            self.compile_expression(program, chunk, initial);
+        } else {
+            chunk.emit_constant(decl.span, LoxConstant::Nil);
+        }
+        chunk.emit_define_global(decl.span, &decl.name.name);
     }
 
     fn compile_expression_stmt(

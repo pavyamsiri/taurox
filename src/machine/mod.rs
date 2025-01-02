@@ -6,10 +6,11 @@ use crate::{
     compiler::{Chunk, Compiler, LoxConstant, Opcode},
     interpreter::SystemContext,
     resolver::ResolvedProgram,
+    string::{InternStringHandle, StringInterner},
 };
 use error::{VMError, VMRuntimeError, VMRuntimeErrorKind};
 use garbage::StringAllocator;
-use std::fmt::Write;
+use std::{collections::HashMap, fmt::Write};
 use value::VMValue;
 
 const WRITE_FMT_MSG: &'static str =
@@ -19,6 +20,10 @@ pub struct VirtualMachine<C: SystemContext> {
     ip: usize,
     stack: Vec<VMValue>,
     context: C,
+
+    // Globals
+    globals: HashMap<InternStringHandle, VMValue>,
+    interner: StringInterner,
 
     // Allocators
     string_allocator: StringAllocator,
@@ -34,6 +39,8 @@ where
             context,
             stack: Vec::new(),
             string_allocator: StringAllocator::new(),
+            globals: HashMap::new(),
+            interner: StringInterner::new(),
         }
     }
 
@@ -44,6 +51,7 @@ where
         println!("Compiled:\n{}", chunk.disassemble());
         self.interpret_chunk(&chunk)?;
         self.trace_stack();
+        println!("GLOBALS\n{}", self.print_globals());
         println!("STACK\n{}", self.print_stack());
         println!("MEMORY\n{}", self.print_memory());
 
@@ -149,6 +157,14 @@ where
                 Opcode::Pop => {
                     let _ = self.pop_unary_operand()?;
                 }
+                Opcode::DefineGlobal(handle) => {
+                    let identifier = chunk
+                        .get_string_through_ref(handle)
+                        .expect("Compiled chunks should have valid constant handles.");
+                    let value = self.pop_unary_operand()?;
+                    let handle = self.interner.intern(identifier);
+                    self.globals.insert(handle, value);
+                }
             }
             self.ip = offset;
         }
@@ -246,6 +262,21 @@ impl<C> VirtualMachine<C>
 where
     C: SystemContext,
 {
+    fn print_globals(&self) -> String {
+        const INDENT: &'static str = "  ";
+        let mut buffer = String::new();
+        for (handle, value) in self.globals.iter() {
+            let identifier = self
+                .interner
+                .get_string(*handle)
+                .expect("[Print Globals]: Invalid string handle");
+            write!(buffer, "{INDENT}{identifier} = ").expect(WRITE_FMT_MSG);
+            self.debug_format_value(value, &mut buffer);
+            buffer.push('\n');
+        }
+        buffer
+    }
+
     fn print_stack(&self) -> String {
         const INDENT: &'static str = "  ";
         let mut buffer = String::new();
@@ -277,7 +308,7 @@ where
             VMValue::String(handle) => {
                 let value = self
                     .string_allocator
-                    .get(*handle)
+                    .debug_get(*handle)
                     .unwrap_or("INVALID_STRING_HANDLE");
                 write!(buffer, "\"{value}\"").expect(WRITE_FMT_MSG);
             }
