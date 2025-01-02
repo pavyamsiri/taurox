@@ -418,7 +418,7 @@ fn compile(
     };
 
     let vm = VirtualMachine::new(StdioContext);
-    match vm.run(&program) {
+    match vm.run(&program, src) {
         Ok(_) => Ok(()),
         Err(e) => {
             eprintln!("{}", value_formatter.format_error(&e));

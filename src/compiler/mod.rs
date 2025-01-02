@@ -81,6 +81,26 @@ impl<'src> IncompleteChunk<'src> {
         Opcode::Negate.encode(self);
     }
 
+    pub fn emit_not(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::Not.encode(self);
+    }
+
+    pub fn emit_equals(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::Equals.encode(self);
+    }
+
+    pub fn emit_less_than(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::LessThan.encode(self);
+    }
+
+    pub fn emit_greater_than(&mut self, span: Span) {
+        self.spans.push(span);
+        Opcode::GreaterThan.encode(self);
+    }
+
     pub fn emit_constant(&mut self, span: Span, value: LoxConstant) {
         let handle = self.constants.push_constant(value);
         self.spans.push(span);
@@ -263,11 +283,13 @@ impl Compiler {
         let span = expr.get_span();
         match current_node {
             ExpressionNode::Atom(atom) => self.compile_expression_atom(program, chunk, atom),
-            ExpressionNode::Group { inner } => todo!(),
+            ExpressionNode::Group { inner } => {
+                self.compile_expression_node(program, chunk, expr, *inner);
+            }
             ExpressionNode::Prefix { operator, rhs } => {
                 self.compile_expression_node(program, chunk, expr, *rhs);
                 match operator {
-                    PrefixOperator::Bang => todo!(),
+                    PrefixOperator::Bang => chunk.emit_not(span),
                     PrefixOperator::Minus => chunk.emit_negate(span),
                 }
             }
@@ -279,12 +301,21 @@ impl Compiler {
                     InfixOperator::Divide => chunk.emit_divide(span),
                     InfixOperator::Add => chunk.emit_add(span),
                     InfixOperator::Subtract => chunk.emit_subtract(span),
-                    InfixOperator::LessThan => todo!(),
-                    InfixOperator::LessThanEqual => todo!(),
-                    InfixOperator::GreaterThan => todo!(),
-                    InfixOperator::GreaterThanEqual => todo!(),
-                    InfixOperator::EqualEqual => todo!(),
-                    InfixOperator::BangEqual => todo!(),
+                    InfixOperator::EqualEqual => chunk.emit_equals(span),
+                    InfixOperator::LessThan => chunk.emit_less_than(span),
+                    InfixOperator::GreaterThan => chunk.emit_greater_than(span),
+                    InfixOperator::GreaterThanEqual => {
+                        chunk.emit_less_than(span);
+                        chunk.emit_not(span);
+                    }
+                    InfixOperator::LessThanEqual => {
+                        chunk.emit_greater_than(span);
+                        chunk.emit_not(span);
+                    }
+                    InfixOperator::BangEqual => {
+                        chunk.emit_equals(span);
+                        chunk.emit_not(span);
+                    }
                 }
             }
             ExpressionNode::InfixAssignment { lhs, rhs } => todo!(),
@@ -313,8 +344,12 @@ impl Compiler {
             ExpressionAtomKind::Number(value) => {
                 chunk.emit_constant(span, LoxConstant::Number(*value));
             }
-            ExpressionAtomKind::Bool(_) => todo!(),
-            ExpressionAtomKind::Nil => todo!(),
+            ExpressionAtomKind::Bool(value) => {
+                chunk.emit_constant(span, LoxConstant::Bool(*value));
+            }
+            ExpressionAtomKind::Nil => {
+                chunk.emit_constant(span, LoxConstant::Nil);
+            }
             ExpressionAtomKind::Identifier(rc) => todo!(),
             ExpressionAtomKind::StringLiteral(rc) => todo!(),
             ExpressionAtomKind::This => todo!(),

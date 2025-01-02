@@ -28,9 +28,9 @@ where
         }
     }
 
-    pub fn run(mut self, program: &ResolvedProgram) -> Result<C, RuntimeError> {
+    pub fn run(mut self, program: &ResolvedProgram, text: &str) -> Result<C, RuntimeError> {
         let compiler = Compiler;
-        let chunk = compiler.compile(program, "TEST");
+        let chunk = compiler.compile(program, text);
 
         self.interpret_chunk(&chunk)?;
         println!("{}", chunk.disassemble());
@@ -124,6 +124,42 @@ where
                     let operand = self.stack.pop().expect("Not enough values on the stack");
                     self.stack
                         .push(operand.numeric_negate().map_err(|kind| RuntimeError {
+                            kind,
+                            span: Span {
+                                start: 0.into(),
+                                length: 0.into(),
+                            },
+                        })?);
+                }
+                Opcode::Not => {
+                    let operand = self.stack.pop().expect("Not enough values on the stack");
+                    self.stack.push(LoxValue::Bool(operand.logical_not()));
+                }
+                Opcode::Equals => {
+                    let (lhs, rhs) = self
+                        .pop_binary_operands()
+                        .expect("Not enough values on the stack!");
+                    self.stack.push(LoxValue::Bool(lhs.is_equal(&rhs)));
+                }
+                Opcode::LessThan => {
+                    let (lhs, rhs) = self
+                        .pop_binary_operands()
+                        .expect("Not enough values on the stack!");
+                    self.stack
+                        .push(lhs.less_than(&rhs).map_err(|kind| RuntimeError {
+                            kind,
+                            span: Span {
+                                start: 0.into(),
+                                length: 0.into(),
+                            },
+                        })?);
+                }
+                Opcode::GreaterThan => {
+                    let (lhs, rhs) = self
+                        .pop_binary_operands()
+                        .expect("Not enough values on the stack!");
+                    self.stack
+                        .push(lhs.greater_than(&rhs).map_err(|kind| RuntimeError {
                             kind,
                             span: Span {
                                 start: 0.into(),

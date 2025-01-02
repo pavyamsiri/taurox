@@ -18,12 +18,16 @@ pub enum DecodeError {
 #[derive(Debug, Clone, Copy)]
 pub enum LoxConstant {
     Number(f64),
+    Nil,
+    Bool(bool),
 }
 
 impl std::fmt::Display for LoxConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LoxConstant::Number(value) => write!(f, "{value}"),
+            LoxConstant::Nil => write!(f, "nil"),
+            LoxConstant::Bool(value) => write!(f, "{value}"),
         }
     }
 }
@@ -32,6 +36,8 @@ impl From<&LoxConstant> for LoxValue {
     fn from(value: &LoxConstant) -> Self {
         match value {
             LoxConstant::Number(value) => Self::Number(*value),
+            LoxConstant::Nil => Self::Nil,
+            LoxConstant::Bool(value) => Self::Bool(*value),
         }
     }
 }
@@ -67,6 +73,10 @@ pub enum Opcode {
     Add,
     Subtract,
     Negate,
+    Not,
+    Equals,
+    LessThan,
+    GreaterThan,
 }
 
 impl Opcode {
@@ -78,6 +88,10 @@ impl Opcode {
     const C_ADD: u8 = 0x05;
     const C_SUBTRACT: u8 = 0x06;
     const C_NEGATE: u8 = 0x07;
+    const C_NOT: u8 = 0x08;
+    const C_EQUAL: u8 = 0x09;
+    const C_LESS_THAN: u8 = 0x0A;
+    const C_GREATER_THAN: u8 = 0x0B;
 
     pub fn decode(data: &[u8]) -> Result<Option<(Opcode, &[u8])>, DecodeError> {
         let Some((first, rest)) = data.split_first() else {
@@ -90,6 +104,10 @@ impl Opcode {
             Opcode::C_ADD => (Opcode::Add, rest),
             Opcode::C_SUBTRACT => (Opcode::Subtract, rest),
             Opcode::C_NEGATE => (Opcode::Negate, rest),
+            Opcode::C_NOT => (Opcode::Not, rest),
+            Opcode::C_EQUAL => (Opcode::Equals, rest),
+            Opcode::C_LESS_THAN => (Opcode::LessThan, rest),
+            Opcode::C_GREATER_THAN => (Opcode::GreaterThan, rest),
             Opcode::C_CONST => {
                 let (handle_bytes, rest) = rest.split_at(4);
                 let [first, second, third, fourth] = handle_bytes else {
@@ -109,37 +127,43 @@ impl Opcode {
 
     pub fn encode(&self, chunk: &mut IncompleteChunk) {
         match self {
-            Opcode::Return => {
-                chunk.emit_u8(Opcode::C_RETURN);
-            }
             Opcode::Const(handle) => {
                 chunk.emit_u8(Opcode::C_CONST);
                 chunk.emit_u32(handle.0);
             }
+            Opcode::Return => chunk.emit_u8(Opcode::C_RETURN),
             Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
             Opcode::Divide => chunk.emit_u8(Opcode::C_DIVIDE),
             Opcode::Add => chunk.emit_u8(Opcode::C_ADD),
             Opcode::Subtract => chunk.emit_u8(Opcode::C_SUBTRACT),
             Opcode::Negate => chunk.emit_u8(Opcode::C_NEGATE),
+            Opcode::Not => chunk.emit_u8(Opcode::C_NOT),
+            Opcode::Equals => chunk.emit_u8(Opcode::C_EQUAL),
+            Opcode::LessThan => chunk.emit_u8(Opcode::C_LESS_THAN),
+            Opcode::GreaterThan => chunk.emit_u8(Opcode::C_GREATER_THAN),
         }
     }
 
     pub fn format(&self, buffer: &mut String, chunk: &Chunk) {
         match self {
+            Opcode::Const(handle) => {
+                buffer.push_str("ldc");
+                let value = chunk
+                    .get_constant(*handle)
+                    .expect("OP_CONSTANT has an invalid constant reference.");
+                write!(buffer, " {:<width$}${} = {value}", " ", handle.0, width = 4)
+                    .expect(WRITE_FMT_MSG);
+            }
             Opcode::Return => buffer.push_str("ret"),
             Opcode::Multiply => buffer.push_str("mul"),
             Opcode::Divide => buffer.push_str("div"),
             Opcode::Add => buffer.push_str("add"),
             Opcode::Subtract => buffer.push_str("sub"),
             Opcode::Negate => buffer.push_str("neg"),
-            Opcode::Const(handle) => {
-                buffer.push_str("ldc ");
-                let value = chunk
-                    .get_constant(*handle)
-                    .expect("OP_CONSTANT has an invalid constant reference.");
-                write!(buffer, "{:<width$}${} = {value}", " ", handle.0, width = 4)
-                    .expect(WRITE_FMT_MSG);
-            }
+            Opcode::Not => buffer.push_str("not"),
+            Opcode::Equals => buffer.push_str("eq"),
+            Opcode::LessThan => buffer.push_str("lt"),
+            Opcode::GreaterThan => buffer.push_str("gt"),
         }
     }
 }
