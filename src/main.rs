@@ -354,7 +354,7 @@ fn compile(
     path: &Path,
     format: &ProgramFormat,
 ) -> std::result::Result<(), ProgramError> {
-    use taurox::interpreter::{context::StdioContext, TreeWalkInterpreter};
+    use taurox::interpreter::context::StdioContext;
     use taurox::machine::VirtualMachine;
     use taurox::parser::{
         formatter::{

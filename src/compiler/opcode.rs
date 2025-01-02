@@ -1,9 +1,19 @@
+use thiserror::Error;
+
 use super::{Chunk, IncompleteChunk};
 use crate::value::LoxValue;
 use std::fmt::Write;
 
 const WRITE_FMT_MSG: &'static str =
     "Encountered an error while attempting to write format string to buffer.";
+
+#[derive(Debug, Error, Clone)]
+pub enum DecodeError {
+    #[error("Encountered invalid opcode {value}.")]
+    InvalidOpcode { value: u8 },
+    #[error("Incomplete operand for opcode {opcode:?}.")]
+    IncompleteOperand { opcode: u8 },
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum LoxConstant {
@@ -69,8 +79,10 @@ impl Opcode {
     const C_SUBTRACT: u8 = 0x06;
     const C_NEGATE: u8 = 0x07;
 
-    pub fn decode(data: &[u8]) -> Option<(Opcode, &[u8])> {
-        let (first, rest) = data.split_first()?;
+    pub fn decode(data: &[u8]) -> Result<Option<(Opcode, &[u8])>, DecodeError> {
+        let Some((first, rest)) = data.split_first() else {
+            return Ok(None);
+        };
         let (opcode, rest) = match *first {
             Opcode::C_RETURN => (Opcode::Return, rest),
             Opcode::C_MULTIPLY => (Opcode::Multiply, rest),
@@ -81,16 +93,18 @@ impl Opcode {
             Opcode::C_CONST => {
                 let (handle_bytes, rest) = rest.split_at(4);
                 let [first, second, third, fourth] = handle_bytes else {
-                    return None;
+                    return Err(DecodeError::IncompleteOperand {
+                        opcode: Opcode::C_CONST,
+                    });
                 };
                 let handle = u32::from_le_bytes([*first, *second, *third, *fourth]);
                 (Opcode::Const(ConstRef(handle)), rest)
             }
-            _ => {
-                return None;
+            opcode => {
+                return Err(DecodeError::InvalidOpcode { value: opcode });
             }
         };
-        Some((opcode, rest))
+        Ok(Some((opcode, rest)))
     }
 
     pub fn encode(&self, chunk: &mut IncompleteChunk) {

@@ -29,9 +29,12 @@ where
     }
 
     pub fn run(mut self, program: &ResolvedProgram) -> Result<C, RuntimeError> {
-        let chunk = Compiler::compile(program, "TEST");
+        let compiler = Compiler;
+        let chunk = compiler.compile(program, "TEST");
 
         self.interpret_chunk(&chunk)?;
+        println!("{}", chunk.disassemble());
+        println!("STACK\n{}", self.print_stack());
 
         Ok(self.context)
     }
@@ -43,10 +46,17 @@ where
 {
     fn interpret_chunk(&mut self, chunk: &Chunk) -> Result<(), RuntimeError> {
         loop {
-            let Some((inst, offset)) = chunk.decode_at(self.ip) else {
-                eprintln!("SEGFAULT AT IP = {}", self.ip);
-                eprintln!("{}", chunk.disassemble());
-                panic!("SEGFAULT");
+            let (inst, offset) = match chunk.decode_at(self.ip) {
+                Ok(Some(v)) => v,
+                Ok(None) => {
+                    break;
+                }
+                Err(e) => {
+                    eprintln!("SEGFAULT AT IP = {} due to {e}", self.ip);
+                    eprintln!("{}", chunk.disassemble());
+                    eprintln!("{:?}", chunk.get_data());
+                    panic!("SEGFAULT");
+                }
             };
 
             match inst {
@@ -57,9 +67,7 @@ where
                     self.stack.push(value.into());
                 }
                 Opcode::Return => {
-                    println!("{}", chunk.disassemble());
-                    println!("STACK\n{}", self.print_stack());
-                    return Ok(());
+                    break;
                 }
                 Opcode::Multiply => {
                     let (lhs, rhs) = self
@@ -126,6 +134,7 @@ where
             }
             self.ip = offset;
         }
+        Ok(())
     }
 
     fn print_stack(&self) -> String {

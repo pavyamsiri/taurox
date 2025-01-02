@@ -1,8 +1,14 @@
 mod opcode;
 
 use crate::lexer::{LineBreaks, Span};
+use crate::parser::expression::{
+    Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
+    InfixOperator, PrefixOperator,
+};
+use crate::parser::statement::{ExpressionStatement, Statement};
 use crate::resolver::ResolvedProgram;
 use crate::string::IdentName;
+pub use opcode::DecodeError;
 pub use opcode::{ConstRef, ConstantPool, LoxConstant, Opcode};
 use std::fmt::Write;
 use std::sync::Arc;
@@ -114,7 +120,7 @@ impl<'a, 'src> std::iter::Iterator for OpcodeIterator<'a, 'src> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let value = Opcode::decode(&self.data);
-        if let Some((opcode, rest)) = value {
+        if let Ok(Some((opcode, rest))) = value {
             // Should not underflow because `rest.len()` is at most `self.data.len()`.
             let offset = self.index;
             self.index += self.data.len() - rest.len();
@@ -136,11 +142,18 @@ impl<'src> Chunk<'src> {
         }
     }
 
-    pub fn decode_at(&self, index: usize) -> Option<(Opcode, usize)> {
+    pub fn decode_at(&self, index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
         let slice = &self.data[index..];
-        let (opcode, rest) = Opcode::decode(&self.data[index..])?;
+        let (opcode, rest) = match Opcode::decode(&self.data[index..])? {
+            Some(s) => s,
+            None => return Ok(None),
+        };
         let offset = slice.len() - rest.len() + index;
-        Some((opcode, offset))
+        Ok(Some((opcode, offset)))
+    }
+
+    pub fn get_data<'a>(&'a self) -> &'a [u8] {
+        &self.data
     }
 
     pub fn get_constant(&self, handle: ConstRef) -> Option<&LoxConstant> {
@@ -183,18 +196,129 @@ impl<'src> Chunk<'src> {
     }
 }
 
-pub struct Compiler {}
+pub struct Compiler;
 
 impl Compiler {
-    pub fn compile<'src>(program: &ResolvedProgram, text: &'src str) -> Chunk<'src> {
-        let dummy_span = Span {
-            start: 0.into(),
-            length: 0.into(),
-        };
-        let mut chunk = IncompleteChunk::new("TEST".into(), text);
-        chunk.emit_constant(dummy_span, LoxConstant::Number(4512.0084));
-        chunk.emit_negate(dummy_span);
-        chunk.emit_return(dummy_span);
+    pub fn compile<'src>(&self, program: &ResolvedProgram, text: &'src str) -> Chunk<'src> {
+        let mut chunk = IncompleteChunk::new("PROGRAM".into(), text);
+
+        for stmt in program.iter() {
+            self.compile_stmt(program, &mut chunk, stmt);
+        }
+
         chunk.finish()
+    }
+
+    fn compile_stmt<'stmt>(
+        &self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        stmt: Statement<'stmt>,
+    ) {
+        match stmt {
+            Statement::VariableDecl(_) => todo!(),
+            Statement::FunctionDecl(_) => todo!(),
+            Statement::ClassDecl(_) => todo!(),
+            Statement::Expression(stmt) => self.compile_expression_stmt(program, chunk, stmt),
+            Statement::Print(_) => todo!(),
+            Statement::Block(_) => todo!(),
+            Statement::If(_) => todo!(),
+            Statement::While(_) => todo!(),
+            Statement::For(_) => todo!(),
+            Statement::Return(_) => todo!(),
+        }
+    }
+
+    fn compile_expression_stmt(
+        &self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        stmt: &ExpressionStatement,
+    ) {
+        self.compile_expression(program, chunk, &stmt.expr);
+    }
+}
+
+// Expression compilation
+impl Compiler {
+    fn compile_expression(
+        &self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        expr: &Expression,
+    ) {
+        self.compile_expression_node(program, chunk, expr, expr.get_root_ref())
+    }
+
+    fn compile_expression_node(
+        &self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        expr: &Expression,
+        node: ExpressionNodeRef,
+    ) {
+        let current_node = expr
+            .get_node(node)
+            .expect("Node ref came from the tree so it must exist.");
+        let span = expr.get_span();
+        match current_node {
+            ExpressionNode::Atom(atom) => self.compile_expression_atom(program, chunk, atom),
+            ExpressionNode::Group { inner } => todo!(),
+            ExpressionNode::Prefix { operator, rhs } => {
+                self.compile_expression_node(program, chunk, expr, *rhs);
+                match operator {
+                    PrefixOperator::Bang => todo!(),
+                    PrefixOperator::Minus => chunk.emit_negate(span),
+                }
+            }
+            ExpressionNode::Infix { operator, lhs, rhs } => {
+                self.compile_expression_node(program, chunk, expr, *lhs);
+                self.compile_expression_node(program, chunk, expr, *rhs);
+                match operator {
+                    InfixOperator::Multiply => chunk.emit_multiply(span),
+                    InfixOperator::Divide => chunk.emit_divide(span),
+                    InfixOperator::Add => chunk.emit_add(span),
+                    InfixOperator::Subtract => chunk.emit_subtract(span),
+                    InfixOperator::LessThan => todo!(),
+                    InfixOperator::LessThanEqual => todo!(),
+                    InfixOperator::GreaterThan => todo!(),
+                    InfixOperator::GreaterThanEqual => todo!(),
+                    InfixOperator::EqualEqual => todo!(),
+                    InfixOperator::BangEqual => todo!(),
+                }
+            }
+            ExpressionNode::InfixAssignment { lhs, rhs } => todo!(),
+            ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
+                todo!()
+            }
+            ExpressionNode::Call { callee, arguments } => todo!(),
+            ExpressionNode::Get { object, name } => todo!(),
+            ExpressionNode::Set {
+                object,
+                name,
+                value,
+            } => todo!(),
+        }
+    }
+
+    fn compile_expression_atom(
+        &self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        atom: &ExpressionAtom,
+    ) {
+        let _ = program;
+        let span = atom.span;
+        match &atom.kind {
+            ExpressionAtomKind::Number(value) => {
+                chunk.emit_constant(span, LoxConstant::Number(*value));
+            }
+            ExpressionAtomKind::Bool(_) => todo!(),
+            ExpressionAtomKind::Nil => todo!(),
+            ExpressionAtomKind::Identifier(rc) => todo!(),
+            ExpressionAtomKind::StringLiteral(rc) => todo!(),
+            ExpressionAtomKind::This => todo!(),
+            ExpressionAtomKind::Super(rc) => todo!(),
+        }
     }
 }
