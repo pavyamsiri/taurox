@@ -2,6 +2,7 @@ pub mod compiler;
 pub mod environment;
 pub mod interpreter;
 pub mod lexer;
+pub mod machine;
 pub mod parser;
 pub mod resolver;
 pub mod string;

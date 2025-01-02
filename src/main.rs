@@ -354,8 +354,8 @@ fn compile(
     path: &Path,
     format: &ProgramFormat,
 ) -> std::result::Result<(), ProgramError> {
-    use taurox::compiler::{Chunk, Compiler};
     use taurox::interpreter::{context::StdioContext, TreeWalkInterpreter};
+    use taurox::machine::VirtualMachine;
     use taurox::parser::{
         formatter::{
             BasicParserFormatter, DebugParserFormatter, NystromParserFormatter, ParserFormatter,
@@ -417,8 +417,12 @@ fn compile(
         }
     };
 
-    let chunk = Compiler::compile(&program, src);
-    println!("{}", chunk.disassemble());
-
-    Ok(())
+    let vm = VirtualMachine::new(StdioContext);
+    match vm.run(&program) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            eprintln!("{}", value_formatter.format_error(&e));
+            Err(ProgramError::RuntimeError)
+        }
+    }
 }

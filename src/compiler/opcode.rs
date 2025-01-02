@@ -1,5 +1,5 @@
 use super::{Chunk, IncompleteChunk};
-use crate::lexer::Span;
+use crate::value::LoxValue;
 use std::fmt::Write;
 
 const WRITE_FMT_MSG: &'static str =
@@ -14,6 +14,14 @@ impl std::fmt::Display for LoxConstant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             LoxConstant::Number(value) => write!(f, "{value}"),
+        }
+    }
+}
+
+impl From<&LoxConstant> for LoxValue {
+    fn from(value: &LoxConstant) -> Self {
+        match value {
+            LoxConstant::Number(value) => Self::Number(*value),
         }
     }
 }

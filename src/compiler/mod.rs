@@ -3,7 +3,7 @@ mod opcode;
 use crate::lexer::{LineBreaks, Span};
 use crate::resolver::ResolvedProgram;
 use crate::string::IdentName;
-use opcode::{ConstRef, ConstantPool, LoxConstant, Opcode};
+pub use opcode::{ConstRef, ConstantPool, LoxConstant, Opcode};
 use std::fmt::Write;
 use std::sync::Arc;
 
@@ -111,6 +111,13 @@ impl<'src> Chunk<'src> {
         }
     }
 
+    pub fn decode_at(&self, index: usize) -> Option<(Opcode, usize)> {
+        let slice = &self.data[index..];
+        let (opcode, rest) = Opcode::decode(&self.data[index..])?;
+        let offset = slice.len() - rest.len() + index;
+        Some((opcode, offset))
+    }
+
     pub fn get_constant(&self, handle: ConstRef) -> Option<&LoxConstant> {
         self.constants.get(handle)
     }
@@ -118,7 +125,6 @@ impl<'src> Chunk<'src> {
     pub fn disassemble(&self) -> String {
         const INDENT: &'static str = "  ";
         let max_line = self.line_breaks.get_max_line();
-        let max_line = 100000u32;
         let num_digits = 4usize.max((max_line.checked_ilog10().unwrap_or(0) + 1) as usize);
 
         let mut buffer = String::new();
@@ -157,18 +163,6 @@ pub struct Compiler {}
 impl Compiler {
     pub fn compile<'src>(program: &ResolvedProgram, text: &'src str) -> Chunk<'src> {
         let mut chunk = IncompleteChunk::new("TEST".into(), text);
-        chunk.emit_return(Span {
-            start: 0.into(),
-            length: 3.into(),
-        });
-        chunk.emit_return(Span {
-            start: 0.into(),
-            length: 3.into(),
-        });
-        chunk.emit_return(Span {
-            start: 0.into(),
-            length: 3.into(),
-        });
         chunk.emit_constant(
             Span {
                 start: 3.into(),
@@ -176,6 +170,18 @@ impl Compiler {
             },
             LoxConstant::Number(4512.0084),
         );
+        chunk.emit_return(Span {
+            start: 0.into(),
+            length: 3.into(),
+        });
+        chunk.emit_return(Span {
+            start: 0.into(),
+            length: 3.into(),
+        });
+        chunk.emit_return(Span {
+            start: 0.into(),
+            length: 3.into(),
+        });
         chunk.emit_return(Span {
             start: 8.into(),
             length: 2.into(),
