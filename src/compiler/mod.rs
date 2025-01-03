@@ -243,6 +243,7 @@ impl IncompleteChunk {
     }
 }
 
+#[derive(Debug)]
 pub struct Chunk {
     name: IdentName,
     line_breaks: LineBreaks,

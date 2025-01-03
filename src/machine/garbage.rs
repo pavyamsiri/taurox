@@ -38,6 +38,12 @@ impl<T> Clone for VMObjectRef<T> {
 
 impl<T> Copy for VMObjectRef<T> {}
 
+impl<T> PartialEq for VMObjectRef<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index.eq(&other.index) && self.generation.eq(&other.index)
+    }
+}
+
 impl<T> VMObjectAllocator<T> {
     pub fn new() -> Self {
         Self {
@@ -58,7 +64,7 @@ impl<T> VMObjectAllocator<T> {
     }
 
     pub fn allocate(&mut self, object: T) -> VMObjectRef<T> {
-        const MSG: &'static str = "All string allocator arrays should have the same length.";
+        const MSG: &'static str = "All allocator arrays should have the same length.";
         self.verify_integrity();
 
         // Find the first empty cell
@@ -90,7 +96,7 @@ impl<T> VMObjectAllocator<T> {
     }
 
     pub fn get(&self, handle: VMObjectRef<T>) -> Option<&T> {
-        const MSG: &'static str = "All string allocator arrays should have the same length.";
+        const MSG: &'static str = "All allocator arrays should have the same length.";
         self.verify_integrity();
 
         let generation = self.generation.get(handle.index as usize)?;
@@ -110,7 +116,7 @@ impl<T> VMObjectAllocator<T> {
     }
 
     pub fn debug_get(&self, handle: VMObjectRef<T>) -> Option<&T> {
-        const MSG: &'static str = "All string allocator arrays should have the same length.";
+        const MSG: &'static str = "All allocator arrays should have the same length.";
         self.verify_integrity();
         let value = self.data.get(handle.index as usize).expect(MSG);
         Some(value)

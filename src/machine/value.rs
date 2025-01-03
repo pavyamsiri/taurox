@@ -1,4 +1,13 @@
+use crate::compiler::Chunk;
+
 use super::{error::VMRuntimeErrorKind, garbage::VMObjectRef};
+
+#[derive(Debug)]
+pub struct VMFunction {
+    name: VMObjectRef<String>,
+    chunk: Chunk,
+    arity: usize,
+}
 
 #[derive(Debug, Clone)]
 pub enum VMValue {
@@ -6,6 +15,7 @@ pub enum VMValue {
     Nil,
     Bool(bool),
     String(VMObjectRef<String>),
+    Function(VMObjectRef<VMFunction>),
 }
 
 impl std::fmt::Display for VMValue {
@@ -15,6 +25,7 @@ impl std::fmt::Display for VMValue {
             Self::Nil => write!(f, "nil"),
             Self::Bool(v) => write!(f, "{v}"),
             Self::String(v) => write!(f, "<string ref {v:?}>"),
+            Self::Function(v) => write!(f, "<function ref {v:?}>"),
         }
     }
 }

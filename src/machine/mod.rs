@@ -320,6 +320,7 @@ where
                     .expect("[Equal]: RHS Handle should be valid.");
                 lhs == rhs
             }
+            (VMValue::Function(lhs), VMValue::Function(rhs)) => lhs == rhs,
             _ => false,
         }
     }
