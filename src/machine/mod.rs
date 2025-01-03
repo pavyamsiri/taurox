@@ -352,7 +352,7 @@ where
             }
             LoxConstant::Function(func) => {
                 let name = chunk
-                    .get_string(func.name)
+                    .get_string_through_ref(func.name)
                     .expect("String constants should have valid intern string handles.");
                 let new_name = self.string_allocator.allocate_from_ref(name);
                 let new_func = VMFunction {
@@ -401,6 +401,8 @@ where
     fn print_memory(&self) -> String {
         const INDENT: &'static str = "  ";
         let mut buffer = String::new();
+        // Strings
+        buffer.push_str(" STRINGS\n");
         for (index, (string, marker, generation)) in self.string_allocator.iter().enumerate() {
             write!(buffer, "{INDENT}{index:02}: ").expect(WRITE_FMT_MSG);
             write!(
@@ -410,6 +412,25 @@ where
             .expect(WRITE_FMT_MSG);
             buffer.push('\n');
         }
+
+        // Functions
+        buffer.push_str(" FUNCTIONS\n");
+        for (index, (function, marker, generation)) in self.function_allocator.iter().enumerate() {
+            let name = self
+                .string_allocator
+                .debug_get(function.name)
+                .map(|v| v.as_str())
+                .unwrap_or("DEAD");
+            write!(buffer, "{INDENT}{index:02}: ").expect(WRITE_FMT_MSG);
+            write!(
+                buffer,
+                "[{}, alive = {marker}, generation = {generation}]",
+                name,
+            )
+            .expect(WRITE_FMT_MSG);
+            buffer.push('\n');
+        }
+
         buffer
     }
 
@@ -464,6 +485,6 @@ where
     }
 
     fn should_collect(&self) -> bool {
-        self.string_allocator.should_collect()
+        self.string_allocator.should_collect() || self.function_allocator.should_collect()
     }
 }

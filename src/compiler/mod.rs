@@ -7,11 +7,12 @@ use crate::parser::expression::{
     InfixOperator, InfixShortCircuitOperator, PrefixOperator,
 };
 use crate::parser::statement::{
-    BlockStatement, ExpressionStatement, ForStatement, IfStatement, Initializer, NonDeclaration,
-    PrintStatement, Statement, VariableDecl, WhileStatement,
+    BlockStatement, ExpressionStatement, ForStatement, FunctionDecl, IfStatement, Initializer,
+    NonDeclaration, PrintStatement, Statement, VariableDecl, WhileStatement,
 };
 use crate::resolver::ResolvedProgram;
 use crate::string::{Ident, IdentName, InternSymbol, StringInterner};
+use constant::FunctionConstant;
 pub use constant::{ConstRef, ConstantPool, LoxConstant};
 pub use opcode::{DecodeError, Opcode};
 use opcode::{InstructionOffset, StackSlot};
@@ -35,11 +36,22 @@ impl IncompleteChunk {
         let line_breaks = LineBreaks::new(text);
         Self {
             name,
-            line_breaks,
             data: Vec::new(),
             spans: Vec::new(),
             constants: ConstantPool::new(),
             starts: Vec::new(),
+            line_breaks,
+        }
+    }
+
+    pub fn with_line_breaks(name: IdentName, line_breaks: LineBreaks) -> Self {
+        Self {
+            name,
+            data: Vec::new(),
+            spans: Vec::new(),
+            constants: ConstantPool::new(),
+            starts: Vec::new(),
+            line_breaks,
         }
     }
 
@@ -165,11 +177,12 @@ impl IncompleteChunk {
         Opcode::SetGlobal(handle).encode(self);
     }
 
-    pub fn emit_string_literal(&mut self, span: Span, text: &str) {
+    pub fn emit_string_literal(&mut self, span: Span, text: &str) -> ConstRef {
         self.starts.push(self.data.len());
         self.spans.push(span);
         let handle = self.constants.push_str(text);
         Opcode::Const(handle).encode(self);
+        handle
     }
 
     pub fn emit_get_local(&mut self, span: Span, slot: StackSlot) {
@@ -233,11 +246,11 @@ impl IncompleteChunk {
 
     pub fn finish(self) -> Chunk {
         Chunk {
+            line_breaks: self.line_breaks,
             name: self.name,
             data: self.data.into(),
             spans: self.spans.into(),
             constants: self.constants,
-            line_breaks: self.line_breaks,
             starts: self.starts.into(),
         }
     }
@@ -255,7 +268,6 @@ pub struct Chunk {
 
 struct OpcodeIterator<'a> {
     starts: &'a [usize],
-    line_breaks: &'a LineBreaks,
     data: &'a [u8],
     index: usize,
 }
@@ -281,7 +293,6 @@ impl Chunk {
         OpcodeIterator {
             data: &self.data,
             index: 0,
-            line_breaks: &self.line_breaks,
             starts: &self.starts,
         }
     }
@@ -442,7 +453,7 @@ impl Compiler {
     ) {
         match stmt {
             Statement::VariableDecl(decl) => self.compile_variable_decl(program, chunk, decl),
-            Statement::FunctionDecl(_) => todo!(),
+            Statement::FunctionDecl(decl) => self.compile_function_decl(program, chunk, decl),
             Statement::ClassDecl(_) => todo!(),
             Statement::Expression(stmt) => self.compile_expression_stmt(program, chunk, stmt),
             Statement::Print(stmt) => self.compile_print_stmt(program, chunk, stmt),
@@ -492,6 +503,53 @@ impl Compiler {
         }
     }
 
+    fn compile_function_decl(
+        &mut self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        decl: &FunctionDecl,
+    ) {
+        // Compile function body as a chunk
+        let mut body_chunk =
+            IncompleteChunk::with_line_breaks(decl.name.name.clone(), chunk.line_breaks.clone());
+        let body = program
+            .get_block_stmt(decl.body)
+            .expect("[Compile Function Decl]: All handles are valid.");
+
+        let mut inner_compiler = Compiler::new();
+        inner_compiler.enter_scope();
+
+        // Define parameters
+        for parameter in decl.parameters.iter() {
+            inner_compiler.add_local(parameter);
+        }
+
+        for stmt in body.iter() {
+            let stmt = program
+                .get_statement(stmt)
+                .expect("[Compile Function Decl]: All handles are valid.");
+            inner_compiler.compile_stmt(program, &mut body_chunk, stmt);
+        }
+
+        // Create function
+        let name_handle = chunk.emit_string_literal(decl.span, &decl.name.name);
+        let func = FunctionConstant {
+            name: name_handle,
+            chunk: body_chunk.finish(),
+            arity: decl.parameters.len() as u32,
+        };
+
+        chunk.emit_constant(decl.span, LoxConstant::Function(func));
+
+        // Local scope
+        if self.depth > 0 {
+            self.add_local(&decl.name);
+        }
+        // Global scope
+        else {
+            chunk.emit_define_global(decl.span, &decl.name.name);
+        }
+    }
     fn compile_expression_stmt(
         &self,
         program: &ResolvedProgram,

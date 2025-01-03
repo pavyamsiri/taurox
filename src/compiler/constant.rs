@@ -8,7 +8,7 @@ const WRITE_FMT_MSG: &'static str =
 #[derive(Debug, Clone)]
 pub struct FunctionConstant {
     // TODO(pavyamsiri): Seems a bit dumb to copy a chunk around, each chunk should be allocated into a pool.
-    pub name: InternSymbol,
+    pub name: ConstRef,
     pub chunk: Chunk,
     pub arity: u32,
 }
