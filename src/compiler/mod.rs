@@ -21,9 +21,8 @@ use std::sync::Arc;
 const WRITE_FMT_MSG: &'static str =
     "Encountered an error while attempting to write format string to buffer.";
 
-pub struct IncompleteChunk<'src> {
+pub struct IncompleteChunk {
     name: IdentName,
-    text: &'src str,
     line_breaks: LineBreaks,
     data: Vec<u8>,
     spans: Vec<Span>,
@@ -31,12 +30,11 @@ pub struct IncompleteChunk<'src> {
     starts: Vec<usize>,
 }
 
-impl<'src> IncompleteChunk<'src> {
-    pub fn new(name: IdentName, text: &'src str) -> Self {
+impl IncompleteChunk {
+    pub fn new(name: IdentName, text: &str) -> Self {
         let line_breaks = LineBreaks::new(text);
         Self {
             name,
-            text,
             line_breaks,
             data: Vec::new(),
             spans: Vec::new(),
@@ -233,22 +231,20 @@ impl<'src> IncompleteChunk<'src> {
         self.data.len()
     }
 
-    pub fn finish(self) -> Chunk<'src> {
+    pub fn finish(self) -> Chunk {
         Chunk {
             name: self.name,
             data: self.data.into(),
             spans: self.spans.into(),
             constants: self.constants,
-            text: &self.text,
             line_breaks: self.line_breaks,
             starts: self.starts.into(),
         }
     }
 }
 
-pub struct Chunk<'src> {
+pub struct Chunk {
     name: IdentName,
-    text: &'src str,
     line_breaks: LineBreaks,
     data: Arc<[u8]>,
     spans: Arc<[Span]>,
@@ -256,15 +252,14 @@ pub struct Chunk<'src> {
     constants: ConstantPool,
 }
 
-struct OpcodeIterator<'a, 'src> {
-    text: &'src str,
+struct OpcodeIterator<'a> {
     starts: &'a [usize],
     line_breaks: &'a LineBreaks,
     data: &'a [u8],
     index: usize,
 }
 
-impl<'a, 'src> std::iter::Iterator for OpcodeIterator<'a, 'src> {
+impl<'a> std::iter::Iterator for OpcodeIterator<'a> {
     type Item = (Option<Opcode>, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -280,12 +275,11 @@ impl<'a, 'src> std::iter::Iterator for OpcodeIterator<'a, 'src> {
     }
 }
 
-impl<'src> Chunk<'src> {
-    fn iter<'a>(&'a self) -> OpcodeIterator<'a, 'src> {
+impl Chunk {
+    fn iter<'a>(&'a self) -> OpcodeIterator<'a> {
         OpcodeIterator {
             data: &self.data,
             index: 0,
-            text: &self.text,
             line_breaks: &self.line_breaks,
             starts: &self.starts,
         }
@@ -429,7 +423,7 @@ impl Compiler {
         }
     }
 
-    pub fn compile<'src>(mut self, program: &ResolvedProgram, text: &'src str) -> Chunk<'src> {
+    pub fn compile(mut self, program: &ResolvedProgram, text: &str) -> Chunk {
         let mut chunk = IncompleteChunk::new("PROGRAM".into(), text);
 
         for stmt in program.iter() {
