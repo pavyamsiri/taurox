@@ -7,8 +7,8 @@ use crate::parser::expression::{
     InfixOperator, InfixShortCircuitOperator, PrefixOperator,
 };
 use crate::parser::statement::{
-    BlockStatement, ExpressionStatement, IfStatement, NonDeclaration, PrintStatement, Statement,
-    VariableDecl, WhileStatement,
+    BlockStatement, ExpressionStatement, ForStatement, IfStatement, Initializer, NonDeclaration,
+    PrintStatement, Statement, VariableDecl, WhileStatement,
 };
 use crate::resolver::ResolvedProgram;
 use crate::string::{Ident, IdentName, InternStringHandle, StringInterner};
@@ -454,7 +454,7 @@ impl Compiler {
             Statement::Block(stmt) => self.compile_block_stmt(program, chunk, stmt),
             Statement::If(stmt) => self.compile_if_stmt(program, chunk, stmt),
             Statement::While(stmt) => self.compile_while_stmt(program, chunk, stmt),
-            Statement::For(_) => todo!(),
+            Statement::For(stmt) => self.compile_for_stmt(program, chunk, stmt),
             Statement::Return(_) => todo!(),
         }
     }
@@ -471,7 +471,7 @@ impl Compiler {
             NonDeclaration::Block(stmt) => self.compile_block_stmt(program, chunk, stmt),
             NonDeclaration::If(stmt) => self.compile_if_stmt(program, chunk, stmt),
             NonDeclaration::While(stmt) => self.compile_while_stmt(program, chunk, stmt),
-            NonDeclaration::For(_) => todo!(),
+            NonDeclaration::For(stmt) => self.compile_for_stmt(program, chunk, stmt),
             NonDeclaration::Return(_) => todo!(),
         }
     }
@@ -604,6 +604,77 @@ impl Compiler {
             .patch_jump(exit_jump)
             .expect("[Compile While]: Failed to patch exit jump.");
         chunk.emit_pop(stmt.span);
+    }
+
+    fn compile_for_stmt(
+        &mut self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        stmt: &ForStatement,
+    ) {
+        // Scope
+        self.enter_scope();
+
+        // Initializer
+        match stmt.initializer {
+            Some(Initializer::VariableDecl(decl)) => {
+                let decl = program
+                    .get_variable_decl(decl)
+                    .expect("[Compile For]: All handles are valid.");
+                self.compile_variable_decl(program, chunk, decl);
+            }
+            Some(Initializer::Expression(expr)) => {
+                let expr = program
+                    .get_expression_stmt(expr)
+                    .expect("[Compile For]: All handles are valid.");
+                self.compile_expression_stmt(program, chunk, expr);
+            }
+            None => {}
+        }
+
+        // Condition
+        let start_label = chunk.get_label();
+        let mut exit_jump = None;
+        match &stmt.condition {
+            Some(expr) => {
+                self.compile_expression(program, chunk, expr);
+                exit_jump = Some(chunk.emit_unpatched_jump(stmt.span, true));
+                chunk.emit_pop(stmt.span);
+            }
+            None => {}
+        }
+
+        // Body
+        let body_stmt = program
+            .get_non_declaration(stmt.body)
+            .expect("[Compile For]: All handles are valid.");
+        self.compile_non_declaration(program, chunk, body_stmt);
+
+        // Increment
+        match &stmt.increment {
+            Some(expr) => {
+                self.compile_expression(program, chunk, expr);
+                chunk.emit_pop(stmt.span);
+            }
+            None => {}
+        }
+
+        // Loop back to condition
+        let offset = (chunk.get_label() - start_label) as i32;
+        chunk.emit_jump(stmt.span, -offset);
+
+        // After body
+        if let Some(exit_jump) = exit_jump {
+            chunk
+                .patch_jump(exit_jump)
+                .expect("[Compile For]: Failed to patch exit jump.");
+            chunk.emit_pop(stmt.span);
+        }
+
+        let to_pop = self.exit_scope();
+        for _ in 0..to_pop {
+            chunk.emit_pop(stmt.span);
+        }
     }
 }
 
