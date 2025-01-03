@@ -7,7 +7,6 @@ use crate::{
     interpreter::SystemContext,
     resolver::ResolvedProgram,
     string::{InternStringHandle, StringInterner},
-    value::LoxValue,
 };
 use error::{VMError, VMRuntimeError, VMRuntimeErrorKind};
 use garbage::StringAllocator;
@@ -210,6 +209,17 @@ where
                 Opcode::SetLocal(slot) => {
                     let value = self.peek()?;
                     self.set_stack(value.clone(), slot.0 as usize)?;
+                }
+                Opcode::JumpIfFalse(offset) => {
+                    let flag = self.peek()?.is_truthy();
+                    if !flag {
+                        self.ip += offset.0 as usize;
+                        continue;
+                    }
+                }
+                Opcode::Jump(offset) => {
+                    self.ip += offset.0 as usize;
+                    continue;
                 }
             }
             self.ip = offset;

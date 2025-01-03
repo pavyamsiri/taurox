@@ -16,6 +16,8 @@ pub enum DecodeError {
 
 #[derive(Debug, Clone, Copy)]
 pub struct StackSlot(pub u32);
+#[derive(Debug, Clone, Copy)]
+pub struct InstructionOffset(pub u32);
 
 #[derive(Debug, Clone, Copy)]
 pub enum Opcode {
@@ -37,28 +39,32 @@ pub enum Opcode {
     SetGlobal(ConstRef),
     GetLocal(StackSlot),
     SetLocal(StackSlot),
+    JumpIfFalse(InstructionOffset),
+    Jump(InstructionOffset),
 }
 
 impl Opcode {
     // Opcode table
-    const C_RETURN: u8 = 0x01;
-    const C_CONST: u8 = 0x02;
-    const C_MULTIPLY: u8 = 0x03;
-    const C_DIVIDE: u8 = 0x04;
-    const C_ADD: u8 = 0x05;
-    const C_SUBTRACT: u8 = 0x06;
-    const C_NEGATE: u8 = 0x07;
-    const C_NOT: u8 = 0x08;
-    const C_EQUAL: u8 = 0x09;
-    const C_LESS_THAN: u8 = 0x0A;
-    const C_GREATER_THAN: u8 = 0x0B;
-    const C_PRINT: u8 = 0x0C;
-    const C_POP: u8 = 0x0D;
-    const C_DEFINE_GLOBAL: u8 = 0x0E;
-    const C_GET_GLOBAL: u8 = 0x0F;
-    const C_SET_GLOBAL: u8 = 0x10;
-    const C_GET_LOCAL: u8 = 0x11;
-    const C_SET_LOCAL: u8 = 0x12;
+    pub const C_RETURN: u8 = 0x01;
+    pub const C_CONST: u8 = 0x02;
+    pub const C_MULTIPLY: u8 = 0x03;
+    pub const C_DIVIDE: u8 = 0x04;
+    pub const C_ADD: u8 = 0x05;
+    pub const C_SUBTRACT: u8 = 0x06;
+    pub const C_NEGATE: u8 = 0x07;
+    pub const C_NOT: u8 = 0x08;
+    pub const C_EQUAL: u8 = 0x09;
+    pub const C_LESS_THAN: u8 = 0x0A;
+    pub const C_GREATER_THAN: u8 = 0x0B;
+    pub const C_PRINT: u8 = 0x0C;
+    pub const C_POP: u8 = 0x0D;
+    pub const C_DEFINE_GLOBAL: u8 = 0x0E;
+    pub const C_GET_GLOBAL: u8 = 0x0F;
+    pub const C_SET_GLOBAL: u8 = 0x10;
+    pub const C_GET_LOCAL: u8 = 0x11;
+    pub const C_SET_LOCAL: u8 = 0x12;
+    pub const C_JUMP_IF_FALSE: u8 = 0x13;
+    pub const C_JUMP: u8 = 0x14;
 
     pub fn decode_at(data: &[u8], index: usize) -> Result<Option<(Opcode, usize)>, DecodeError> {
         let Some(first) = data.get(index) else {
@@ -98,6 +104,14 @@ impl Opcode {
                 let slot = parse_u32(Opcode::C_SET_GLOBAL)?;
                 (Opcode::SetLocal(StackSlot(slot)), index + 5)
             }
+            Opcode::C_JUMP_IF_FALSE => {
+                let slot = parse_u32(Opcode::C_JUMP_IF_FALSE)?;
+                (Opcode::JumpIfFalse(InstructionOffset(slot)), index + 5)
+            }
+            Opcode::C_JUMP => {
+                let slot = parse_u32(Opcode::C_JUMP)?;
+                (Opcode::Jump(InstructionOffset(slot)), index + 5)
+            }
             Opcode::C_RETURN => (Opcode::Return, index + 1),
             Opcode::C_MULTIPLY => (Opcode::Multiply, index + 1),
             Opcode::C_DIVIDE => (Opcode::Divide, index + 1),
@@ -135,13 +149,21 @@ impl Opcode {
                 chunk.emit_u8(Opcode::C_SET_GLOBAL);
                 chunk.emit_u32(handle.0);
             }
-            Opcode::GetLocal(handle) => {
+            Opcode::GetLocal(slot) => {
                 chunk.emit_u8(Opcode::C_GET_LOCAL);
-                chunk.emit_u32(handle.0);
+                chunk.emit_u32(slot.0);
             }
-            Opcode::SetLocal(handle) => {
+            Opcode::SetLocal(slot) => {
                 chunk.emit_u8(Opcode::C_SET_LOCAL);
-                chunk.emit_u32(handle.0);
+                chunk.emit_u32(slot.0);
+            }
+            Opcode::JumpIfFalse(offset) => {
+                chunk.emit_u8(Opcode::C_JUMP_IF_FALSE);
+                chunk.emit_u32(offset.0);
+            }
+            Opcode::Jump(offset) => {
+                chunk.emit_u8(Opcode::C_JUMP);
+                chunk.emit_u32(offset.0);
             }
             Opcode::Return => chunk.emit_u8(Opcode::C_RETURN),
             Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
@@ -180,13 +202,21 @@ impl Opcode {
                 write!(buffer, " {:<width$}${} = ", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
                 chunk.constants.format_constant(*handle, buffer);
             }
-            Opcode::GetLocal(handle) => {
+            Opcode::GetLocal(slot) => {
                 buffer.push_str("glc");
-                write!(buffer, " {:<width$}#{}", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
+                write!(buffer, " {:<width$}#{}", " ", slot.0, width = 4).expect(WRITE_FMT_MSG);
             }
-            Opcode::SetLocal(handle) => {
+            Opcode::SetLocal(slot) => {
                 buffer.push_str("slc");
-                write!(buffer, " {:<width$}#{}", " ", handle.0, width = 4).expect(WRITE_FMT_MSG);
+                write!(buffer, " {:<width$}#{}", " ", slot.0, width = 4).expect(WRITE_FMT_MSG);
+            }
+            Opcode::JumpIfFalse(offset) => {
+                buffer.push_str("jif");
+                write!(buffer, " {:<width$}v{}", " ", offset.0, width = 4).expect(WRITE_FMT_MSG);
+            }
+            Opcode::Jump(offset) => {
+                buffer.push_str("jpa");
+                write!(buffer, " {:<width$}v{}", " ", offset.0, width = 4).expect(WRITE_FMT_MSG);
             }
             Opcode::Return => buffer.push_str("ret"),
             Opcode::Multiply => buffer.push_str("mul"),

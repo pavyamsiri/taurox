@@ -7,13 +7,13 @@ use crate::parser::expression::{
     InfixOperator, PrefixOperator,
 };
 use crate::parser::statement::{
-    BlockStatement, ExpressionStatement, PrintStatement, Statement, VariableDecl,
+    BlockStatement, ExpressionStatement, IfStatement, PrintStatement, Statement, VariableDecl,
 };
 use crate::resolver::ResolvedProgram;
 use crate::string::{Ident, IdentName, InternStringHandle, StringInterner};
 pub use constant::{ConstRef, ConstantPool, LoxConstant};
-use opcode::StackSlot;
 pub use opcode::{DecodeError, Opcode};
+use opcode::{InstructionOffset, StackSlot};
 use std::fmt::Write;
 use std::sync::Arc;
 
@@ -176,6 +176,39 @@ impl<'src> IncompleteChunk<'src> {
         Opcode::SetLocal(slot).encode(self);
     }
 
+    pub fn emit_unpatched_jump(&mut self, span: Span, conditional: bool) -> usize {
+        let instruction_start = self.data.len();
+        self.starts.push(instruction_start);
+        self.spans.push(span);
+        if conditional {
+            Opcode::JumpIfFalse(InstructionOffset(0xDEADBEEF)).encode(self);
+        } else {
+            Opcode::Jump(InstructionOffset(0xDEADBEEF)).encode(self);
+        }
+        instruction_start
+    }
+
+    // This function is a bit error prone so we probably should make better named errors.
+    pub fn patch_jump(&mut self, start: usize) -> Result<(), ()> {
+        let offset = (self.data.len() - start) as u32;
+        let [first, second, third, fourth] = offset.to_le_bytes();
+        let opcode = self.data.get(start).ok_or(())?;
+        // Make sure that the patch actually applies to a jump
+        if opcode != &Opcode::C_JUMP_IF_FALSE && opcode != &Opcode::C_JUMP {
+            return Err(());
+        }
+        // Make sure that we can write the bytes i.e. the instruction stream is large enough
+        if start + 4 >= self.data.len() {
+            return Err(());
+        }
+
+        *self.data.get_mut(start + 1).ok_or(())? = first;
+        *self.data.get_mut(start + 2).ok_or(())? = second;
+        *self.data.get_mut(start + 3).ok_or(())? = third;
+        *self.data.get_mut(start + 4).ok_or(())? = fourth;
+
+        Ok(())
+    }
     pub fn finish(self) -> Chunk<'src> {
         Chunk {
             name: self.name,
@@ -395,7 +428,7 @@ impl Compiler {
             Statement::Expression(stmt) => self.compile_expression_stmt(program, chunk, stmt),
             Statement::Print(stmt) => self.compile_print_stmt(program, chunk, stmt),
             Statement::Block(stmt) => self.compile_block_stmt(program, chunk, stmt),
-            Statement::If(_) => todo!(),
+            Statement::If(stmt) => self.compile_if_stmt(program, chunk, stmt),
             Statement::While(_) => todo!(),
             Statement::For(_) => todo!(),
             Statement::Return(_) => todo!(),
@@ -463,6 +496,44 @@ impl Compiler {
         for _ in 0..to_pop {
             chunk.emit_pop(block.span);
         }
+    }
+
+    fn compile_if_stmt(
+        &mut self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        stmt: &IfStatement,
+    ) {
+        // Condition
+        self.compile_expression(program, chunk, &stmt.condition);
+
+        // Emit unpatched jump
+        let then_jump = chunk.emit_unpatched_jump(stmt.span, true);
+        chunk.emit_pop(stmt.span);
+
+        // Compile then statement
+        let then_stmt = program
+            .get_statement(stmt.success)
+            .expect("[Compile If]: All handles are valid.");
+        self.compile_stmt(program, chunk, then_stmt);
+
+        let else_jump = chunk.emit_unpatched_jump(stmt.span, false);
+        // Patch then jump
+        chunk
+            .patch_jump(then_jump)
+            .expect("[Compile If]: Failed to patch then jump.");
+
+        // Handle else
+        chunk.emit_pop(stmt.span);
+        if let Some(failure) = stmt.failure {
+            let else_stmt = program
+                .get_statement(failure)
+                .expect("[Compile If]: All handles are valid.");
+            self.compile_stmt(program, chunk, else_stmt);
+        }
+        chunk
+            .patch_jump(else_jump)
+            .expect("[Compile If]: Failed to patch else jump.");
     }
 }
 
