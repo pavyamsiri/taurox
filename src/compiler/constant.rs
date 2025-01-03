@@ -1,6 +1,6 @@
 use crate::{
     machine::value::VMValue,
-    string::{InternStringHandle, StringInterner},
+    string::{InternSymbol, StringInterner},
     value::LoxValue,
 };
 use std::fmt::Write;
@@ -16,7 +16,7 @@ pub enum LoxConstant {
     Number(f64),
     Nil,
     Bool(bool),
-    String(InternStringHandle),
+    String(InternSymbol),
 }
 
 impl std::fmt::Display for LoxConstant {
@@ -78,7 +78,7 @@ impl ConstantPool {
         }
     }
 
-    pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
+    pub fn get_string(&self, handle: InternSymbol) -> Option<&str> {
         self.interned_strings.get_string(handle)
     }
 

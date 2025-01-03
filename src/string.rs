@@ -20,14 +20,14 @@ impl std::fmt::Display for Ident {
 pub type IdentName = Rc<str>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct InternStringHandle {
+pub struct InternSymbol {
     start: u32,
     length: u32,
 }
 
 #[derive(Debug)]
 pub struct StringInterner {
-    handles: HashMap<u64, InternStringHandle>,
+    handles: HashMap<u64, InternSymbol>,
     buffer: String,
 }
 
@@ -45,7 +45,7 @@ impl StringInterner {
         hasher.finish()
     }
 
-    pub fn intern(&mut self, text: &str) -> InternStringHandle {
+    pub fn intern(&mut self, text: &str) -> InternSymbol {
         let key = Self::hash_string(text);
         if let Some(handle) = self.handles.get(&key) {
             *handle
@@ -53,14 +53,14 @@ impl StringInterner {
             // Intern string
             let start = self.buffer.len() as u32;
             let length = text.len() as u32;
-            let handle = InternStringHandle { start, length };
+            let handle = InternSymbol { start, length };
             self.buffer.push_str(text);
             self.handles.insert(key, handle);
             handle
         }
     }
 
-    pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
+    pub fn get_string(&self, handle: InternSymbol) -> Option<&str> {
         let start = (handle.start) as usize;
         let end = start + (handle.length as usize);
         self.buffer.get(start..end)

@@ -6,7 +6,7 @@ use crate::{
     compiler::{Chunk, Compiler, LoxConstant, Opcode},
     interpreter::SystemContext,
     resolver::ResolvedProgram,
-    string::{InternStringHandle, StringInterner},
+    string::{InternSymbol, StringInterner},
 };
 use error::{VMError, VMRuntimeError, VMRuntimeErrorKind};
 use garbage::VMObjectAllocator;
@@ -22,7 +22,7 @@ pub struct VirtualMachine<C: SystemContext> {
     context: C,
 
     // Globals
-    globals: HashMap<InternStringHandle, VMValue>,
+    globals: HashMap<InternSymbol, VMValue>,
     interner: StringInterner,
 
     // Allocators

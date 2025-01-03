@@ -11,7 +11,7 @@ use crate::parser::statement::{
     PrintStatement, Statement, VariableDecl, WhileStatement,
 };
 use crate::resolver::ResolvedProgram;
-use crate::string::{Ident, IdentName, InternStringHandle, StringInterner};
+use crate::string::{Ident, IdentName, InternSymbol, StringInterner};
 pub use constant::{ConstRef, ConstantPool, LoxConstant};
 pub use opcode::{DecodeError, Opcode};
 use opcode::{InstructionOffset, StackSlot};
@@ -326,7 +326,7 @@ impl Chunk {
         self.constants.get_string_through_ref(handle)
     }
 
-    pub fn get_string(&self, handle: InternStringHandle) -> Option<&str> {
+    pub fn get_string(&self, handle: InternSymbol) -> Option<&str> {
         self.constants.get_string(handle)
     }
 
@@ -376,7 +376,7 @@ impl Chunk {
 }
 
 struct Local {
-    name: InternStringHandle,
+    name: InternSymbol,
     depth: usize,
 }
 
