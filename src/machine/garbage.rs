@@ -30,6 +30,18 @@ pub struct VMObjectRef<T> {
     _marker: std::marker::PhantomData<T>,
 }
 
+impl<T> std::fmt::Display for VMObjectRef<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let type_name = std::any::type_name::<T>();
+        let short_name = type_name.split("::").last().unwrap_or(type_name);
+        write!(
+            f,
+            "VMObjectRef<{}> {{ index: {}, generation: {} }}",
+            short_name, self.index, self.generation
+        )
+    }
+}
+
 impl<T> Clone for VMObjectRef<T> {
     fn clone(&self) -> Self {
         *self
@@ -133,6 +145,8 @@ impl<T> VMObjectAllocator<T> {
 
     pub fn mark(&mut self, handles: &[VMObjectRef<T>]) {
         self.verify_integrity();
+
+        let previous_markers = self.markers.clone();
         // Mark everything as dead
         self.markers.iter_mut().for_each(|m| {
             *m = false;
@@ -150,6 +164,17 @@ impl<T> VMObjectAllocator<T> {
                 "[Mark]: This handle was verified as valid when it indexed the generations.",
             ) = true;
         }
+
+        // Bump up generation for all dead
+        self.markers
+            .iter()
+            .zip(previous_markers.into_iter())
+            .zip(self.generation.iter_mut())
+            .for_each(|((current_alive, previous_alive), generation)| {
+                if previous_alive && !current_alive {
+                    *generation += 1;
+                }
+            });
     }
 
     fn verify_integrity(&self) {

@@ -24,8 +24,8 @@ impl std::fmt::Display for VMValue {
             Self::Number(v) => write!(f, "{v}"),
             Self::Nil => write!(f, "nil"),
             Self::Bool(v) => write!(f, "{v}"),
-            Self::String(v) => write!(f, "<string ref {v:?}>"),
-            Self::Function(v) => write!(f, "<function ref {v:?}>"),
+            Self::String(v) => write!(f, "{v}"),
+            Self::Function(v) => write!(f, "{v}"),
         }
     }
 }
