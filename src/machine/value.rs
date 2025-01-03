@@ -1,11 +1,11 @@
-use super::{error::VMRuntimeErrorKind, garbage::VMStringRef};
+use super::{error::VMRuntimeErrorKind, garbage::VMObjectRef};
 
 #[derive(Debug, Clone)]
 pub enum VMValue {
     Number(f64),
     Nil,
     Bool(bool),
-    String(VMStringRef),
+    String(VMObjectRef<String>),
 }
 
 impl std::fmt::Display for VMValue {

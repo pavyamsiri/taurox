@@ -9,7 +9,7 @@ use crate::{
     string::{InternStringHandle, StringInterner},
 };
 use error::{VMError, VMRuntimeError, VMRuntimeErrorKind};
-use garbage::StringAllocator;
+use garbage::VMObjectAllocator;
 use std::{collections::HashMap, fmt::Write};
 use value::VMValue;
 
@@ -26,7 +26,7 @@ pub struct VirtualMachine<C: SystemContext> {
     interner: StringInterner,
 
     // Allocators
-    string_allocator: StringAllocator,
+    string_allocator: VMObjectAllocator<String>,
 }
 
 impl<C> VirtualMachine<C>
@@ -38,7 +38,7 @@ where
             ip: 0,
             context,
             stack: Vec::new(),
-            string_allocator: StringAllocator::new(),
+            string_allocator: VMObjectAllocator::new(),
             globals: HashMap::new(),
             interner: StringInterner::new(),
         }
@@ -296,7 +296,7 @@ where
                     .get(*rhs)
                     .expect("Invalid string ref?");
                 let value = format!("{lhs}{rhs}");
-                let handle = self.string_allocator.allocate(&value);
+                let handle = self.string_allocator.allocate(value);
                 Ok(VMValue::String(handle))
             }
             (lhs, rhs) => Err(VMRuntimeErrorKind::NonAddable(lhs.clone(), rhs.clone())),
@@ -338,7 +338,7 @@ where
                 let value = chunk
                     .get_string(*handle)
                     .expect("String constants should have valid intern string handles.");
-                let new_handle = self.string_allocator.allocate(value);
+                let new_handle = self.string_allocator.allocate_from_ref(value);
                 VMValue::String(new_handle)
             }
         }
@@ -396,6 +396,7 @@ where
                 let value = self
                     .string_allocator
                     .debug_get(*handle)
+                    .map(|s| s.as_str())
                     .unwrap_or("INVALID_STRING_HANDLE");
                 write!(buffer, "\"{value}\"").expect(WRITE_FMT_MSG);
             }
@@ -411,6 +412,7 @@ where
                 let value = self
                     .string_allocator
                     .get(*handle)
+                    .map(|s| s.as_str())
                     .unwrap_or("INVALID_STRING_HANDLE");
                 write!(buffer, "{value}").expect(WRITE_FMT_MSG);
             }

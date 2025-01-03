@@ -1,35 +1,44 @@
-#[derive(Debug, Clone, Copy)]
-pub struct VMStringRef {
-    index: u32,
-    generation: u32,
-}
-
-pub struct StringAllocator {
-    data: Vec<String>,
+pub struct VMObjectAllocator<T> {
+    data: Vec<T>,
     markers: Vec<bool>,
     generation: Vec<u32>,
 }
 
-pub struct StringAllocatorIterator<'a> {
-    strings: &'a [String],
+pub struct VMObjectAllocatorIterator<'a, T> {
+    objects: &'a [T],
     markers: &'a [bool],
     generation: &'a [u32],
     index: usize,
 }
 
-impl<'a> std::iter::Iterator for StringAllocatorIterator<'a> {
-    type Item = (&'a str, bool, u32);
+impl<'a, T> std::iter::Iterator for VMObjectAllocatorIterator<'a, T> {
+    type Item = (&'a T, bool, u32);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let string = self.strings.get(self.index)?;
+        let object = self.objects.get(self.index)?;
         let marker = self.markers.get(self.index)?;
         let generation = self.generation.get(self.index)?;
         self.index += 1;
-        Some((string, *marker, *generation))
+        Some((object, *marker, *generation))
     }
 }
 
-impl StringAllocator {
+#[derive(Debug)]
+pub struct VMObjectRef<T> {
+    index: u32,
+    generation: u32,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> Clone for VMObjectRef<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for VMObjectRef<T> {}
+
+impl<T> VMObjectAllocator<T> {
     pub fn new() -> Self {
         Self {
             data: Vec::new(),
@@ -38,16 +47,17 @@ impl StringAllocator {
         }
     }
 
-    pub fn iter<'a>(&'a self) -> StringAllocatorIterator<'a> {
-        StringAllocatorIterator {
-            strings: &self.data,
+    pub fn iter<'a>(&'a self) -> VMObjectAllocatorIterator<'a, T> {
+        self.verify_integrity();
+        VMObjectAllocatorIterator {
+            objects: &self.data,
             markers: &self.markers,
             generation: &self.generation,
             index: 0,
         }
     }
 
-    pub fn allocate(&mut self, text: &str) -> VMStringRef {
+    pub fn allocate(&mut self, object: T) -> VMObjectRef<T> {
         const MSG: &'static str = "All string allocator arrays should have the same length.";
         self.verify_integrity();
 
@@ -55,29 +65,31 @@ impl StringAllocator {
         match self.markers.iter().enumerate().find(|&(_, &v)| !v) {
             Some((index, _)) => {
                 let generation = *self.generation.get(index).expect(MSG);
-                // Allocate string
-                *self.data.get_mut(index).expect(MSG) = text.to_string();
+                // Allocate object
+                *self.data.get_mut(index).expect(MSG) = object;
 
-                VMStringRef {
+                VMObjectRef {
                     index: index as u32,
                     generation,
+                    _marker: std::marker::PhantomData,
                 }
             }
             None => {
                 // Allocate new data
-                self.data.push(text.to_string());
+                self.data.push(object);
                 self.markers.push(true);
                 self.generation.push(0);
 
-                VMStringRef {
+                VMObjectRef {
                     index: (self.data.len() - 1) as u32,
                     generation: 0,
+                    _marker: std::marker::PhantomData,
                 }
             }
         }
     }
 
-    pub fn get(&self, handle: VMStringRef) -> Option<&str> {
+    pub fn get(&self, handle: VMObjectRef<T>) -> Option<&T> {
         const MSG: &'static str = "All string allocator arrays should have the same length.";
         self.verify_integrity();
 
@@ -97,13 +109,13 @@ impl StringAllocator {
         Some(value)
     }
 
-    pub fn debug_get(&self, handle: VMStringRef) -> Option<&str> {
+    pub fn debug_get(&self, handle: VMObjectRef<T>) -> Option<&T> {
         const MSG: &'static str = "All string allocator arrays should have the same length.";
         self.verify_integrity();
         let value = self.data.get(handle.index as usize).expect(MSG);
         Some(value)
     }
-    pub fn mark(&mut self, handles: &[VMStringRef]) {
+    pub fn mark(&mut self, handles: &[VMObjectRef<T>]) {
         self.verify_integrity();
         // Mark everything as dead
         self.markers.iter_mut().for_each(|m| {
@@ -135,5 +147,12 @@ impl StringAllocator {
             self.generation.len(),
             "Data, markers and generation should have same length."
         );
+    }
+}
+
+impl VMObjectAllocator<String> {
+    pub fn allocate_from_ref(&mut self, object: &str) -> VMObjectRef<String> {
+        let object = object.to_owned();
+        self.allocate(object)
     }
 }
