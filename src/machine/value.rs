@@ -4,9 +4,9 @@ use super::{error::VMRuntimeErrorKind, garbage::VMObjectRef};
 
 #[derive(Debug)]
 pub struct VMFunction {
-    name: VMObjectRef<String>,
-    chunk: Chunk,
-    arity: usize,
+    pub name: VMObjectRef<String>,
+    pub chunk: Chunk,
+    pub arity: u32,
 }
 
 #[derive(Debug, Clone)]

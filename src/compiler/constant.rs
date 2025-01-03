@@ -1,22 +1,40 @@
-use crate::{
-    machine::value::VMValue,
-    string::{InternSymbol, StringInterner},
-    value::LoxValue,
-};
+use super::Chunk;
+use crate::string::{InternSymbol, StringInterner};
 use std::fmt::Write;
 
 const WRITE_FMT_MSG: &'static str =
     "Encountered an error while attempting to write format string to buffer.";
 
+#[derive(Debug, Clone)]
+pub struct FunctionConstant {
+    // TODO(pavyamsiri): Seems a bit dumb to copy a chunk around, each chunk should be allocated into a pool.
+    pub name: InternSymbol,
+    pub chunk: Chunk,
+    pub arity: u32,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ConstRef(pub u32);
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum LoxConstant {
     Number(f64),
     Nil,
     Bool(bool),
     String(InternSymbol),
+    Function(FunctionConstant),
+}
+
+impl std::cmp::PartialEq for LoxConstant {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (LoxConstant::Nil, LoxConstant::Nil) => true,
+            (LoxConstant::Number(lhs), LoxConstant::Number(rhs)) => lhs == rhs,
+            (LoxConstant::Bool(lhs), LoxConstant::Bool(rhs)) => lhs == rhs,
+            (LoxConstant::String(lhs), LoxConstant::String(rhs)) => lhs == rhs,
+            _ => false,
+        }
+    }
 }
 
 impl std::fmt::Display for LoxConstant {
@@ -26,33 +44,12 @@ impl std::fmt::Display for LoxConstant {
             LoxConstant::Nil => write!(f, "nil"),
             LoxConstant::Bool(value) => write!(f, "{value}"),
             LoxConstant::String(_) => write!(f, "Interned String"),
+            LoxConstant::Function(_) => write!(f, "Function"),
         }
     }
 }
 
-impl From<&LoxConstant> for LoxValue {
-    fn from(value: &LoxConstant) -> Self {
-        match value {
-            LoxConstant::Number(value) => Self::Number(*value),
-            LoxConstant::Nil => Self::Nil,
-            LoxConstant::Bool(value) => Self::Bool(*value),
-            LoxConstant::String(_) => todo!(),
-        }
-    }
-}
-
-impl From<&LoxConstant> for VMValue {
-    fn from(value: &LoxConstant) -> Self {
-        match value {
-            LoxConstant::Number(value) => Self::Number(*value),
-            LoxConstant::Nil => Self::Nil,
-            LoxConstant::Bool(value) => Self::Bool(*value),
-            LoxConstant::String(_) => todo!(),
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ConstantPool {
     data: Vec<LoxConstant>,
     interned_strings: StringInterner,

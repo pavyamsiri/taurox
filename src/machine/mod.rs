@@ -11,7 +11,7 @@ use crate::{
 use error::{VMError, VMRuntimeError, VMRuntimeErrorKind};
 use garbage::VMObjectAllocator;
 use std::{collections::HashMap, fmt::Write};
-use value::VMValue;
+use value::{VMFunction, VMValue};
 
 const WRITE_FMT_MSG: &'static str =
     "Encountered an error while attempting to write format string to buffer.";
@@ -27,6 +27,7 @@ pub struct VirtualMachine<C: SystemContext> {
 
     // Allocators
     string_allocator: VMObjectAllocator<String>,
+    function_allocator: VMObjectAllocator<VMFunction>,
 }
 
 impl<C> VirtualMachine<C>
@@ -38,9 +39,11 @@ where
             ip: 0,
             context,
             stack: Vec::new(),
-            string_allocator: VMObjectAllocator::new(),
             globals: HashMap::new(),
             interner: StringInterner::new(),
+            // Allocator
+            string_allocator: VMObjectAllocator::new(),
+            function_allocator: VMObjectAllocator::new(),
         }
     }
 
@@ -346,6 +349,20 @@ where
                     .expect("String constants should have valid intern string handles.");
                 let new_handle = self.string_allocator.allocate_from_ref(value);
                 VMValue::String(new_handle)
+            }
+            LoxConstant::Function(func) => {
+                let name = chunk
+                    .get_string(func.name)
+                    .expect("String constants should have valid intern string handles.");
+                let new_name = self.string_allocator.allocate_from_ref(name);
+                let new_func = VMFunction {
+                    name: new_name,
+                    // TODO(pavyamsiri): This is gross :|
+                    chunk: func.chunk.clone(),
+                    arity: func.arity,
+                };
+                let new_handle = self.function_allocator.allocate(new_func);
+                VMValue::Function(new_handle)
             }
         }
     }

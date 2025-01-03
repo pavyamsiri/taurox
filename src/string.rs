@@ -25,7 +25,7 @@ pub struct InternSymbol {
     length: u32,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct StringInterner {
     handles: HashMap<u64, InternSymbol>,
     buffer: String,
