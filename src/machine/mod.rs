@@ -213,12 +213,18 @@ where
                 Opcode::JumpIfFalse(offset) => {
                     let flag = self.peek()?.is_truthy();
                     if !flag {
-                        self.ip += offset.0 as usize;
+                        self.ip = self
+                            .ip
+                            .checked_add_signed(offset.0 as isize)
+                            .expect("jif caused overflow");
                         continue;
                     }
                 }
                 Opcode::Jump(offset) => {
-                    self.ip += offset.0 as usize;
+                    self.ip = self
+                        .ip
+                        .checked_add_signed(offset.0 as isize)
+                        .expect("jpa caused overflow");
                     continue;
                 }
             }

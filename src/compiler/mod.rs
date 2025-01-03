@@ -7,7 +7,8 @@ use crate::parser::expression::{
     InfixOperator, InfixShortCircuitOperator, PrefixOperator,
 };
 use crate::parser::statement::{
-    BlockStatement, ExpressionStatement, IfStatement, PrintStatement, Statement, VariableDecl,
+    BlockStatement, ExpressionStatement, IfStatement, NonDeclaration, PrintStatement, Statement,
+    VariableDecl, WhileStatement,
 };
 use crate::resolver::ResolvedProgram;
 use crate::string::{Ident, IdentName, InternStringHandle, StringInterner};
@@ -49,6 +50,15 @@ impl<'src> IncompleteChunk<'src> {
     }
 
     pub fn emit_u32(&mut self, value: u32) {
+        // Little endian
+        let [first, second, third, fourth] = value.to_le_bytes();
+        self.data.push(first);
+        self.data.push(second);
+        self.data.push(third);
+        self.data.push(fourth);
+    }
+
+    pub fn emit_i32(&mut self, value: i32) {
         // Little endian
         let [first, second, third, fourth] = value.to_le_bytes();
         self.data.push(first);
@@ -177,14 +187,23 @@ impl<'src> IncompleteChunk<'src> {
     }
 
     pub fn emit_unpatched_jump(&mut self, span: Span, conditional: bool) -> usize {
+        const DEFAULT_OFFSET: i32 = -0xD0128;
         let instruction_start = self.data.len();
         self.starts.push(instruction_start);
         self.spans.push(span);
         if conditional {
-            Opcode::JumpIfFalse(InstructionOffset(0xDEADBEEF)).encode(self);
+            Opcode::JumpIfFalse(InstructionOffset(DEFAULT_OFFSET)).encode(self);
         } else {
-            Opcode::Jump(InstructionOffset(0xDEADBEEF)).encode(self);
+            Opcode::Jump(InstructionOffset(DEFAULT_OFFSET)).encode(self);
         }
+        instruction_start
+    }
+
+    pub fn emit_jump(&mut self, span: Span, offset: i32) -> usize {
+        let instruction_start = self.data.len();
+        self.starts.push(instruction_start);
+        self.spans.push(span);
+        Opcode::Jump(InstructionOffset(offset)).encode(self);
         instruction_start
     }
 
@@ -209,6 +228,11 @@ impl<'src> IncompleteChunk<'src> {
 
         Ok(())
     }
+
+    pub fn get_label(&self) -> usize {
+        self.data.len()
+    }
+
     pub fn finish(self) -> Chunk<'src> {
         Chunk {
             name: self.name,
@@ -429,12 +453,28 @@ impl Compiler {
             Statement::Print(stmt) => self.compile_print_stmt(program, chunk, stmt),
             Statement::Block(stmt) => self.compile_block_stmt(program, chunk, stmt),
             Statement::If(stmt) => self.compile_if_stmt(program, chunk, stmt),
-            Statement::While(_) => todo!(),
+            Statement::While(stmt) => self.compile_while_stmt(program, chunk, stmt),
             Statement::For(_) => todo!(),
             Statement::Return(_) => todo!(),
         }
     }
 
+    fn compile_non_declaration<'stmt>(
+        &mut self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        stmt: NonDeclaration<'stmt>,
+    ) {
+        match stmt {
+            NonDeclaration::Expression(stmt) => self.compile_expression_stmt(program, chunk, stmt),
+            NonDeclaration::Print(stmt) => self.compile_print_stmt(program, chunk, stmt),
+            NonDeclaration::Block(stmt) => self.compile_block_stmt(program, chunk, stmt),
+            NonDeclaration::If(stmt) => self.compile_if_stmt(program, chunk, stmt),
+            NonDeclaration::While(stmt) => self.compile_while_stmt(program, chunk, stmt),
+            NonDeclaration::For(_) => todo!(),
+            NonDeclaration::Return(_) => todo!(),
+        }
+    }
     fn compile_variable_decl(
         &mut self,
         program: &ResolvedProgram,
@@ -534,6 +574,36 @@ impl Compiler {
         chunk
             .patch_jump(else_jump)
             .expect("[Compile If]: Failed to patch else jump.");
+    }
+
+    fn compile_while_stmt(
+        &mut self,
+        program: &ResolvedProgram,
+        chunk: &mut IncompleteChunk,
+        stmt: &WhileStatement,
+    ) {
+        let condition_label = chunk.get_label();
+        // Condition
+        self.compile_expression(program, chunk, &stmt.condition);
+
+        // Emit unpatched jump
+        let exit_jump = chunk.emit_unpatched_jump(stmt.span, true);
+        chunk.emit_pop(stmt.span);
+
+        // Compile body
+        let body_stmt = program
+            .get_non_declaration(stmt.body)
+            .expect("[Compile While]: All handles are valid.");
+        self.compile_non_declaration(program, chunk, body_stmt);
+
+        // Set up loop
+        let offset = (chunk.get_label() - condition_label) as i32;
+        chunk.emit_jump(stmt.span, -offset);
+
+        chunk
+            .patch_jump(exit_jump)
+            .expect("[Compile While]: Failed to patch exit jump.");
+        chunk.emit_pop(stmt.span);
     }
 }
 

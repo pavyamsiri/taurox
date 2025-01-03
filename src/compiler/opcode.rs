@@ -17,7 +17,7 @@ pub enum DecodeError {
 #[derive(Debug, Clone, Copy)]
 pub struct StackSlot(pub u32);
 #[derive(Debug, Clone, Copy)]
-pub struct InstructionOffset(pub u32);
+pub struct InstructionOffset(pub i32);
 
 #[derive(Debug, Clone, Copy)]
 pub enum Opcode {
@@ -79,6 +79,14 @@ impl Opcode {
             Ok(u32::from_le_bytes([*first, *second, *third, *fourth]))
         };
 
+        let parse_i32 = |code: u8| -> Result<i32, DecodeError> {
+            let handle_bytes = &data[index + 1..(index + 5)];
+            let [first, second, third, fourth] = handle_bytes else {
+                return Err(DecodeError::IncompleteOperand { opcode: code });
+            };
+            Ok(i32::from_le_bytes([*first, *second, *third, *fourth]))
+        };
+
         let (opcode, rest) = match *first {
             Opcode::C_CONST => {
                 let handle = parse_u32(Opcode::C_CONST)?;
@@ -105,11 +113,11 @@ impl Opcode {
                 (Opcode::SetLocal(StackSlot(slot)), index + 5)
             }
             Opcode::C_JUMP_IF_FALSE => {
-                let slot = parse_u32(Opcode::C_JUMP_IF_FALSE)?;
+                let slot = parse_i32(Opcode::C_JUMP_IF_FALSE)?;
                 (Opcode::JumpIfFalse(InstructionOffset(slot)), index + 5)
             }
             Opcode::C_JUMP => {
-                let slot = parse_u32(Opcode::C_JUMP)?;
+                let slot = parse_i32(Opcode::C_JUMP)?;
                 (Opcode::Jump(InstructionOffset(slot)), index + 5)
             }
             Opcode::C_RETURN => (Opcode::Return, index + 1),
@@ -159,11 +167,11 @@ impl Opcode {
             }
             Opcode::JumpIfFalse(offset) => {
                 chunk.emit_u8(Opcode::C_JUMP_IF_FALSE);
-                chunk.emit_u32(offset.0);
+                chunk.emit_i32(offset.0);
             }
             Opcode::Jump(offset) => {
                 chunk.emit_u8(Opcode::C_JUMP);
-                chunk.emit_u32(offset.0);
+                chunk.emit_i32(offset.0);
             }
             Opcode::Return => chunk.emit_u8(Opcode::C_RETURN),
             Opcode::Multiply => chunk.emit_u8(Opcode::C_MULTIPLY),
@@ -212,11 +220,11 @@ impl Opcode {
             }
             Opcode::JumpIfFalse(offset) => {
                 buffer.push_str("jif");
-                write!(buffer, " {:<width$}v{}", " ", offset.0, width = 4).expect(WRITE_FMT_MSG);
+                write!(buffer, " {:<width$}{:+}", " ", offset.0, width = 4).expect(WRITE_FMT_MSG);
             }
             Opcode::Jump(offset) => {
                 buffer.push_str("jpa");
-                write!(buffer, " {:<width$}v{}", " ", offset.0, width = 4).expect(WRITE_FMT_MSG);
+                write!(buffer, " {:<width$}{:+}", " ", offset.0, width = 4).expect(WRITE_FMT_MSG);
             }
             Opcode::Return => buffer.push_str("ret"),
             Opcode::Multiply => buffer.push_str("mul"),
