@@ -74,6 +74,11 @@ where
 {
     fn interpret_chunk(&mut self, chunk: &Chunk) -> Result<(), VMError> {
         loop {
+            // Garbage collection
+            if self.should_collect() {
+                self.trace_stack();
+            }
+
             let (inst, offset, span) = match chunk.decode_at(self.ip) {
                 Ok(Some(v)) => v,
                 Ok(None) => {
@@ -429,7 +434,6 @@ where
     C: SystemContext,
 {
     // Trace stack
-
     fn trace_stack(&mut self) {
         let alive: Vec<_> = self
             .stack
@@ -440,5 +444,9 @@ where
             })
             .collect();
         self.string_allocator.mark(&alive);
+    }
+
+    fn should_collect(&self) -> bool {
+        self.string_allocator.should_collect()
     }
 }

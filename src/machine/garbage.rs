@@ -63,6 +63,15 @@ impl<T> VMObjectAllocator<T> {
         }
     }
 
+    pub fn get_size(&self) -> usize {
+        let num_alive = self.markers.iter().filter(|v| **v).count();
+        num_alive * std::mem::size_of::<T>()
+    }
+
+    pub fn should_collect(&self) -> bool {
+        true
+    }
+
     pub fn allocate(&mut self, object: T) -> VMObjectRef<T> {
         const MSG: &'static str = "All allocator arrays should have the same length.";
         self.verify_integrity();
@@ -121,6 +130,7 @@ impl<T> VMObjectAllocator<T> {
         let value = self.data.get(handle.index as usize).expect(MSG);
         Some(value)
     }
+
     pub fn mark(&mut self, handles: &[VMObjectRef<T>]) {
         self.verify_integrity();
         // Mark everything as dead
