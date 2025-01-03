@@ -4,7 +4,7 @@ mod opcode;
 use crate::lexer::{LineBreaks, Span};
 use crate::parser::expression::{
     Expression, ExpressionAtom, ExpressionAtomKind, ExpressionNode, ExpressionNodeRef,
-    InfixOperator, PrefixOperator,
+    InfixOperator, InfixShortCircuitOperator, PrefixOperator,
 };
 use crate::parser::statement::{
     BlockStatement, ExpressionStatement, IfStatement, PrintStatement, Statement, VariableDecl,
@@ -605,9 +605,37 @@ impl Compiler {
                     chunk.emit_set_global(span, &lhs.name);
                 }
             }
-            ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => {
-                todo!()
-            }
+            ExpressionNode::InfixShortCircuit { operator, lhs, rhs } => match operator {
+                InfixShortCircuitOperator::And => {
+                    self.compile_expression_node(program, chunk, expr, *lhs);
+                    // Skip if already false
+                    let short_circuit_jump = chunk.emit_unpatched_jump(span, true);
+                    chunk.emit_pop(span);
+                    self.compile_expression_node(program, chunk, expr, *rhs);
+                    // Patch jump here
+                    chunk
+                        .patch_jump(short_circuit_jump)
+                        .expect("[Compile And]: Failed to patch short circuit jump.")
+                }
+                InfixShortCircuitOperator::Or => {
+                    self.compile_expression_node(program, chunk, expr, *lhs);
+                    // Jump if false to rhs evaluation
+                    let jump_to_rhs = chunk.emit_unpatched_jump(span, true);
+                    // Otherwise jump past it
+                    let skip_rhs = chunk.emit_unpatched_jump(span, false);
+
+                    // Jump to here to evaluate rhs
+                    chunk
+                        .patch_jump(jump_to_rhs)
+                        .expect("[Compile Or]: Failed to patch jump to RHS evaluation.");
+                    chunk.emit_pop(span);
+                    self.compile_expression_node(program, chunk, expr, *rhs);
+                    // Patch jump here
+                    chunk
+                        .patch_jump(skip_rhs)
+                        .expect("[Compile Or]: Failed to patch jump past RHS evaluation.")
+                }
+            },
             ExpressionNode::Call { callee, arguments } => todo!(),
             ExpressionNode::Get { object, name } => todo!(),
             ExpressionNode::Set {
